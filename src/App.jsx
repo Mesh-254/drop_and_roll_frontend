@@ -1,12 +1,12 @@
 // App.jsx
 import { Routes, Route } from 'react-router-dom'
-import Header from "./components/Header"
-import Hero from "./components/Hero"
-import Services from "./components/Services"
-import About from "./components/About"
-import ContactForm from "./components/ContactForm"
-import Footer from "./components/Footer"
-import AdminDashboard from "./components/AdminDashboard" // 👈 new admin component
+import Header from "./components/common/Header"
+import Hero from "./components/landingPage/Hero"
+import Services from "./components/landingPage/Services"
+import About from "./components/about/About"
+import ContactForm from "./components/contact/ContactForm"
+import Footer from "./components/common/Footer"
+import AdminDashboard from "./components/admin/AdminDashboard" // 👈 new admin component
 import "./App.css"
 
 function HomePage() {

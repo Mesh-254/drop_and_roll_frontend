@@ -4,7 +4,7 @@ import { useState, lazy, Suspense } from "react"
 import { X, Package, FileText, Truck, MapPin, Calculator, Clock, Zap, Calendar } from "lucide-react"
 
 // Lazy load the map component for better performance
-const MapComponent = lazy(() => import("./MapComponent"))
+const MapComponent = lazy(() => import("../map/MapComponent"))
 
 const shipmentTypes = [
   {

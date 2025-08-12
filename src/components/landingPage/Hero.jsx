@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import GetQuoteBook from "./GetQuoteBook"
+import GetQuoteBook from "../quote/GetQuoteBook"
 
 export default function Hero() {
   const [showQuoteModal, setShowQuoteModal] = useState(false)
