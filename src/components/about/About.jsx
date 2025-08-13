@@ -71,13 +71,13 @@ const ValueCard = ({ icon: Icon, title, description, delay }) => {
       transition={{ duration: 0.6, delay }}
       viewport={{ once: true }}
       whileHover={{ scale: 1.05, rotateY: 5 }}
-      className="bg-gradient-to-br from-gray-800 to-gray-900 p-6 rounded-2xl border border-gray-700 hover:border-orange-500/50 transition-all duration-300 group"
+      className="bg-white p-6 rounded-2xl border border-gray-700 hover:border-orange-500/50 transition-all duration-300 group"
     >
       <div className="w-16 h-16 bg-orange-500/10 rounded-full flex items-center justify-center mb-4 group-hover:bg-orange-500/20 transition-colors">
-        <Icon className="w-8 h-8 text-orange-500 group-hover:scale-110 transition-transform" />
+        <Icon className="w-8 h-8 text-orange-800 group-hover:scale-110 transition-transform" />
       </div>
-      <h3 className="text-xl font-bold text-white mb-2 group-hover:text-orange-500 transition-colors">{title}</h3>
-      <p className="text-gray-400 leading-relaxed">{description}</p>
+      <h3 className="text-xl font-bold text-black mb-2 group-hover:text-orange-500 transition-colors">{title}</h3>
+      <p className="text-gray-700 leading-relaxed">{description}</p>
     </motion.div>
   )
 }
