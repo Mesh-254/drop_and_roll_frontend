@@ -1,38 +1,63 @@
 // App.jsx
-import { Routes, Route } from 'react-router-dom'
-import Header from "./components/common/Header"
-import Hero from "./components/landingPage/Hero"
-import Services from "./components/landingPage/Services"
-import About from "./components/about/About"
-import ContactForm from "./components/contact/ContactForm"
-import Footer from "./components/common/Footer"
-import AdminDashboard from "./components/admin/AdminDashboard" // 👈 new admin component
-import "./App.css"
+import { Routes, Route } from "react-router-dom";
+import Header from "./components/common/Header";
+import Hero from "./components/landingPage/Hero";
+import Services from "./components/landingPage/Services";
+import About from "./components/about/About";
+import ContactForm from "./components/contact/ContactForm";
+import Footer from "./components/common/Footer";
+import AdminDashboard from "./components/admin/AdminDashboard";
+import FAQ from "./components/contact/faq";
+import "./App.css";
 
-function HomePage() {
+// Layout for pages with Header and Footer
+function MainLayout({ children }) {
   return (
     <>
       <Header />
-      <main>
-        <Hero />
-        <Services />
-        <About />
-        <ContactForm />
-      </main>
+      <main>{children}</main>
       <Footer />
     </>
-  )
+  );
+}
+
+// HomePage now only includes content, no Header/Footer
+function HomePage() {
+  return (
+    <>
+      <Hero />
+      <Services />
+      <About />
+      <ContactForm />
+    </>
+  );
 }
 
 function App() {
   return (
     <div className="min-h-screen bg-black text-white">
       <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/admin" element={<AdminDashboard />} />
+        <Route
+          path="/"
+          element={
+            <MainLayout>
+              <HomePage />
+            </MainLayout>
+          }
+        />
+        <Route
+          path="/faqs"
+          element={
+            <MainLayout>
+              <FAQ />
+            </MainLayout>
+          }
+        />
+        <Route path="/admin" element={<AdminDashboard />} />{" "}
+        {/* No header/footer for admin */}
       </Routes>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
