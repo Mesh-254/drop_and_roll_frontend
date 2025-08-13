@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
+import GetQuoteBook from "../quote/GetQuoteBook";
+import TrackParcelModal from "../track/TrackParcelModal";
 
 export default function Hero() {
   const [showQuoteModal, setShowQuoteModal] = useState(false);
+  const [showTrackModal, setShowTrackModal] = useState(false);
 
   const handleBookDelivery = () => {
-    alert("Book a Delivery - Redirecting to booking system...");
+    setShowQuoteModal(true);
   };
 
-  const handleContactUs = () => {
-    setShowQuoteModal(true);
+  const handleTracking = () => {
+    setShowTrackModal(true);
   };
 
   return (
@@ -52,28 +55,25 @@ export default function Hero() {
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20">
         <div className="text-center">
-          <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-orange-500 mb-6 leading-tight font-sans tracking-tight">
+          <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-orange-500 mb-6 leading-tight tracking-tight font-montserrat">
             SAME DAY. NEXT DAY
             <br />
             <span className="text-white">NO DELAY</span>
           </h1>
-
-          <p className="text-lg sm:text-xl lg:text-2xl text-gray-200 mb-12 max-w-4xl mx-auto font-sans leading-relaxed">
+          <p className="text-lg sm:text-xl lg:text-2xl text-gray-200 mb-12 max-w-4xl mx-auto font-poppins leading-relaxed">
             Fast, secure, and reliable delivery service with years of logistics
             experience
           </p>
-
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16">
             <button
               onClick={handleBookDelivery}
-              className="bg-orange-500 hover:bg-orange-600 text-black font-bold py-4 px-8 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-orange-500/25 min-w-[200px]"
+              className="bg-orange-500 hover:bg-orange-600 text-black font-bold py-4 px-8 rounded-lg transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-orange-500/25 min-w-[200px] focus:outline-none focus:ring-2 focus:ring-orange-400"
             >
-              <span>Get Quote & Book</span>
+              Get Quote & Book
             </button>
-
             <button
-              onClick={handleContactUs}
-              className="group bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-10 rounded-xl transition-all duration-300 transform hover:scale-105 hover:shadow-2xl hover:shadow-orange-500/25 shadow-lg min-w-[220px] border-2 border-orange-500 hover:border-orange-400 flex items-center justify-center gap-3"
+              onClick={handleTracking}
+              className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-10 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-orange-500/25 shadow-lg min-w-[220px] border-2 border-orange-500 hover:border-orange-400 flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-orange-400"
             >
               <span>Track</span>
               <svg
@@ -91,14 +91,27 @@ export default function Hero() {
               </svg>
             </button>
           </div>
-
-          <div className="absolute bottom- left-1/2 transform -translate-x-1/2 animate-bounce">
+          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 animate-bounce">
             <div className="w-6 h-10 border-2 border-white rounded-full flex justify-center">
               <div className="w-1 h-3 bg-white rounded-full mt-2 animate-pulse"></div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Quote Modal */}
+      {showQuoteModal && (
+        <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center">Loading...</div>}>
+          <GetQuoteBook isOpen={showQuoteModal} onClose={() => setShowQuoteModal(false)} />
+        </Suspense>
+      )}
+
+      {/* Track Parcel Modal */}
+      {showTrackModal && (
+        <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center">Loading...</div>}>
+          <TrackParcelModal isOpen={showTrackModal} onClose={() => setShowTrackModal(false)} />
+        </Suspense>
+      )}
 
       <style jsx>{`
         @keyframes float {
