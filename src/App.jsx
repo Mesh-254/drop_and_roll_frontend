@@ -9,6 +9,7 @@ import Footer from "./components/common/Footer";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import FAQ from "./components/contact/faq";
 import "./App.css";
+import LoginPage from "./components/auth/Login";
 
 // Layout for pages with Header and Footer
 function MainLayout({ children }) {
@@ -53,6 +54,7 @@ function App() {
             </MainLayout>
           }
         />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/admin" element={<AdminDashboard />} />{" "}
         {/* No header/footer for admin */}
       </Routes>
