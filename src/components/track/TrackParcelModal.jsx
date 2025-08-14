@@ -24,7 +24,7 @@ export default function TrackParcelModal({ isOpen, onClose }) {
     return () => clearInterval(interval);
   }, [showMap]);
 
-  const handleTrack = () => {
+  const handleTrackingSubmit = () => {
     if (trackingNumber) {
       setLoading(true);
       setTimeout(() => {
@@ -32,8 +32,12 @@ export default function TrackParcelModal({ isOpen, onClose }) {
         setLoading(false);
         // In production, replace with API call to get real coordinates
       }, 1000); // Simulate API delay
+
+      console.log('Tracking number submited:', trackingNumber)
     }
   };
+
+  
 
   if (!isOpen) return null;
 
@@ -66,7 +70,7 @@ export default function TrackParcelModal({ isOpen, onClose }) {
             </div>
 
             <button
-              onClick={handleTrack}
+              onClick={handleTrackingSubmit}
               disabled={!trackingNumber || loading}
               className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed text-black font-bold py-3 px-6 rounded-lg transition-all duration-300 flex items-center justify-center gap-2"
             >
