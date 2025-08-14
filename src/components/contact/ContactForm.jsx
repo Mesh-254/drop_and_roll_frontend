@@ -1,35 +1,45 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Phone, Mail, MapPin, Twitter, Facebook, Instagram } from "lucide-react"
+import { useState } from "react";
+import {
+  Phone,
+  Mail,
+  MapPin,
+  Facebook,
+  Instagram,
+} from "lucide-react";
+import { FaXTwitter } from "react-icons/fa6";
+
 
 export default function ContactForm() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     message: "",
-  })
+  });
 
   const handleSubmit = (e) => {
-    e.preventDefault()
-    console.log("Form submitted:", formData)
-    alert("Message sent! We'll get back to you soon.")
-    setFormData({ name: "", email: "", message: "" })
-  }
+    e.preventDefault();
+    console.log("Form submitted:", formData);
+    alert("Message sent! We'll get back to you soon.");
+    setFormData({ name: "", email: "", message: "" });
+  };
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
-    })
-  }
+    });
+  };
 
   return (
     <section id="contact" className="bg-black py-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center mb-16">
-          <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">Get In Touch</h2>
+          <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
+            Get In Touch
+          </h2>
           <p className="text-xl text-gray-400 max-w-3xl mx-auto">
             Ready to get started? Contact us today for a personalized quote
           </p>
@@ -38,10 +48,14 @@ export default function ContactForm() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           {/* Contact Form */}
           <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-            <h3 className="text-2xl font-bold text-white mb-6">Send us a Message</h3>
+            <h3 className="text-2xl font-bold text-white mb-6">
+              Send us a Message
+            </h3>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label className="block text-gray-300 font-medium mb-2">Name</label>
+                <label className="block text-gray-300 font-medium mb-2">
+                  Name
+                </label>
                 <input
                   type="text"
                   name="name"
@@ -53,7 +67,9 @@ export default function ContactForm() {
                 />
               </div>
               <div>
-                <label className="block text-gray-300 font-medium mb-2">Email</label>
+                <label className="block text-gray-300 font-medium mb-2">
+                  Email
+                </label>
                 <input
                   type="email"
                   name="email"
@@ -65,7 +81,9 @@ export default function ContactForm() {
                 />
               </div>
               <div>
-                <label className="block text-gray-300 font-medium mb-2">Message</label>
+                <label className="block text-gray-300 font-medium mb-2">
+                  Message
+                </label>
                 <textarea
                   name="message"
                   placeholder="Tell us about your delivery needs..."
@@ -89,7 +107,9 @@ export default function ContactForm() {
           <div className="space-y-8">
             {/* Contact Information */}
             <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-              <h3 className="text-2xl font-bold text-white mb-6">Contact Information</h3>
+              <h3 className="text-2xl font-bold text-white mb-6">
+                Contact Information
+              </h3>
               <div className="space-y-6">
                 <div className="flex items-center space-x-4">
                   <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center">
@@ -115,7 +135,9 @@ export default function ContactForm() {
                   </div>
                   <div>
                     <p className="text-gray-400 text-sm">Address</p>
-                    <p className="text-white font-medium">400 Service St, Suite 1326</p>
+                    <p className="text-white font-medium">
+                      400 Service St, Suite 1326
+                    </p>
                   </div>
                 </div>
 
@@ -124,10 +146,10 @@ export default function ContactForm() {
                   <p className="text-gray-400 text-sm mb-4">Follow Us</p>
                   <div className="flex space-x-4">
                     <a
-                      href="#"
+                      href="https://x.com"
                       className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center hover:bg-orange-600 transition-colors"
                     >
-                      <Twitter className="w-5 h-5 text-black" />
+                      <FaXTwitter className="w-5 h-5 text-black" />
                     </a>
                     <a
                       href="#"
@@ -159,5 +181,5 @@ export default function ContactForm() {
         </div>
       </div>
     </section>
-  )
+  );
 }

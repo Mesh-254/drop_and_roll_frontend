@@ -1,14 +1,16 @@
 "use client"
 
-import { useState, useEffect } from 'react'
-import { Menu, X } from 'lucide-react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { useState, useEffect } from "react"
+import { Menu, X } from "lucide-react"
+import { NavLink, useLocation } from "react-router-dom"
 import TrackParcelModal from "../track/TrackParcelModal"
+import GetQuoteBook from "../quote/GetQuoteBook"
 
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showTrackModal, setShowTrackModal] = useState(false)
+  const [showQuoteModal, setShowQuoteModal] = useState(false)
   const location = useLocation()
 
   useEffect(() => {
@@ -16,8 +18,8 @@ export default function Header() {
       setIsScrolled(window.scrollY > 50)
     }
 
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
+    window.addEventListener("scroll", handleScroll)
+    return () => window.removeEventListener("scroll", handleScroll)
   }, [])
 
   const handleTracking = () => {
@@ -28,21 +30,23 @@ export default function Header() {
     setShowTrackModal(false)
   }
 
-  const handleTrackingSubmit = (trackingNumber) => {
-    // Handle tracking number submission (e.g., API call)
-    console.log('Tracking number submitted:', trackingNumber)
-    handleModalClose() // Close modal after submission
+  const handleBookDelivery = () => {
+    setShowQuoteModal(true)
+  }
+
+  const handleBookDeliveryClose = () => {
+    setShowQuoteModal(false)
   }
 
   const navItems = [
-    { name: 'Home', href: '/' },
-    { name: 'Services', href: '#services' },
+    { name: "Home", href: "/" },
+    { name: "Services", href: "#services" },
     {
-      name: 'Tracking',
+      name: "Tracking",
       onClick: handleTracking, // Trigger modal instead of navigating
     },
-    { name: 'Support', href: '#support' },
-    { name: 'FAQ', href: '/faqs' },
+    { name: "Support", href: "#support" },
+    { name: "FAQ", href: "/faqs" },
   ]
 
   return (
@@ -50,14 +54,14 @@ export default function Header() {
       <header
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           isScrolled
-            ? 'bg-black/95 backdrop-blur-md shadow-lg border-b border-orange-500/20 h-16'
-            : 'bg-transparent h-20'
+            ? "bg-black/95 backdrop-blur-md shadow-lg border-b border-orange-500/20 h-16"
+            : "bg-transparent h-20"
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div
             className={`flex items-center justify-between transition-all duration-300 ${
-              isScrolled ? 'h-16' : 'h-20'
+              isScrolled ? "h-16" : "h-20"
             }`}
           >
             {/* Logo */}
@@ -68,7 +72,7 @@ export default function Header() {
                 </div>
                 <span
                   className={`text-xl font-bold transition-colors duration-300 font-montserrat ${
-                    isScrolled ? 'text-white' : 'text-white'
+                    isScrolled ? "text-white" : "text-white"
                   }`}
                 >
                   Drop & Roll
@@ -82,14 +86,14 @@ export default function Header() {
                 <NavLink
                   key={item.name}
                   to={item.href}
-                  onClick={item.onClick} // Handle click for Tracking
+                  onClick={item.onClick}
                   className={({ isActive }) =>
                     `font-medium transition-all duration-300 relative group ${
-                      isActive
-                        ? 'text-orange-500 font-bold'
+                      isActive && !item.onClick
+                        ? "text-orange-500 font-bold"
                         : isScrolled
-                        ? 'text-white/90 hover:text-orange-500'
-                        : 'text-white/90 hover:text-orange-500'
+                        ? "text-white/90 hover:text-orange-500"
+                        : "text-white/90 hover:text-orange-500"
                     }`
                   }
                 >
@@ -101,7 +105,10 @@ export default function Header() {
 
             {/* CTA Button */}
             <div className="hidden md:flex items-center">
-              <button className="bg-orange-500 hover:bg-orange-600 text-white font-medium px-6 py-2 rounded-full transition-all duration-300 transform hover:scale-105 hover:shadow-orange-500/30">
+              <button
+                className="bg-orange-500 hover:bg-orange-600 text-white font-medium px-6 py-2 rounded-full transition-all duration-300 transform hover:scale-105 hover:shadow-orange-500/30"
+                onClick={handleBookDelivery}
+              >
                 Send an Item
               </button>
             </div>
@@ -110,7 +117,9 @@ export default function Header() {
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className={`md:hidden p-2 rounded-lg transition-all duration-300 transform hover:scale-105 ${
-                isScrolled ? 'text-white hover:text-orange-500' : 'text-white hover:text-orange-500'
+                isScrolled
+                  ? "text-white hover:text-orange-500"
+                  : "text-white hover:text-orange-500"
               }`}
             >
               {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -133,7 +142,7 @@ export default function Header() {
                     }}
                     className={({ isActive }) =>
                       `block px-3 py-2 font-medium transition-all duration-300 hover:text-orange-500 hover:bg-orange-500/10 rounded-md ${
-                        isActive ? 'text-orange-500 font-bold' : 'text-white/90'
+                        isActive && !item.onClick ? "text-orange-500 font-bold" : "text-white/90"
                       }`
                     }
                   >
@@ -141,7 +150,13 @@ export default function Header() {
                   </NavLink>
                 ))}
                 <div className="px-3 py-2">
-                  <button className="w-full bg-orange-500 hover:bg-orange-600 text-white font-medium px-6 py-2 rounded-full transition-all duration-300 transform hover:scale-105">
+                  <button
+                    className="w-full bg-orange-500 hover:bg-orange-600 text-white font-medium px-6 py-2 rounded-full transition-all duration-300 transform hover:scale-105"
+                    onClick={() => {
+                      handleBookDelivery()
+                      setIsMobileMenuOpen(false)
+                    }}
+                  >
                     Send an Item
                   </button>
                 </div>
@@ -152,11 +167,10 @@ export default function Header() {
       </header>
 
       {/* Tracking Modal */}
-      <TrackParcelModal
-        isOpen={showTrackModal}
-        onClose={handleModalClose}
-        onSubmit={handleTrackingSubmit}
-      />
+      <TrackParcelModal isOpen={showTrackModal} onClose={handleModalClose} />
+
+      {/* Quote Modal */}
+      <GetQuoteBook isOpen={showQuoteModal} onClose={handleBookDeliveryClose} />
     </>
   )
 }
