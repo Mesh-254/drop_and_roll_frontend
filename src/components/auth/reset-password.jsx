@@ -66,7 +66,7 @@ export default function ResetPassword() {
       if (formData.confirmPassword) {
         const confirmError = validateConfirmPassword(
           formData.confirmPassword,
-          value
+          value,
         );
         setErrors((prev) => ({ ...prev, confirmPassword: confirmError }));
       }
@@ -84,7 +84,7 @@ export default function ResetPassword() {
     const passwordError = validatePassword(formData.password);
     const confirmPasswordError = validateConfirmPassword(
       formData.confirmPassword,
-      formData.password
+      formData.password,
     );
 
     if (passwordError || confirmPasswordError) {

@@ -127,8 +127,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
 
     try {
       // Real API integration with getaddress.io
-      const API_KEY =
-        import.meta.env.VITE_GETADDRESS_API_KEY || "demo-api-key";
+      const API_KEY = import.meta.env.VITE_GETADDRESS_API_KEY || "demo-api-key";
 
       // First try autocomplete endpoint
       let response = await fetch(
@@ -216,98 +215,101 @@ export default function GetQuoteModal({ isOpen, onClose }) {
     }, 500);
   };
 
- const validateStep = useCallback(
-  (step) => {
-    const errors = {};
+  const validateStep = useCallback(
+    (step) => {
+      const errors = {};
 
-    switch (step) {
-      case 1: {
-        if (!formData.shipmentType)
-          errors.shipmentType = "Please select a shipment type";
-        break;
-      }
-      case 2: {
-        if (!formData.service) errors.service = "Please select a service";
-        break;
-      }
-      case 3: {
-        if (!formData.pickupAddress)
-          errors.pickupAddress = "Please select pickup address";
-        if (!formData.dropoffAddress)
-          errors.dropoffAddress = "Please select dropoff address";
-
-        // Handle both string and object address formats
-        const getAddressString = (address) => {
-          if (typeof address === "string") return address;
-          if (typeof address === "object" && address.formatted_address)
-            return address.formatted_address;
-          if (typeof address === "object" && address.address)
-            return address.address;
-          return "";
-        };
-
-        const pickupStr = getAddressString(formData.pickupAddress).toLowerCase();
-        const dropoffStr = getAddressString(
-          formData.dropoffAddress,
-        ).toLowerCase();
-
-        const isPickupValid =
-          pickupStr.includes("milton keynes") || pickupStr.includes("oxford");
-        const isDropoffValid =
-          dropoffStr.includes("milton keynes") || dropoffStr.includes("oxford");
-
-        if (formData.pickupAddress && !isPickupValid)
-          errors.pickupAddress =
-            "Sorry, this location is not within our operating areas (Milton Keynes or Oxford)";
-        if (formData.dropoffAddress && !isDropoffValid)
-          errors.dropoffAddress =
-            "Sorry, this location is not within our operating areas (Milton Keynes or Oxford)";
-        break;
-      }
-      case 4: {
-        if (!formData.weight || formData.weight <= 0)
-          errors.weight = "Please enter a valid weight";
-        if (
-          formData.shipmentType?.id === "parcels" &&
-          formData.weight > 31.5
-        ) {
-          errors.weight = "Parcels must be 31.5kg or less";
+      switch (step) {
+        case 1: {
+          if (!formData.shipmentType)
+            errors.shipmentType = "Please select a shipment type";
+          break;
         }
-        if (formData.shipmentType?.id === "parcels") {
-          if (!formData.width || formData.width <= 0)
-            errors.width = "Please enter width";
-          if (!formData.length || formData.length <= 0)
-            errors.length = "Please enter length";
+        case 2: {
+          if (!formData.service) errors.service = "Please select a service";
+          break;
+        }
+        case 3: {
+          if (!formData.pickupAddress)
+            errors.pickupAddress = "Please select pickup address";
+          if (!formData.dropoffAddress)
+            errors.dropoffAddress = "Please select dropoff address";
+
+          // Handle both string and object address formats
+          const getAddressString = (address) => {
+            if (typeof address === "string") return address;
+            if (typeof address === "object" && address.formatted_address)
+              return address.formatted_address;
+            if (typeof address === "object" && address.address)
+              return address.address;
+            return "";
+          };
+
+          const pickupStr = getAddressString(
+            formData.pickupAddress,
+          ).toLowerCase();
+          const dropoffStr = getAddressString(
+            formData.dropoffAddress,
+          ).toLowerCase();
+
+          const isPickupValid =
+            pickupStr.includes("milton keynes") || pickupStr.includes("oxford");
+          const isDropoffValid =
+            dropoffStr.includes("milton keynes") ||
+            dropoffStr.includes("oxford");
+
+          if (formData.pickupAddress && !isPickupValid)
+            errors.pickupAddress =
+              "Sorry, this location is not within our operating areas (Milton Keynes or Oxford)";
+          if (formData.dropoffAddress && !isDropoffValid)
+            errors.dropoffAddress =
+              "Sorry, this location is not within our operating areas (Milton Keynes or Oxford)";
+          break;
+        }
+        case 4: {
+          if (!formData.weight || formData.weight <= 0)
+            errors.weight = "Please enter a valid weight";
           if (
-            formData.fragile &&
-            (!formData.height || formData.height <= 0)
+            formData.shipmentType?.id === "parcels" &&
+            formData.weight > 31.5
           ) {
-            errors.height = "Height is required for fragile items";
+            errors.weight = "Parcels must be 31.5kg or less";
           }
+          if (formData.shipmentType?.id === "parcels") {
+            if (!formData.width || formData.width <= 0)
+              errors.width = "Please enter width";
+            if (!formData.length || formData.length <= 0)
+              errors.length = "Please enter length";
+            if (
+              formData.fragile &&
+              (!formData.height || formData.height <= 0)
+            ) {
+              errors.height = "Height is required for fragile items";
+            }
+          }
+          break;
         }
-        break;
-      }
-      case 5: {
-        if (
-          formData.insurance &&
-          (!formData.insuranceAmount ||
-            formData.insuranceAmount < 50 ||
-            formData.insuranceAmount > 5000)
-        ) {
-          errors.insuranceAmount =
-            "Insurance amount must be between $50 and $5000";
+        case 5: {
+          if (
+            formData.insurance &&
+            (!formData.insuranceAmount ||
+              formData.insuranceAmount < 50 ||
+              formData.insuranceAmount > 5000)
+          ) {
+            errors.insuranceAmount =
+              "Insurance amount must be between $50 and $5000";
+          }
+          break;
         }
-        break;
+        default:
+          break;
       }
-      default:
-        break;
-    }
 
-    setValidation(errors);
-    return Object.keys(errors).length === 0;
-  },
-  [formData],
-);
+      setValidation(errors);
+      return Object.keys(errors).length === 0;
+    },
+    [formData],
+  );
 
   const nextStep = useCallback(() => {
     if (validateStep(currentStep)) {

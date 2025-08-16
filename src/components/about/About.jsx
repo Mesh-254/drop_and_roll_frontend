@@ -71,7 +71,7 @@ const FloatingParticles = () => {
 };
 
 // Mission/Values Cards
- 
+
 // eslint-disable-next-line no-unused-vars
 const ValueCard = ({ icon: Icon, title, description, delay }) => {
   return (
