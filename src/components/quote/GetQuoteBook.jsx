@@ -128,13 +128,13 @@ export default function GetQuoteModal({ isOpen, onClose }) {
     try {
       // Real API integration with getaddress.io
       const API_KEY =
-        process.env.NEXT_PUBLIC_GETADDRESS_API_KEY || "demo-api-key";
+        import.meta.env.VITE_GETADDRESS_API_KEY || "demo-api-key";
 
       // First try autocomplete endpoint
       let response = await fetch(
         `https://api.getAddress.io/autocomplete/${encodeURIComponent(
-          postcode
-        )}?api-key=${API_KEY}`
+          postcode,
+        )}?api-key=${API_KEY}`,
       );
 
       if (!response.ok) {
@@ -152,14 +152,14 @@ export default function GetQuoteModal({ isOpen, onClose }) {
         try {
           response = await fetch(
             `https://api.getAddress.io/get/${encodeURIComponent(
-              postcode
-            )}?api-key=${API_KEY}`
+              postcode,
+            )}?api-key=${API_KEY}`,
           );
           if (response.ok) {
             data = await response.json();
             if (data.addresses && data.addresses.length > 0) {
               addresses = data.addresses.map(
-                (addr) => `${addr}, ${postcode.toUpperCase()}`
+                (addr) => `${addr}, ${postcode.toUpperCase()}`,
               );
             }
           }
@@ -216,94 +216,98 @@ export default function GetQuoteModal({ isOpen, onClose }) {
     }, 500);
   };
 
-  const validateStep = useCallback(
-    (step) => {
-      const errors = {};
+ const validateStep = useCallback(
+  (step) => {
+    const errors = {};
 
-      switch (step) {
-        case 1:
-          if (!formData.shipmentType)
-            errors.shipmentType = "Please select a shipment type";
-          break;
-        case 2:
-          if (!formData.service) errors.service = "Please select a service";
-          break;
-        case 3:
-          if (!formData.pickupAddress)
-            errors.pickupAddress = "Please select pickup address";
-          if (!formData.dropoffAddress)
-            errors.dropoffAddress = "Please select dropoff address";
-
-          // Handle both string and object address formats
-          const getAddressString = (address) => {
-            if (typeof address === "string") return address;
-            if (typeof address === "object" && address.formatted_address)
-              return address.formatted_address;
-            if (typeof address === "object" && address.address)
-              return address.address;
-            return "";
-          };
-
-          const pickupStr = getAddressString(
-            formData.pickupAddress
-          ).toLowerCase();
-          const dropoffStr = getAddressString(
-            formData.dropoffAddress
-          ).toLowerCase();
-
-          const isPickupValid =
-            pickupStr.includes("milton keynes") || pickupStr.includes("oxford");
-          const isDropoffValid =
-            dropoffStr.includes("milton keynes") ||
-            dropoffStr.includes("oxford");
-
-          if (formData.pickupAddress && !isPickupValid)
-            errors.pickupAddress =
-              "Sorry, this location is not within our operating areas (Milton Keynes or Oxford)";
-          if (formData.dropoffAddress && !isDropoffValid)
-            errors.dropoffAddress =
-              "Sorry, this location is not within our operating areas (Milton Keynes or Oxford)";
-          break;
-        case 4:
-          if (!formData.weight || formData.weight <= 0)
-            errors.weight = "Please enter a valid weight";
-          if (
-            formData.shipmentType?.id === "parcels" &&
-            formData.weight > 31.5
-          ) {
-            errors.weight = "Parcels must be 31.5kg or less";
-          }
-          if (formData.shipmentType?.id === "parcels") {
-            if (!formData.width || formData.width <= 0)
-              errors.width = "Please enter width";
-            if (!formData.length || formData.length <= 0)
-              errors.length = "Please enter length";
-            if (
-              formData.fragile &&
-              (!formData.height || formData.height <= 0)
-            ) {
-              errors.height = "Height is required for fragile items";
-            }
-          }
-          break;
-        case 5:
-          if (
-            formData.insurance &&
-            (!formData.insuranceAmount ||
-              formData.insuranceAmount < 50 ||
-              formData.insuranceAmount > 5000)
-          ) {
-            errors.insuranceAmount =
-              "Insurance amount must be between $50 and $5000";
-          }
-          break;
+    switch (step) {
+      case 1: {
+        if (!formData.shipmentType)
+          errors.shipmentType = "Please select a shipment type";
+        break;
       }
+      case 2: {
+        if (!formData.service) errors.service = "Please select a service";
+        break;
+      }
+      case 3: {
+        if (!formData.pickupAddress)
+          errors.pickupAddress = "Please select pickup address";
+        if (!formData.dropoffAddress)
+          errors.dropoffAddress = "Please select dropoff address";
 
-      setValidation(errors);
-      return Object.keys(errors).length === 0;
-    },
-    [formData]
-  );
+        // Handle both string and object address formats
+        const getAddressString = (address) => {
+          if (typeof address === "string") return address;
+          if (typeof address === "object" && address.formatted_address)
+            return address.formatted_address;
+          if (typeof address === "object" && address.address)
+            return address.address;
+          return "";
+        };
+
+        const pickupStr = getAddressString(formData.pickupAddress).toLowerCase();
+        const dropoffStr = getAddressString(
+          formData.dropoffAddress,
+        ).toLowerCase();
+
+        const isPickupValid =
+          pickupStr.includes("milton keynes") || pickupStr.includes("oxford");
+        const isDropoffValid =
+          dropoffStr.includes("milton keynes") || dropoffStr.includes("oxford");
+
+        if (formData.pickupAddress && !isPickupValid)
+          errors.pickupAddress =
+            "Sorry, this location is not within our operating areas (Milton Keynes or Oxford)";
+        if (formData.dropoffAddress && !isDropoffValid)
+          errors.dropoffAddress =
+            "Sorry, this location is not within our operating areas (Milton Keynes or Oxford)";
+        break;
+      }
+      case 4: {
+        if (!formData.weight || formData.weight <= 0)
+          errors.weight = "Please enter a valid weight";
+        if (
+          formData.shipmentType?.id === "parcels" &&
+          formData.weight > 31.5
+        ) {
+          errors.weight = "Parcels must be 31.5kg or less";
+        }
+        if (formData.shipmentType?.id === "parcels") {
+          if (!formData.width || formData.width <= 0)
+            errors.width = "Please enter width";
+          if (!formData.length || formData.length <= 0)
+            errors.length = "Please enter length";
+          if (
+            formData.fragile &&
+            (!formData.height || formData.height <= 0)
+          ) {
+            errors.height = "Height is required for fragile items";
+          }
+        }
+        break;
+      }
+      case 5: {
+        if (
+          formData.insurance &&
+          (!formData.insuranceAmount ||
+            formData.insuranceAmount < 50 ||
+            formData.insuranceAmount > 5000)
+        ) {
+          errors.insuranceAmount =
+            "Insurance amount must be between $50 and $5000";
+        }
+        break;
+      }
+      default:
+        break;
+    }
+
+    setValidation(errors);
+    return Object.keys(errors).length === 0;
+  },
+  [formData],
+);
 
   const nextStep = useCallback(() => {
     if (validateStep(currentStep)) {
@@ -341,11 +345,13 @@ export default function GetQuoteModal({ isOpen, onClose }) {
   const checkStepValidity = useCallback(
     (data) => {
       switch (currentStep) {
-        case 1:
+        case 1: {
           return data.shipmentType && data.shipmentType.id;
-        case 2:
+        }
+        case 2: {
           return data.service && data.service.id;
-        case 3:
+        }
+        case 3: {
           // Enhanced address validation
           const getAddressString = (address) => {
             if (typeof address === "string") return address;
@@ -362,7 +368,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
 
           const pickupStr = getAddressString(data.pickupAddress).toLowerCase();
           const dropoffStr = getAddressString(
-            data.dropoffAddress
+            data.dropoffAddress,
           ).toLowerCase();
 
           const hasPickup = data.pickupAddress && pickupStr.length > 0;
@@ -378,7 +384,8 @@ export default function GetQuoteModal({ isOpen, onClose }) {
             dropoffStr.includes("oxford");
 
           return isPickupValid && isDropoffValid;
-        case 4:
+        }
+        case 4: {
           const hasWeight = data.weight && Number.parseFloat(data.weight) > 0;
           if (!hasWeight) return false;
 
@@ -398,17 +405,20 @@ export default function GetQuoteModal({ isOpen, onClose }) {
           }
 
           return true;
-        case 5:
+        }
+        case 5: {
           if (data.insurance) {
             const amount = Number.parseFloat(data.insuranceAmount);
             return amount >= 50 && amount <= 5000;
           }
           return true;
-        default:
+        }
+        default: {
           return false;
+        }
       }
     },
-    [currentStep]
+    [currentStep],
   );
 
   // Auto-focus first input when step changes
@@ -488,7 +498,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
         [type === "pickup" ? "pickupPostcode" : "dropoffPostcode"]: "",
       }));
     },
-    []
+    [],
   );
 
   useEffect(() => {
@@ -513,12 +523,12 @@ export default function GetQuoteModal({ isOpen, onClose }) {
       service?.id === "standard"
         ? 8
         : service?.id === "express"
-        ? 25
-        : service?.id === "business"
-        ? 12
-        : service?.id === "specialized"
-        ? 30
-        : 15;
+          ? 25
+          : service?.id === "business"
+            ? 12
+            : service?.id === "specialized"
+              ? 30
+              : 15;
 
     const weight = Number.parseFloat(formData.weight) || 1;
     const weightMultiplier = weight > 5 ? 1 + (weight - 5) * 0.1 : 1;
@@ -589,8 +599,8 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                       isCompleted
                         ? "bg-green-500 text-white"
                         : isActive
-                        ? "bg-orange-500 text-white"
-                        : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                          ? "bg-orange-500 text-white"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
                     }
                   `}
                   >
@@ -700,7 +710,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                 </div>
                 <button
                   onClick={prevStep}
-                  className="flex items-center text-orange-500 hover:text-orange-600 text-sm font-medium px-4 py-2 border border-orange-500 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="flex items-center text-orange-500 hover:text-orange-600 text-sm font-medium px-4 py-2 border border-orange-500 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
                 >
                   <ChevronLeft size={16} className="mr-1" />
                   Change Type
@@ -896,7 +906,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                               "pickup",
                               manualPickupStreet,
                               manualPickupCity,
-                              manualPickupPostcode
+                              manualPickupPostcode,
                             )
                           }
                           disabled={
@@ -1087,7 +1097,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                               "dropoff",
                               manualDropoffStreet,
                               manualDropoffCity,
-                              manualDropoffPostcode
+                              manualDropoffPostcode,
                             )
                           }
                           disabled={
@@ -1366,7 +1376,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                   </div>
                 </div>
 
-                {process.env.NODE_ENV === "development" && (
+                {import.meta.env.NODE_ENV === "development" && (
                   <div className="text-xs text-gray-500 p-2 bg-gray-100 dark:bg-gray-800 rounded">
                     Debug: Step {currentStep}, Shipment Type:{" "}
                     {formData.shipmentType?.id || "none"}, Fragile:{" "}

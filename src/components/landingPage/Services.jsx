@@ -1,7 +1,8 @@
-"use client"
+"use client";
 
-import { Zap, Clock, Building, Package, CheckCircle } from "lucide-react"
-import { motion } from "framer-motion"
+import { Zap, Clock, Building, Package, CheckCircle } from "lucide-react";
+// eslint-disable-next-line no-unused-vars
+import { motion } from "framer-motion";
 
 const services = [
   {
@@ -64,7 +65,7 @@ const services = [
     price: "From $30",
     action: "Learn More",
   },
-]
+];
 
 export default function Services() {
   return (
@@ -72,7 +73,9 @@ export default function Services() {
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center mb-12">
-          <h2 className="text-4xl lg:text-4 xl font-bold text-white-500 mb-4 font-montserrat">Our Core Service Offerings</h2>
+          <h2 className="text-4xl lg:text-4 xl font-bold text-white-500 mb-4 font-montserrat">
+            Our Core Service Offerings
+          </h2>
           <p className="text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed font-montserrat">
             Tailored delivery solutions for all your shipping needs.
           </p>
@@ -81,7 +84,7 @@ export default function Services() {
         {/* Services Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {services.map((service, index) => {
-            const IconComponent = service.icon
+            const IconComponent = service.icon;
             return (
               <motion.div
                 key={index}
@@ -114,15 +117,22 @@ export default function Services() {
                 </div>
 
                 {/* Service Subtitle */}
-                <p className="text-sm text-gray-400 mb-2 text-center leading-relaxed font-montserrat">{service.subtitle}</p>
+                <p className="text-sm text-gray-400 mb-2 text-center leading-relaxed font-montserrat">
+                  {service.subtitle}
+                </p>
 
                 {/* Service Description */}
-                <p className="text-base text-gray-400 mb-3 text-center leading-relaxed font-montserrat">{service.description}</p>
+                <p className="text-base text-gray-400 mb-3 text-center leading-relaxed font-montserrat">
+                  {service.description}
+                </p>
 
                 {/* Features List */}
                 <ul className="space-y-1.5 mb-4">
                   {service.features.map((feature, featureIndex) => (
-                    <li key={featureIndex} className="text-base text-gray-400 flex items-center leading-6 font-montserrat">
+                    <li
+                      key={featureIndex}
+                      className="text-base text-gray-400 flex items-center leading-6 font-montserrat"
+                    >
                       <feature.icon className="w-4 h-4 text-orange-500 mr-1.5 flex-shrink-0" />
                       {feature.text}
                     </li>
@@ -131,7 +141,9 @@ export default function Services() {
 
                 {/* Price and Action */}
                 <div className="text-center pt-4 border-t border-gray-700">
-                  <span className="text-lg text-orange-500 font-bold font-montserrat">{service.price}</span>
+                  <span className="text-lg text-orange-500 font-bold font-montserrat">
+                    {service.price}
+                  </span>
                   <div className="mt-3">
                     <button className="w-full bg-orange-500/10 text-orange-500 py-1.5 rounded-lg hover:bg-orange-500 hover:text-white transition-colors duration-300 font-semibold text-sm font-montserrat">
                       {service.action}
@@ -139,10 +151,10 @@ export default function Services() {
                   </div>
                 </div>
               </motion.div>
-            )
+            );
           })}
         </div>
       </div>
     </section>
-  )
+  );
 }

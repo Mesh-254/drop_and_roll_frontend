@@ -10,6 +10,9 @@ import AdminDashboard from "./components/admin/AdminDashboard";
 import FAQ from "./components/contact/faq";
 import "./App.css";
 import LoginPage from "./components/auth/Login";
+import ForgotPassword from "./components/auth/forgot-password";
+import CheckEmail from "./components/auth/check-email";
+import ResetPassword from "./components/auth/reset-password";
 
 // Layout for pages with Header and Footer
 function MainLayout({ children }) {
@@ -55,6 +58,9 @@ function App() {
           }
         />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/check-email" element={<CheckEmail />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="/admin" element={<AdminDashboard />} />{" "}
         {/* No header/footer for admin */}
       </Routes>

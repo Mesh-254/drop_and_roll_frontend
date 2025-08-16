@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 export default function Footer() {
   return (
@@ -8,14 +8,18 @@ export default function Footer() {
           {/* Logo and Description */}
           <div className="md:col-span-2">
             <div className="flex items-center space-x-3 mb-4">
-              <img src="/images/logo-clean.jpeg" alt="Drop 'n Roll Logo" className="w-10 h-10 rounded-lg" />
+              <img
+                src="/images/logo-clean.jpeg"
+                alt="Drop 'n Roll Logo"
+                className="w-10 h-10 rounded-lg"
+              />
               <div className="text-white font-bold text-xl">
                 DROP<span className="text-orange-500">'N</span>ROLL
               </div>
             </div>
             <p className="text-gray-400 mb-4 max-w-md">
-              Fast, secure, and reliable delivery service with years of logistics experience. Same day, next day, no
-              delay.
+              Fast, secure, and reliable delivery service with years of
+              logistics experience. Same day, next day, no delay.
             </p>
             <div className="flex space-x-4">
               <div className="text-center">
@@ -38,22 +42,34 @@ export default function Footer() {
             <h3 className="text-white font-semibold mb-4">Quick Links</h3>
             <ul className="space-y-2">
               <li>
-                <a href="#services" className="text-gray-400 hover:text-orange-500 transition-colors">
+                <a
+                  href="#services"
+                  className="text-gray-400 hover:text-orange-500 transition-colors"
+                >
                   Services
                 </a>
               </li>
               <li>
-                <a href="#about" className="text-gray-400 hover:text-orange-500 transition-colors">
+                <a
+                  href="#about"
+                  className="text-gray-400 hover:text-orange-500 transition-colors"
+                >
                   About Us
                 </a>
               </li>
               <li>
-                <a href="#contact" className="text-gray-400 hover:text-orange-500 transition-colors">
+                <a
+                  href="#contact"
+                  className="text-gray-400 hover:text-orange-500 transition-colors"
+                >
                   Contact
                 </a>
               </li>
               <li>
-                <a href="#" className="text-gray-400 hover:text-orange-500 transition-colors">
+                <a
+                  href="#"
+                  className="text-gray-400 hover:text-orange-500 transition-colors"
+                >
                   Track Package
                 </a>
               </li>
@@ -91,5 +107,5 @@ export default function Footer() {
         </div>
       </div>
     </footer>
-  )
+  );
 }

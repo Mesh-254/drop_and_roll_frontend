@@ -1,15 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Phone,
-  Mail,
-  MapPin,
-  Facebook,
-  Instagram,
-} from "lucide-react";
+import { Phone, Mail, MapPin, Facebook, Instagram } from "lucide-react";
 import { FaXTwitter } from "react-icons/fa6";
-
 
 export default function ContactForm() {
   const [formData, setFormData] = useState({

@@ -33,11 +33,9 @@ export default function TrackParcelModal({ isOpen, onClose }) {
         // In production, replace with API call to get real coordinates
       }, 1000); // Simulate API delay
 
-      console.log('Tracking number submited:', trackingNumber)
+      console.log("Tracking number submited:", trackingNumber);
     }
   };
-
-  
 
   if (!isOpen) return null;
 
@@ -59,7 +57,9 @@ export default function TrackParcelModal({ isOpen, onClose }) {
         <div className="p-6">
           <div className="space-y-6">
             <div>
-              <label className="block text-white font-medium mb-2">Tracking Number *</label>
+              <label className="block text-white font-medium mb-2">
+                Tracking Number *
+              </label>
               <input
                 type="text"
                 value={trackingNumber}
@@ -100,7 +100,11 @@ export default function TrackParcelModal({ isOpen, onClose }) {
                     </div>
                   }
                 >
-                  <MapComponent center={mapCoords} zoom={12} marker={mapCoords} />
+                  <MapComponent
+                    center={mapCoords}
+                    zoom={12}
+                    marker={mapCoords}
+                  />
                 </Suspense>
               </div>
             )}

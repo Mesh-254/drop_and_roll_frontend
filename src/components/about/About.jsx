@@ -1,39 +1,47 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef } from "react"
-import { motion, useInView, useAnimation } from "framer-motion"
-import { Heart, Shield, Target, Star, Quote } from "lucide-react"
+import { useState, useEffect, useRef } from "react";
+
+// eslint-disable-next-line no-unused-vars
+import { motion, useInView, useAnimation } from "framer-motion";
+import { Heart, Shield, Target, Star, Quote } from "lucide-react";
 
 // Animated Counter Component
 const AnimatedCounter = ({ end, duration = 2, suffix = "" }) => {
-  const [count, setCount] = useState(0)
-  const countRef = useRef(null)
-  const isInView = useInView(countRef, { once: true })
+  const [count, setCount] = useState(0);
+  const countRef = useRef(null);
+  const isInView = useInView(countRef, { once: true });
 
   useEffect(() => {
     if (isInView) {
-      let startTime = null
+      let startTime = null;
       const animate = (currentTime) => {
-        if (startTime === null) startTime = currentTime
-        const progress = Math.min((currentTime - startTime) / (duration * 1000), 1)
+        if (startTime === null) startTime = currentTime;
+        const progress = Math.min(
+          (currentTime - startTime) / (duration * 1000),
+          1,
+        );
 
-        setCount(Math.floor(progress * end))
+        setCount(Math.floor(progress * end));
 
         if (progress < 1) {
-          requestAnimationFrame(animate)
+          requestAnimationFrame(animate);
         }
-      }
-      requestAnimationFrame(animate)
+      };
+      requestAnimationFrame(animate);
     }
-  }, [isInView, end, duration])
+  }, [isInView, end, duration]);
 
   return (
-    <span ref={countRef} className="text-3xl md:text-4xl font-bold text-orange-500">
+    <span
+      ref={countRef}
+      className="text-3xl md:text-4xl font-bold text-orange-500"
+    >
       {count}
       {suffix}
     </span>
-  )
-}
+  );
+};
 
 // Floating Particles Background
 const FloatingParticles = () => {
@@ -59,10 +67,12 @@ const FloatingParticles = () => {
         />
       ))}
     </div>
-  )
-}
+  );
+};
 
 // Mission/Values Cards
+ 
+// eslint-disable-next-line no-unused-vars
 const ValueCard = ({ icon: Icon, title, description, delay }) => {
   return (
     <motion.div
@@ -76,11 +86,13 @@ const ValueCard = ({ icon: Icon, title, description, delay }) => {
       <div className="w-16 h-16 bg-orange-500/10 rounded-full flex items-center justify-center mb-4 group-hover:bg-orange-500/20 transition-colors">
         <Icon className="w-8 h-8 text-orange-800 group-hover:scale-110 transition-transform" />
       </div>
-      <h3 className="text-xl font-bold text-black mb-2 group-hover:text-orange-500 transition-colors">{title}</h3>
+      <h3 className="text-xl font-bold text-black mb-2 group-hover:text-orange-500 transition-colors">
+        {title}
+      </h3>
       <p className="text-gray-700 leading-relaxed">{description}</p>
     </motion.div>
-  )
-}
+  );
+};
 
 // Team/Fleet Image Card
 const ImageCard = ({ src, alt, caption, delay, className = "" }) => {
@@ -104,19 +116,19 @@ const ImageCard = ({ src, alt, caption, delay, className = "" }) => {
       </div>
       <div className="absolute inset-0 bg-orange-500/0 group-hover:bg-orange-500/10 transition-colors duration-300" />
     </motion.div>
-  )
-}
+  );
+};
 
 export default function About() {
-  const controls = useAnimation()
-  const ref = useRef(null)
-  const isInView = useInView(ref, { once: true })
+  const controls = useAnimation();
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true });
 
   useEffect(() => {
     if (isInView) {
-      controls.start("visible")
+      controls.start("visible");
     }
-  }, [controls, isInView])
+  }, [controls, isInView]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -127,7 +139,7 @@ export default function About() {
         delayChildren: 0.1,
       },
     },
-  }
+  };
 
   const itemVariants = {
     hidden: { opacity: 0, y: 50 },
@@ -136,7 +148,7 @@ export default function About() {
       y: 0,
       transition: { duration: 0.6, ease: "easeOut" },
     },
-  }
+  };
 
   return (
     <section id="about" className="relative bg-black py-20 overflow-hidden">
@@ -160,11 +172,18 @@ export default function About() {
               Our Story
             </span>
           </motion.div>
-          <motion.h2 variants={itemVariants} className="text-4xl lg:text-6xl font-bold text-white mb-6">
+          <motion.h2
+            variants={itemVariants}
+            className="text-4xl lg:text-6xl font-bold text-white mb-6"
+          >
             About <span className="text-orange-500">Drop 'n Roll</span>
           </motion.h2>
-          <motion.p variants={itemVariants} className="text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed">
-            Born from a passion for connecting people and businesses through reliable, lightning-fast delivery solutions
+          <motion.p
+            variants={itemVariants}
+            className="text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed"
+          >
+            Born from a passion for connecting people and businesses through
+            reliable, lightning-fast delivery solutions
           </motion.p>
         </motion.div>
 
@@ -180,16 +199,21 @@ export default function About() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
               <div>
                 <h3 className="text-3xl font-bold text-white mb-6">
-                  From Vision to <span className="text-orange-500">Reality</span>
+                  From Vision to{" "}
+                  <span className="text-orange-500">Reality</span>
                 </h3>
                 <p className="text-gray-300 text-lg leading-relaxed mb-6">
-                  What started as a simple idea between friends has evolved into a revolutionary delivery platform. We
-                  saw the frustration of unreliable deliveries, the anxiety of not knowing where your package is, and
-                  the disconnect between businesses and their customers.
+                  What started as a simple idea between friends has evolved into
+                  a revolutionary delivery platform. We saw the frustration of
+                  unreliable deliveries, the anxiety of not knowing where your
+                  package is, and the disconnect between businesses and their
+                  customers.
                 </p>
                 <p className="text-gray-300 text-lg leading-relaxed">
-                  Today, Drop 'n Roll bridges that gap with cutting-edge technology, a passionate team, and an
-                  unwavering commitment to making every delivery feel personal, secure, and lightning-fast.
+                  Today, Drop 'n Roll bridges that gap with cutting-edge
+                  technology, a passionate team, and an unwavering commitment to
+                  making every delivery feel personal, secure, and
+                  lightning-fast.
                 </p>
               </div>
               <div className="relative">
@@ -247,7 +271,9 @@ export default function About() {
             <h3 className="text-3xl lg:text-4xl font-bold text-white mb-4">
               Our <span className="text-orange-500">Values</span>
             </h3>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto">The principles that drive everything we do</p>
+            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+              The principles that drive everything we do
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -334,17 +360,23 @@ export default function About() {
           <div className="bg-gradient-to-r from-orange-500/10 to-orange-600/10 backdrop-blur-sm rounded-3xl p-8 md:p-12 border border-orange-500/20">
             <Quote className="w-12 h-12 text-orange-500 mx-auto mb-6" />
             <blockquote className="text-2xl md:text-3xl font-bold text-white mb-6 leading-relaxed">
-              "Drop 'n Roll transformed our business. Same-day delivery went from impossible to effortless."
+              "Drop 'n Roll transformed our business. Same-day delivery went
+              from impossible to effortless."
             </blockquote>
             <div className="flex items-center justify-center space-x-1 mb-4">
               {[...Array(5)].map((_, i) => (
-                <Star key={i} className="w-5 h-5 text-orange-500 fill-current" />
+                <Star
+                  key={i}
+                  className="w-5 h-5 text-orange-500 fill-current"
+                />
               ))}
             </div>
-            <cite className="text-gray-400 font-medium">Sarah Johnson, CEO of LocalCraft Co.</cite>
+            <cite className="text-gray-400 font-medium">
+              Sarah Johnson, CEO of LocalCraft Co.
+            </cite>
           </div>
         </motion.div>
       </div>
     </section>
-  )
+  );
 }

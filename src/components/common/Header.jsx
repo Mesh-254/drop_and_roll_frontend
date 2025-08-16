@@ -1,42 +1,41 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Menu, X } from "lucide-react"
-import { NavLink, useLocation } from "react-router-dom"
-import TrackParcelModal from "../track/TrackParcelModal"
-import GetQuoteBook from "../quote/GetQuoteBook"
+import { useState, useEffect } from "react";
+import { Menu, X } from "lucide-react";
+import { NavLink } from "react-router-dom";
+import TrackParcelModal from "../track/TrackParcelModal";
+import GetQuoteBook from "../quote/GetQuoteBook";
 
 export default function Header() {
-  const [isScrolled, setIsScrolled] = useState(false)
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [showTrackModal, setShowTrackModal] = useState(false)
-  const [showQuoteModal, setShowQuoteModal] = useState(false)
-  const location = useLocation()
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showTrackModal, setShowTrackModal] = useState(false);
+  const [showQuoteModal, setShowQuoteModal] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50)
-    }
+      setIsScrolled(window.scrollY > 50);
+    };
 
-    window.addEventListener("scroll", handleScroll)
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const handleTracking = () => {
-    setShowTrackModal(true)
-  }
+    setShowTrackModal(true);
+  };
 
   const handleModalClose = () => {
-    setShowTrackModal(false)
-  }
+    setShowTrackModal(false);
+  };
 
   const handleBookDelivery = () => {
-    setShowQuoteModal(true)
-  }
+    setShowQuoteModal(true);
+  };
 
   const handleBookDeliveryClose = () => {
-    setShowQuoteModal(false)
-  }
+    setShowQuoteModal(false);
+  };
 
   const navItems = [
     { name: "Home", href: "/" },
@@ -47,7 +46,7 @@ export default function Header() {
     },
     { name: "Support", href: "#support" },
     { name: "FAQ", href: "/faqs" },
-  ]
+  ];
 
   return (
     <>
@@ -92,8 +91,8 @@ export default function Header() {
                       isActive && !item.onClick
                         ? "text-orange-500 font-bold"
                         : isScrolled
-                        ? "text-white/90 hover:text-orange-500"
-                        : "text-white/90 hover:text-orange-500"
+                          ? "text-white/90 hover:text-orange-500"
+                          : "text-white/90 hover:text-orange-500"
                     }`
                   }
                 >
@@ -136,13 +135,15 @@ export default function Header() {
                     to={item.href}
                     onClick={(e) => {
                       if (item.onClick) {
-                        item.onClick(e)
+                        item.onClick(e);
                       }
-                      setIsMobileMenuOpen(false)
+                      setIsMobileMenuOpen(false);
                     }}
                     className={({ isActive }) =>
                       `block px-3 py-2 font-medium transition-all duration-300 hover:text-orange-500 hover:bg-orange-500/10 rounded-md ${
-                        isActive && !item.onClick ? "text-orange-500 font-bold" : "text-white/90"
+                        isActive && !item.onClick
+                          ? "text-orange-500 font-bold"
+                          : "text-white/90"
                       }`
                     }
                   >
@@ -153,8 +154,8 @@ export default function Header() {
                   <button
                     className="w-full bg-orange-500 hover:bg-orange-600 text-white font-medium px-6 py-2 rounded-full transition-all duration-300 transform hover:scale-105"
                     onClick={() => {
-                      handleBookDelivery()
-                      setIsMobileMenuOpen(false)
+                      handleBookDelivery();
+                      setIsMobileMenuOpen(false);
                     }}
                   >
                     Send an Item
@@ -172,5 +173,5 @@ export default function Header() {
       {/* Quote Modal */}
       <GetQuoteBook isOpen={showQuoteModal} onClose={handleBookDeliveryClose} />
     </>
-  )
+  );
 }

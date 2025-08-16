@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart3,
@@ -217,7 +219,7 @@ const TopBar = ({ isMobileOpen, setIsMobileOpen }) => {
 };
 
 // Stats Card Component
-const StatsCard = ({ title, value, change, icon: Icon, color = "orange" }) => {
+const StatsCard = ({ title, value, change, color = "orange" }) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -303,8 +305,8 @@ const DashboardSection = () => {
                       order.status === "delivered"
                         ? "bg-green-500"
                         : order.status === "in-transit"
-                        ? "bg-blue-500"
-                        : "bg-yellow-500"
+                          ? "bg-blue-500"
+                          : "bg-yellow-500"
                     }`}
                   />
                   <div>

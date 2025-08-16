@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, lazy, Suspense } from "react";
+import { useState, Suspense } from "react";
 import GetQuoteBook from "../quote/GetQuoteBook";
 import TrackParcelModal from "../track/TrackParcelModal";
 
@@ -101,15 +101,33 @@ export default function Hero() {
 
       {/* Quote Modal */}
       {showQuoteModal && (
-        <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center">Loading...</div>}>
-          <GetQuoteBook isOpen={showQuoteModal} onClose={() => setShowQuoteModal(false)} />
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
+              Loading...
+            </div>
+          }
+        >
+          <GetQuoteBook
+            isOpen={showQuoteModal}
+            onClose={() => setShowQuoteModal(false)}
+          />
         </Suspense>
       )}
 
       {/* Track Parcel Modal */}
       {showTrackModal && (
-        <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center">Loading...</div>}>
-          <TrackParcelModal isOpen={showTrackModal} onClose={() => setShowTrackModal(false)} />
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
+              Loading...
+            </div>
+          }
+        >
+          <TrackParcelModal
+            isOpen={showTrackModal}
+            onClose={() => setShowTrackModal(false)}
+          />
         </Suspense>
       )}
 

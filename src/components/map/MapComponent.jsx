@@ -1,13 +1,13 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { MapPin, Navigation } from "lucide-react"
+import { useState, useEffect } from "react";
+import { MapPin, Navigation } from "lucide-react";
 
 export default function MapComponent({ onLocationSelect }) {
-  const [pickupMarker, setPickupMarker] = useState(null)
-  const [destinationMarker, setDestinationMarker] = useState(null)
-  const [activeMarker, setActiveMarker] = useState("pickup")
-  const [userLocation, setUserLocation] = useState(null)
+  const [pickupMarker, setPickupMarker] = useState(null);
+  const [destinationMarker, setDestinationMarker] = useState(null);
+  const [activeMarker, setActiveMarker] = useState("pickup");
+  const [userLocation, setUserLocation] = useState(null);
 
   // Get user's current location
   useEffect(() => {
@@ -17,46 +17,46 @@ export default function MapComponent({ onLocationSelect }) {
           setUserLocation({
             lat: position.coords.latitude,
             lng: position.coords.longitude,
-          })
+          });
         },
         (error) => {
-          console.log("Geolocation error:", error)
+          console.log("Geolocation error:", error);
           // Default to Halifax coordinates
-          setUserLocation({ lat: 44.6488, lng: -63.5752 })
+          setUserLocation({ lat: 44.6488, lng: -63.5752 });
         },
-      )
+      );
     } else {
       // Default to Halifax coordinates
-      setUserLocation({ lat: 44.6488, lng: -63.5752 })
+      setUserLocation({ lat: 44.6488, lng: -63.5752 });
     }
-  }, [])
+  }, []);
 
   const handleMapClick = (event) => {
-    const rect = event.currentTarget.getBoundingClientRect()
-    const x = event.clientX - rect.left
-    const y = event.clientY - rect.top
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
 
     // Convert to approximate coordinates (Halifax metro area)
     const coords = {
       lat: 44.7488 - (y / rect.height) * 0.2, // Approximate latitude range
       lng: -63.7752 + (x / rect.width) * 0.4, // Approximate longitude range
-    }
+    };
 
     if (activeMarker === "pickup") {
-      setPickupMarker({ x, y, coords })
-      onLocationSelect(coords, "pickup")
-      setActiveMarker("destination")
+      setPickupMarker({ x, y, coords });
+      onLocationSelect(coords, "pickup");
+      setActiveMarker("destination");
     } else {
-      setDestinationMarker({ x, y, coords })
-      onLocationSelect(coords, "destination")
+      setDestinationMarker({ x, y, coords });
+      onLocationSelect(coords, "destination");
     }
-  }
+  };
 
   const clearMarkers = () => {
-    setPickupMarker(null)
-    setDestinationMarker(null)
-    setActiveMarker("pickup")
-  }
+    setPickupMarker(null);
+    setDestinationMarker(null);
+    setActiveMarker("pickup");
+  };
 
   return (
     <div className="space-y-4">
@@ -110,7 +110,9 @@ export default function MapComponent({ onLocationSelect }) {
         <div className="absolute top-4 left-4 bg-black/80 px-3 py-2 rounded-lg">
           <div className="flex items-center space-x-2">
             <Navigation className="w-4 h-4 text-orange-500" />
-            <span className="text-white text-sm font-medium">Halifax Metro Area</span>
+            <span className="text-white text-sm font-medium">
+              Halifax Metro Area
+            </span>
           </div>
         </div>
 
@@ -158,7 +160,13 @@ export default function MapComponent({ onLocationSelect }) {
         {pickupMarker && destinationMarker && (
           <svg className="absolute inset-0 w-full h-full pointer-events-none">
             <defs>
-              <linearGradient id="routeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <linearGradient
+                id="routeGradient"
+                x1="0%"
+                y1="0%"
+                x2="100%"
+                y2="0%"
+              >
                 <stop offset="0%" stopColor="#10B981" />
                 <stop offset="100%" stopColor="#EF4444" />
               </linearGradient>
@@ -186,7 +194,8 @@ export default function MapComponent({ onLocationSelect }) {
               ~
               {Math.round(
                 Math.sqrt(
-                  Math.pow(destinationMarker.x - pickupMarker.x, 2) + Math.pow(destinationMarker.y - pickupMarker.y, 2),
+                  Math.pow(destinationMarker.x - pickupMarker.x, 2) +
+                    Math.pow(destinationMarker.y - pickupMarker.y, 2),
                 ) / 10,
               )}
               km
@@ -199,7 +208,9 @@ export default function MapComponent({ onLocationSelect }) {
           <div className="flex items-center justify-between">
             <div className="text-white text-sm">
               <span className="font-medium">
-                {activeMarker === "pickup" ? "📍 Click to set pickup location" : "🎯 Click to set destination"}
+                {activeMarker === "pickup"
+                  ? "📍 Click to set pickup location"
+                  : "🎯 Click to set destination"}
               </span>
             </div>
             <div className="text-orange-500 text-xs">
@@ -222,7 +233,8 @@ export default function MapComponent({ onLocationSelect }) {
               <div className="flex items-center space-x-2">
                 <span className="text-green-500">📦</span>
                 <span className="text-gray-300">
-                  Pickup: {pickupMarker.coords.lat.toFixed(4)}, {pickupMarker.coords.lng.toFixed(4)}
+                  Pickup: {pickupMarker.coords.lat.toFixed(4)},{" "}
+                  {pickupMarker.coords.lng.toFixed(4)}
                 </span>
               </div>
             )}
@@ -230,7 +242,8 @@ export default function MapComponent({ onLocationSelect }) {
               <div className="flex items-center space-x-2">
                 <span className="text-red-500">🎯</span>
                 <span className="text-gray-300">
-                  Destination: {destinationMarker.coords.lat.toFixed(4)}, {destinationMarker.coords.lng.toFixed(4)}
+                  Destination: {destinationMarker.coords.lat.toFixed(4)},{" "}
+                  {destinationMarker.coords.lng.toFixed(4)}
                 </span>
               </div>
             )}
@@ -238,5 +251,5 @@ export default function MapComponent({ onLocationSelect }) {
         </div>
       )}
     </div>
-  )
+  );
 }

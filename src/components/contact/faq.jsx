@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { ChevronDown, ChevronUp } from "lucide-react"
+import { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 export default function FAQ() {
-  const [openIndex, setOpenIndex] = useState(null)
+  const [openIndex, setOpenIndex] = useState(null);
 
   const faqs = [
     {
@@ -37,23 +37,30 @@ export default function FAQ() {
       answer:
         "You can collect your parcel from our pickup points or arrange for redelivery at a convenient time through our customer portal.",
     },
-  ]
+  ];
 
   return (
     <section className="py-16 bg-gray-400">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
-          <h2 className="font-serif font-bold text-3xl sm:text-4xl text-gray-900 mb-4">Frequently Asked Questions</h2>
+          <h2 className="font-serif font-bold text-3xl sm:text-4xl text-gray-900 mb-4">
+            Frequently Asked Questions
+          </h2>
         </div>
 
         <div className="space-y-4">
           {faqs.map((faq, index) => (
-            <div key={index} className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div
+              key={index}
+              className="bg-white rounded-lg shadow-sm border border-gray-200"
+            >
               <button
                 onClick={() => setOpenIndex(openIndex === index ? null : index)}
                 className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors duration-200"
               >
-                <span className="font-semibold text-gray-900">{faq.question}</span>
+                <span className="font-semibold text-gray-900">
+                  {faq.question}
+                </span>
                 {openIndex === index ? (
                   <ChevronUp className="w-5 h-5 text-orange-500" />
                 ) : (
@@ -70,5 +77,5 @@ export default function FAQ() {
         </div>
       </div>
     </section>
-  )
+  );
 }
