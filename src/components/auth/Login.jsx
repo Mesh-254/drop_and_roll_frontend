@@ -1,23 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
-// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  X,
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  Loader2,
-  Chrome,
-  Facebook,
-  Apple,
-  Twitter,
-} from "lucide-react";
+import { X, Mail, Lock, Eye, EyeOff, Loader2, Chrome } from "lucide-react";
 
-const LoginPage = ({ isOpen = true, onClose }) => {
+const LoginPage = ({ isOpen = true, onClose}) => {
   const [mode, setMode] = useState("login"); // "login" or "signup"
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [email, setEmail] = useState("");
@@ -27,6 +14,22 @@ const LoginPage = ({ isOpen = true, onClose }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState({});
+
+  const handleClose = () => {
+    if (mode === "signup") {
+      // When in register mode, go back to login instead of closing
+      setMode("login");
+      setShowEmailForm(false);
+      setErrors({});
+      // Reset form fields
+      setEmail("");
+      setPassword("");
+      setConfirmPassword("");
+    } else {
+      // When in login mode, close and go to home page
+      onClose();
+    }
+  };
 
   // Validation functions
   const validateEmail = (email) => {
@@ -156,7 +159,7 @@ const LoginPage = ({ isOpen = true, onClose }) => {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
@@ -169,7 +172,7 @@ const LoginPage = ({ isOpen = true, onClose }) => {
         <div className="absolute inset-0 bg-gradient-to-br from-orange-50 dark:from-gray-800 via-white dark:via-gray-900 to-orange-50 dark:to-gray-800 opacity-60" />
 
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className="absolute top-4 right-4 z-10 p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-all duration-200"
           aria-label="Close"
         >
