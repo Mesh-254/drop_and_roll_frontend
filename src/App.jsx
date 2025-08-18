@@ -9,7 +9,7 @@ import Footer from "./components/common/Footer";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import FAQ from "./components/contact/faq";
 import "./App.css";
-import LoginPage from "./components/auth/Login";
+import LoginPage from "./components/auth/login-register";
 import ForgotPassword from "./components/auth/forgot-password";
 import CheckEmail from "./components/auth/check-email";
 import ResetPassword from "./components/auth/reset-password";
@@ -58,6 +58,7 @@ function App() {
           }
         />
         <Route path="/login" element={<LoginPage />} />
+         <Route path="/register" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/check-email" element={<CheckEmail />} />
         <Route path="/reset-password/:token" element={<ResetPassword />} />

@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Mail, Lock, Eye, EyeOff, Loader2, Chrome } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
-const LoginPage = ({ isOpen = true, onClose}) => {
+const LoginPage = ({ isOpen = true, onClose = () => {} }) => {
   const [mode, setMode] = useState("login"); // "login" or "signup"
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [email, setEmail] = useState("");
@@ -14,6 +15,8 @@ const LoginPage = ({ isOpen = true, onClose}) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState({});
+
+  const navigate = useNavigate(); // Initialize Next.js router
 
   const handleClose = () => {
     if (mode === "signup") {
@@ -25,9 +28,11 @@ const LoginPage = ({ isOpen = true, onClose}) => {
       setEmail("");
       setPassword("");
       setConfirmPassword("");
+      navigate("/login"); // Navigate to login page
     } else {
       // When in login mode, close and go to home page
       onClose();
+      navigate("/");
     }
   };
 
