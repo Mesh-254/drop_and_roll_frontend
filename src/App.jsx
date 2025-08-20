@@ -9,10 +9,16 @@ import Footer from "./components/common/Footer";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import FAQ from "./components/contact/faq";
 import "./App.css";
-import LoginPage from "./components/auth/login-register";
+// import LoginPage from "./components/auth/login-register";
 import ForgotPassword from "./components/auth/forgot-password";
 import CheckEmail from "./components/auth/check-email";
 import ResetPassword from "./components/auth/reset-password";
+import ConfirmEmailPage from "./components/auth/confirm-email";
+
+import LoginPage from "./components/auth/LoginPage"
+import RegisterPage from "./components/auth/RegisterPage"
+import EmailConfirmationPage from "./components/auth/EmailConfirmationPage"
+import AccountConfirmedPage from "./components/auth/AccountConfirmedPage"
 
 // Layout for pages with Header and Footer
 function MainLayout({ children }) {
@@ -57,11 +63,16 @@ function App() {
             </MainLayout>
           }
         />
-        <Route path="/login" element={<LoginPage />} />
-         <Route path="/register" element={<LoginPage />} />
+        {/* <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+         <Route path="/confirm-email" element={<ConfirmEmailPage />} />
         <Route path="/check-email" element={<CheckEmail />} />
-        <Route path="/reset-password/:token" element={<ResetPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} /> */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/email-confirmation" element={<EmailConfirmationPage />} />
+        <Route path="/account-confirmed" element={<AccountConfirmedPage />} />
         <Route path="/admin" element={<AdminDashboard />} />{" "}
         {/* No header/footer for admin */}
       </Routes>
