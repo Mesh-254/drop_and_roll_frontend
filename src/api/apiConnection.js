@@ -150,22 +150,35 @@ class ApiConnection {
     }
   }
 
-  async googleAuth(googleToken) {
+  async googleAuth(idToken) {
     try {
       const response = await this.request("/api/users/auth/google/", {
         method: "POST",
-        body: JSON.stringify({ token: googleToken }),
+        body: JSON.stringify({ token: idToken }),
         includeAuth: false,
       })
 
       if (response.data.access) {
         this.setTokens(response.data.access, response.data.refresh)
-        return response.data
+        return {
+          success: true,
+          data: response.data,
+          code: response.data.code || "AUTH_SUCCESS",
+          message: "Google authentication successful"
+        }
       }
 
-      throw new Error("Google authentication failed")
+      return {
+        success: false,
+        code: response.data.code || "AUTH_FAILED",
+        message: response.data.error || "Google authentication failed"
+      }
     } catch (error) {
-      return { success: false, code: error.data?.code, message: error.data?.error || error.message }
+      return {
+        success: false,
+        code: error.data?.code || "AUTH_ERROR",
+        message: error.data?.error || error.message || "Google authentication failed"
+      }
     }
   }
 
