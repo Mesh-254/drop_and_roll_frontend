@@ -1,5 +1,6 @@
 // App.jsx
 import { Routes, Route } from "react-router-dom";
+import { GoogleOAuthProvider } from "@react-oauth/google"
 import Header from "./components/common/Header";
 import Hero from "./components/landingPage/Hero";
 import Services from "./components/landingPage/Services";
@@ -11,9 +12,8 @@ import FAQ from "./components/contact/faq";
 import "./App.css";
 // import LoginPage from "./components/auth/login-register";
 import ForgotPassword from "./components/auth/forgot-password";
-import CheckEmail from "./components/auth/check-email";
 import ResetPassword from "./components/auth/reset-password";
-import ConfirmEmailPage from "./components/auth/confirm-email";
+
 
 import LoginPage from "./components/auth/LoginPage"
 import RegisterPage from "./components/auth/RegisterPage"
@@ -45,7 +45,10 @@ function HomePage() {
 }
 
 function App() {
+  // Ensure VITE_APP_GOOGLE_CLIENT_ID is set in your .env file
+  const googleClientId = import.meta.env.VITE_PUBLIC_GOOGLE_CLIENT_ID;
   return (
+    <GoogleOAuthProvider clientId={googleClientId}>
     <div className="min-h-screen bg-black text-white">
       <Routes>
         <Route
@@ -67,8 +70,8 @@ function App() {
         {/* <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
-         <Route path="/confirm-email" element={<ConfirmEmailPage />} />
-        <Route path="/check-email" element={<CheckEmail />} />
+ 
+        
         <Route path="/reset-password/:token" element={<ResetPassword />} /> */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -79,6 +82,7 @@ function App() {
         {/* No header/footer for admin */}
       </Routes>
     </div>
+    </GoogleOAuthProvider>
   );
 }
 
