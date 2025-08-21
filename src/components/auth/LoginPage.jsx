@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react"
 import { Link, useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "../../contexts/AuthContext"
+import { GoogleLogin } from "@react-oauth/google"
 
 const LoginPage = () => {
   const [email, setEmail] = useState("")
@@ -14,7 +15,7 @@ const LoginPage = () => {
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
 
-  const { login } = useAuth()
+  const { login, googleAuth } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -56,13 +57,13 @@ const LoginPage = () => {
             setErrors({ general: "Account is not activated. Redirecting to resend confirmation..." })
             setTimeout(() => {
               navigate("/resend-confirmation", { state: { email } })
-            }, 2000) // 2-second delay to show the message
+            }, 2000)
             break
           case "EMAIL_NOT_FOUND":
             setErrors({ general: "No account found with this email." })
-             setTimeout(() => {
+            setTimeout(() => {
               navigate("/register", { state: { email } })
-            }, 2000) // 2-second delay to show the message
+            }, 2000)
             break
           case "INVALID_CREDENTIALS":
             setErrors({ general: "The email and password do not match." })
@@ -78,6 +79,29 @@ const LoginPage = () => {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setIsLoading(true)
+    setErrors({})
+
+    try {
+      const result = await googleAuth(credentialResponse.credential)
+      if (result.success) {
+        navigate(from, { replace: true })
+      } else {
+        setErrors({ general: result.message || "Google authentication failed." })
+      }
+    } catch (error) {
+      setErrors({ general: "Google authentication failed. Please try again." })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleGoogleError = () => {
+    setErrors({ general: "Google authentication failed. Please try again." })
+    setIsLoading(false)
   }
 
   return (
@@ -174,6 +198,19 @@ const LoginPage = () => {
           >
             {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Sign in"}
           </button>
+
+          <div className="mt-4">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={handleGoogleError}
+              clientId="your-google-client-id"
+              buttonText="Sign in with Google"
+              className="w-full py-3 bg-white text-gray-700 rounded-full border border-gray-300 hover:bg-gray-100 transition-all duration-200 flex items-center justify-center gap-2"
+            >
+              <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
+              Sign in with Google
+            </GoogleLogin>
+          </div>
         </form>
 
         <div className="mt-6 text-center">
