@@ -102,6 +102,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const googleAuth = async (idToken) => {
+    const result = await apiConnection.googleAuth(idToken)
+    if (result.success) {
+      const userData = await apiConnection.getCurrentUser()
+      setUser(userData)
+    }
+    return result
+  }
+
+
   const logout = () => {
     apiConnection.logout();
     setUser(null);
@@ -117,6 +127,7 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     confirmEmail,
+    googleAuth,
     logout,
     checkAuthStatus,
   };
