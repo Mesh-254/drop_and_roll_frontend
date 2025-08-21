@@ -1,4 +1,3 @@
-// API Connection Layer for Drop 'n Roll Authentication
 const API_BASE_URL = import.meta.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
 
 class ApiConnection {
@@ -6,13 +5,11 @@ class ApiConnection {
     this.baseURL = API_BASE_URL
     this.token = null
 
-    // Initialize token from localStorage if available
     if (typeof window !== "undefined") {
       this.token = localStorage.getItem("access_token")
     }
   }
 
-  // Set authorization header
   getHeaders(includeAuth = true) {
     const headers = {
       "Content-Type": "application/json",
@@ -25,7 +22,6 @@ class ApiConnection {
     return headers
   }
 
-  // Generic API request method
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`
     const config = {
@@ -38,7 +34,10 @@ class ApiConnection {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.detail || data.message || "API request failed")
+        const error = new Error(data.error || data.detail || "API request failed")
+        error.data = data
+        error.status = response.status
+        throw error
       }
 
       return { data, status: response.status }
@@ -48,23 +47,19 @@ class ApiConnection {
     }
   }
 
-  // Authentication Methods
   async login(email, password) {
     try {
-      const response = await this.request("/api/auth/jwt/create/", {
+      const response = await this.request("/api/users/auth/login/", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.toLowerCase(), password }),
         includeAuth: false,
       })
-
       if (response.data.access) {
         this.setTokens(response.data.access, response.data.refresh)
-        return response.data
       }
-
-      throw new Error("Invalid login response")
+      return { success: true, data: response.data }
     } catch (error) {
-      throw new Error(error.message || "Login failed")
+      return { success: false, code: error.data?.code, message: error.data?.error || error.message }
     }
   }
 
@@ -72,26 +67,42 @@ class ApiConnection {
     try {
       const response = await this.request("/api/users/auth/register/", {
         method: "POST",
-        body: JSON.stringify(userData),
+        body: JSON.stringify({ ...userData, email: userData.email.toLowerCase() }),
         includeAuth: false,
       })
-
-      return response.data
+      return { success: true, data: response.data }
     } catch (error) {
-      throw new Error(error.message || "Registration failed")
+      return { success: false, code: error.data?.code, message: error.data?.error || error.message }
     }
   }
 
   async confirmEmail(uid, token) {
     try {
-      const response = await this.request(`/api/users/auth/confirm-email/?uid=${uid}&token=${token}`, {
+      const response = await this.request(`/api/users/auth/confirm/?uid=${uid}&token=${token}`, {
         method: "GET",
         includeAuth: false,
       })
-
-      return response.data
+      return { success: true, data: response.data }
     } catch (error) {
-      throw new Error(error.message || "Email confirmation failed")
+      console.log("Confirm Email Error Details:", error.data); // Debug log
+      return {
+        success: false,
+        code: error.data?.code || "UNKNOWN_ERROR",
+        message: error.data?.error || error.message || "Email confirmation failed",
+      }
+    }
+  }
+
+  async resendConfirmation(email) {
+    try {
+      const response = await this.request("/api/users/auth/resend-confirmation/", {
+        method: "POST",
+        body: JSON.stringify({ email: email.toLowerCase() }),
+        includeAuth: false,
+      })
+      return { success: true, data: response.data }
+    } catch (error) {
+      return { success: false, code: error.data?.code, message: error.data?.error || error.message }
     }
   }
 
@@ -102,7 +113,7 @@ class ApiConnection {
     }
 
     try {
-      const response = await this.request("api/auth/jwt/refresh/", {
+      const response = await this.request("/api/users/auth/jwt/refresh/", {
         method: "POST",
         body: JSON.stringify({ refresh: refreshToken }),
         includeAuth: false,
@@ -125,7 +136,7 @@ class ApiConnection {
       const response = await this.request("/api/users/auth/me/")
       return response.data
     } catch (error) {
-      if (error.message.includes("401")) {
+      if (error.status === 401) {
         try {
           await this.refreshToken()
           const retryResponse = await this.request("/api/users/auth/me/")
@@ -141,7 +152,7 @@ class ApiConnection {
 
   async googleAuth(googleToken) {
     try {
-      const response = await this.request("/api/auth/google/", {
+      const response = await this.request("/api/users/auth/google/", {
         method: "POST",
         body: JSON.stringify({ token: googleToken }),
         includeAuth: false,
@@ -154,11 +165,10 @@ class ApiConnection {
 
       throw new Error("Google authentication failed")
     } catch (error) {
-      throw new Error(error.message || "Google authentication failed")
+      return { success: false, code: error.data?.code, message: error.data?.error || error.message }
     }
   }
 
-  // Token Management
   setTokens(accessToken, refreshToken) {
     this.token = accessToken
     if (typeof window !== "undefined") {
@@ -182,38 +192,34 @@ class ApiConnection {
     return !!this.token
   }
 
-  // Profile Methods
   async updateProfile(profileData, userType = "customer") {
     try {
-      const response = await this.request(`/api/profile/${userType}/`, {
+      const response = await this.request(`/api/users/profile/${userType}/`, {
         method: "PATCH",
         body: JSON.stringify(profileData),
       })
-
       return response.data
     } catch (error) {
-      throw new Error(error.message || "Profile update failed")
+      throw new Error(error.data?.error || error.message || "Profile update failed")
     }
   }
 
   async changePassword(oldPassword, newPassword) {
     try {
-      const response = await this.request("/api/auth/change-password/", {
+      const response = await this.request("/api/users/auth/change-password/", {
         method: "POST",
         body: JSON.stringify({
           old_password: oldPassword,
           new_password: newPassword,
         }),
       })
-
       return response.data
     } catch (error) {
-      throw new Error(error.message || "Password change failed")
+      throw new Error(error.data?.error || error.message || "Password change failed")
     }
   }
 }
 
-// Create singleton instance
 const apiConnection = new ApiConnection()
 
 export default apiConnection

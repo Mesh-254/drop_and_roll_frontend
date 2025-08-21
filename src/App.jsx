@@ -19,6 +19,7 @@ import LoginPage from "./components/auth/LoginPage"
 import RegisterPage from "./components/auth/RegisterPage"
 import EmailConfirmationPage from "./components/auth/EmailConfirmationPage"
 import AccountConfirmedPage from "./components/auth/AccountConfirmedPage"
+import ResendConfirmationPage from './components/auth/ResendConfirmationPage'
 
 // Layout for pages with Header and Footer
 function MainLayout({ children }) {
@@ -73,6 +74,7 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/email-confirmation" element={<EmailConfirmationPage />} />
         <Route path="/account-confirmed" element={<AccountConfirmedPage />} />
+        <Route path="/resend-confirmation" element={<ResendConfirmationPage />} />
         <Route path="/admin" element={<AdminDashboard />} />{" "}
         {/* No header/footer for admin */}
       </Routes>

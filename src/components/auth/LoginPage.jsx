@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react"
+import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react"
 import { Link, useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "../../contexts/AuthContext"
 
@@ -51,7 +51,27 @@ const LoginPage = () => {
       if (result.success) {
         navigate(from, { replace: true })
       } else {
-        setErrors({ general: result.error })
+        switch (result.code) {
+          case "ACCOUNT_NOT_ACTIVATED":
+            setErrors({ general: "Account is not activated. Redirecting to resend confirmation..." })
+            setTimeout(() => {
+              navigate("/resend-confirmation", { state: { email } })
+            }, 2000) // 2-second delay to show the message
+            break
+          case "EMAIL_NOT_FOUND":
+            setErrors({ general: "No account found with this email." })
+             setTimeout(() => {
+              navigate("/register", { state: { email } })
+            }, 2000) // 2-second delay to show the message
+            break
+          case "INVALID_CREDENTIALS":
+            setErrors({ general: "The email and password do not match." })
+            break
+          default:
+            setErrors({
+              general: result.message || "Login failed. Please try again.",
+            })
+        }
       }
     } catch (error) {
       setErrors({ general: "Login failed. Please try again." })
@@ -68,16 +88,21 @@ const LoginPage = () => {
         className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-8"
       >
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Welcome back</h1>
-          <p className="text-gray-600 dark:text-gray-400">Sign in to your Drop 'N Roll account</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            Welcome back
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Sign in to your Drop 'N Roll account
+          </p>
         </div>
 
         {errors.general && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-6"
+            className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-6 flex items-start gap-2"
           >
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
             <p className="text-red-600 dark:text-red-400 text-sm">{errors.general}</p>
           </motion.div>
         )}

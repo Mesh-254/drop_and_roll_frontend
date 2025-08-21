@@ -1,88 +1,114 @@
-"use client"
+"use client";
 
-import { createContext, useContext, useState, useEffect } from "react"
-import apiConnection from "../api/apiConnection"
+import { createContext, useContext, useState, useEffect } from "react";
+import apiConnection from "../api/apiConnection";
 
-const AuthContext = createContext()
+const AuthContext = createContext();
 
 export const useAuth = () => {
-  const context = useContext(AuthContext)
+  const context = useContext(AuthContext);
   if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider")
+    throw new Error("useAuth must be used within an AuthProvider");
   }
-  return context
-}
+  return context;
+};
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    checkAuthStatus()
-  }, [])
+    checkAuthStatus();
+  }, []);
 
   const checkAuthStatus = async () => {
     try {
       if (apiConnection.isAuthenticated()) {
-        const userData = await apiConnection.getCurrentUser()
-        setUser(userData)
-        setIsAuthenticated(true)
+        const userData = await apiConnection.getCurrentUser();
+        setUser(userData);
+        setIsAuthenticated(true);
       }
     } catch (error) {
-      console.error("Auth check failed:", error)
-      logout()
+      console.error("Auth check failed:", error);
+      logout();
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const login = async (email, password, rememberMe = false) => {
     try {
-      const response = await apiConnection.login(email, password)
-
-      // Handle remember me functionality
-      if (rememberMe) {
-        localStorage.setItem("remember_me", "true")
+      const response = await apiConnection.login(email, password);
+      if (response.success) {
+        if (rememberMe) {
+          localStorage.setItem("remember_me", "true");
+          localStorage.setItem("user_data", JSON.stringify(response.data));
+        } else {
+          localStorage.removeItem("remember_me");
+        }
+        const userData = await apiConnection.getCurrentUser();
+        setUser(userData);
+        setIsAuthenticated(true);
+        return { success: true, data: response.data };
       } else {
-        localStorage.removeItem("remember_me")
+        return {
+          success: false,
+          code: response.code,
+          message: response.message,
+        };
       }
-
-      const userData = await apiConnection.getCurrentUser()
-      setUser(userData)
-      setIsAuthenticated(true)
-
-      return { success: true, data: response }
     } catch (error) {
-      return { success: false, error: error.message }
+      return {
+        success: false,
+        code: "NETWORK_ERROR",
+        message: "Network error occurred. Please try again.",
+      };
     }
-  }
+  };
 
   const register = async (userData) => {
     try {
-      const response = await apiConnection.register(userData)
-      console.log(response)
-      return { success: true, data: response }
+      const response = await apiConnection.register(userData);
+      if (response.success) {
+        return { success: true, data: response.data };
+      } else {
+        return {
+          success: false,
+          code: response.code,
+          message: response.message,
+        };
+      }
     } catch (error) {
-      return { success: false, error: error.message }
+      return {
+        success: false,
+        code: error.data?.code || "NETWORK_ERROR",
+        message:
+          error.data?.error || "Network error occurred. Please try again.",
+      };
     }
-  }
+  };
 
   const confirmEmail = async (uid, token) => {
     try {
-      const response = await apiConnection.confirmEmail(uid, token)
-      return { success: true, data: response }
+      const response = await apiConnection.confirmEmail(uid, token);
+      return { success: true, data: response.data };
     } catch (error) {
-      return { success: false, error: error.message }
+      return {
+        success: false,
+        code: error.data?.code,
+        message: error.data?.error || error.message,
+      };
     }
-  }
+  };
 
   const logout = () => {
-    apiConnection.logout()
-    setUser(null)
-    setIsAuthenticated(false)
-    localStorage.removeItem("remember_me")
-  }
+    apiConnection.logout();
+    setUser(null);
+    setIsAuthenticated(false);
+    localStorage.removeItem("remember_me");
+    localStorage.removeItem("user_data");
+  };
 
   const value = {
     user,
@@ -93,7 +119,7 @@ export const AuthProvider = ({ children }) => {
     confirmEmail,
     logout,
     checkAuthStatus,
-  }
+  };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
