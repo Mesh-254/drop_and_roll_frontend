@@ -1,5 +1,8 @@
 "use client";
-
+import { useNavigate } from "react-router-dom";
+import apiConnection from "../../api/apiConnection";
+import jsPDF from "jspdf";
+import dayjs from "dayjs";
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   X,
@@ -13,6 +16,8 @@ import {
   ChevronRight,
   Check,
   AlertCircle,
+  Download,
+  Loader2,
 } from "lucide-react";
 
 // Shipment types as specified
@@ -81,6 +86,7 @@ const stepTitles = [
 ];
 
 export default function GetQuoteModal({ isOpen, onClose }) {
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
     shipmentType: null,
@@ -105,6 +111,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
   });
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
   const [quote, setQuote] = useState(null);
+  const [isLoadingQuote, setIsLoadingQuote] = useState(false);
 
   const [manualPickupStreet, setManualPickupStreet] = useState("");
   const [manualPickupCity, setManualPickupCity] = useState("");
@@ -132,8 +139,8 @@ export default function GetQuoteModal({ isOpen, onClose }) {
       // First try autocomplete endpoint
       let response = await fetch(
         `https://api.getAddress.io/autocomplete/${encodeURIComponent(
-          postcode,
-        )}?api-key=${API_KEY}`,
+          postcode
+        )}?api-key=${API_KEY}`
       );
 
       if (!response.ok) {
@@ -151,14 +158,14 @@ export default function GetQuoteModal({ isOpen, onClose }) {
         try {
           response = await fetch(
             `https://api.getAddress.io/get/${encodeURIComponent(
-              postcode,
-            )}?api-key=${API_KEY}`,
+              postcode
+            )}?api-key=${API_KEY}`
           );
           if (response.ok) {
             data = await response.json();
             if (data.addresses && data.addresses.length > 0) {
               addresses = data.addresses.map(
-                (addr) => `${addr}, ${postcode.toUpperCase()}`,
+                (addr) => `${addr}, ${postcode.toUpperCase()}`
               );
             }
           }
@@ -246,10 +253,10 @@ export default function GetQuoteModal({ isOpen, onClose }) {
           };
 
           const pickupStr = getAddressString(
-            formData.pickupAddress,
+            formData.pickupAddress
           ).toLowerCase();
           const dropoffStr = getAddressString(
-            formData.dropoffAddress,
+            formData.dropoffAddress
           ).toLowerCase();
 
           const isPickupValid =
@@ -308,7 +315,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
       setValidation(errors);
       return Object.keys(errors).length === 0;
     },
-    [formData],
+    [formData]
   );
 
   const nextStep = useCallback(() => {
@@ -370,7 +377,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
 
           const pickupStr = getAddressString(data.pickupAddress).toLowerCase();
           const dropoffStr = getAddressString(
-            data.dropoffAddress,
+            data.dropoffAddress
           ).toLowerCase();
 
           const hasPickup = data.pickupAddress && pickupStr.length > 0;
@@ -420,7 +427,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
         }
       }
     },
-    [currentStep],
+    [currentStep]
   );
 
   // Auto-focus first input when step changes
@@ -500,7 +507,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
         [type === "pickup" ? "pickupPostcode" : "dropoffPostcode"]: "",
       }));
     },
-    [],
+    []
   );
 
   useEffect(() => {
@@ -519,51 +526,236 @@ export default function GetQuoteModal({ isOpen, onClose }) {
     validateStep,
   ]);
 
-  const calculateQuote = () => {
-    const service = formData.service;
-    const basePrice =
-      service?.id === "standard"
-        ? 8
-        : service?.id === "express"
-          ? 25
-          : service?.id === "business"
-            ? 12
-            : service?.id === "specialized"
-              ? 30
-              : 15;
+  const calculateQuote = async () => {
+    setIsLoadingQuote(true);
 
-    const weight = Number.parseFloat(formData.weight) || 1;
-    const weightMultiplier = weight > 5 ? 1 + (weight - 5) * 0.1 : 1;
+    try {
+      // Calculate distance between addresses
+      const distance = await apiConnection.calculateDistance(
+        formData.pickupAddress,
+        formData.dropoffAddress
+      );
 
-    const fragileMultiplier = formData.fragile ? 1.25 : 1; // 25% surcharge for fragile items
+      // Prepare quote data for backend
+      const quoteData = {
+        shipmentType: formData.shipmentType.id,
+        serviceTier: formData.service.id,
+        weightKg: Number.parseFloat(formData.weight),
+        distanceKm: distance,
+        fragile: formData.fragile,
+        insuranceAmount: formData.insurance
+          ? Number.parseFloat(formData.insuranceAmount)
+          : 0,
+        dimensions: {
+          width: Number.parseFloat(formData.width) || null,
+          length: Number.parseFloat(formData.length) || null,
+          height: Number.parseFloat(formData.height) || null,
+        },
+        surge: 1.0, // Default surge multiplier
+        discount: 0.0, // Default discount
+      };
 
-    const insuranceFee = formData.insurance
-      ? Number.parseFloat(formData.insuranceAmount) * 0.02
-      : 0;
+      // Call backend API to compute quote
+      const result = await apiConnection.createQuote(quoteData);
 
-    const subtotal =
-      Math.round(basePrice * weightMultiplier * fragileMultiplier * 100) / 100;
-    const total = Math.round((subtotal + insuranceFee) * 100) / 100;
+      if (result.success) {
+        const backendQuote = result.data;
+        setQuote({
+          id: backendQuote.id,
+          subtotal: backendQuote.base_price,
+          insuranceFee: formData.insurance
+            ? Number.parseFloat(formData.insuranceAmount) * 0.02
+            : 0,
+          fragileCharge: formData.fragile ? backendQuote.base_price * 0.25 : 0,
+          total: backendQuote.final_price,
+          distanceKm: distance,
+          backendData: backendQuote, // Store full backend response
+        });
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error) {
+      console.error("Quote calculation failed:", error);
+      // Fallback to frontend calculation
+      const service = formData.service;
+      const basePrice = service?.basePrice || 15;
+      const weight = Number.parseFloat(formData.weight) || 1;
+      const weightMultiplier = weight > 5 ? 1 + (weight - 5) * 0.1 : 1;
+      const fragileMultiplier = formData.fragile ? 1.25 : 1;
+      const insuranceFee = formData.insurance
+        ? Number.parseFloat(formData.insuranceAmount) * 0.02
+        : 0;
 
-    setQuote({
-      subtotal,
-      insuranceFee: Math.round(insuranceFee * 100) / 100,
-      fragileCharge: formData.fragile
-        ? Math.round((subtotal / fragileMultiplier) * 0.25 * 100) / 100
-        : 0,
-      total,
-    });
+      const subtotal =
+        Math.round(basePrice * weightMultiplier * fragileMultiplier * 100) /
+        100;
+      const total = Math.round((subtotal + insuranceFee) * 100) / 100;
+
+      setQuote({
+        subtotal,
+        insuranceFee: Math.round(insuranceFee * 100) / 100,
+        fragileCharge: formData.fragile
+          ? Math.round((subtotal / fragileMultiplier) * 0.25 * 100) / 100
+          : 0,
+        total,
+        distanceKm: 15, // Default distance
+        fallback: true,
+      });
+    } finally {
+      setIsLoadingQuote(false);
+    }
   };
 
-  const handleSubmit = () => {
-    if (validateStep(5)) {
-      calculateQuote();
-      // Simulate API submission
-      setTimeout(() => {
-        alert("Quote generated successfully! Redirecting to booking...");
-        onClose();
-      }, 1000);
+  const downloadQuotePDF = () => {
+    if (!quote) return;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+
+    // Header
+    doc.setFontSize(20);
+    doc.text("Shipping Quote", pageWidth / 2, 20, { align: "center" });
+
+    // Quote details
+    doc.setFontSize(12);
+    let yPos = 40;
+
+    doc.text(`Quote ID: ${quote.id || "N/A"}`, 20, yPos);
+    yPos += 10;
+    doc.text(`Date: ${dayjs().format("DD/MM/YYYY HH:mm")}`, 20, yPos);
+    yPos += 20;
+
+    // Shipment details
+    doc.setFontSize(14);
+    doc.text("Shipment Details:", 20, yPos);
+    yPos += 10;
+
+    doc.setFontSize(10);
+    doc.text(`Type: ${formData.shipmentType?.title}`, 20, yPos);
+    yPos += 8;
+    doc.text(`Service: ${formData.service?.title}`, 20, yPos);
+    yPos += 8;
+    doc.text(`Weight: ${formData.weight} kg`, 20, yPos);
+    yPos += 8;
+
+    if (formData.width && formData.length) {
+      doc.text(
+        `Dimensions: ${formData.width} × ${formData.length}${
+          formData.height ? ` × ${formData.height}` : ""
+        } cm`,
+        20,
+        yPos
+      );
+      yPos += 8;
     }
+
+    doc.text(`Fragile: ${formData.fragile ? "Yes" : "No"}`, 20, yPos);
+    yPos += 8;
+    doc.text(`Distance: ${quote.distanceKm} km`, 20, yPos);
+    yPos += 15;
+
+    // Addresses
+    doc.text(
+      `From: ${
+        typeof formData.pickupAddress === "string"
+          ? formData.pickupAddress
+          : formData.pickupAddress?.formatted_address || "N/A"
+      }`,
+      20,
+      yPos
+    );
+    yPos += 8;
+    doc.text(
+      `To: ${
+        typeof formData.dropoffAddress === "string"
+          ? formData.dropoffAddress
+          : formData.dropoffAddress?.formatted_address || "N/A"
+      }`,
+      20,
+      yPos
+    );
+    yPos += 20;
+
+    // Pricing breakdown
+    doc.setFontSize(14);
+    doc.text("Pricing Breakdown:", 20, yPos);
+    yPos += 10;
+
+    doc.setFontSize(10);
+    doc.text(`Base shipping cost: $${quote.subtotal}`, 20, yPos);
+    yPos += 8;
+
+    if (formData.insurance) {
+      doc.text(`Insurance fee (2%): $${quote.insuranceFee}`, 20, yPos);
+      yPos += 8;
+    }
+
+    if (formData.fragile) {
+      doc.text(`Fragile handling (25%): $${quote.fragileCharge}`, 20, yPos);
+      yPos += 8;
+    }
+
+    yPos += 5;
+    doc.setFontSize(12);
+    doc.text(`Total: $${quote.total}`, 20, yPos);
+
+    // Footer
+    doc.setFontSize(8);
+    doc.text(
+      "This quote is valid for 7 days from the date of issue.",
+      pageWidth / 2,
+      280,
+      { align: "center" }
+    );
+
+    doc.save(`shipping-quote-${dayjs().format("YYYY-MM-DD")}.pdf`);
+  };
+
+  const handleSubmit = async () => {
+    if (!validateStep(5)) return;
+
+    await calculateQuote();
+
+    // Wait for quote to be set
+    setTimeout(() => {
+      if (quote) {
+        // Navigate to booking page with state
+        navigate("/booking", {
+          state: {
+            formData: {
+              ...formData,
+
+              shipmentType: {
+                id: formData.shipmentType.id,
+                title: formData.shipmentType.title,
+              }, // Only serializable fields
+              service: {
+                id: formData.service.id,
+                title: formData.service.title,
+              },
+
+              // Transform addresses to consistent format
+              pickupAddress:
+                typeof formData.pickupAddress === "string"
+                  ? {
+                      formatted_address: formData.pickupAddress,
+                      line1: formData.pickupAddress,
+                    }
+                  : formData.pickupAddress,
+              dropoffAddress:
+                typeof formData.dropoffAddress === "string"
+                  ? {
+                      formatted_address: formData.dropoffAddress,
+                      line1: formData.dropoffAddress,
+                    }
+                  : formData.dropoffAddress,
+            },
+            quote: quote,
+          },
+        });
+        onClose();
+      }
+    }, 100);
   };
 
   if (!isOpen) return null;
@@ -601,8 +793,8 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                       isCompleted
                         ? "bg-green-500 text-white"
                         : isActive
-                          ? "bg-orange-500 text-white"
-                          : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+                        ? "bg-orange-500 text-white"
+                        : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
                     }
                   `}
                   >
@@ -908,7 +1100,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                               "pickup",
                               manualPickupStreet,
                               manualPickupCity,
-                              manualPickupPostcode,
+                              manualPickupPostcode
                             )
                           }
                           disabled={
@@ -1099,7 +1291,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                               "dropoff",
                               manualDropoffStreet,
                               manualDropoffCity,
-                              manualDropoffPostcode,
+                              manualDropoffPostcode
                             )
                           }
                           disabled={
@@ -1541,10 +1733,19 @@ export default function GetQuoteModal({ isOpen, onClose }) {
               {/* Quote Display */}
               {quote && (
                 <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-6 animate-in slide-in-from-bottom duration-300">
-                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-                    <Calculator size={20} className="mr-2 text-orange-500" />
-                    Quote Breakdown
-                  </h4>
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                      <Calculator size={20} className="mr-2 text-orange-500" />
+                      Quote Breakdown
+                    </h4>
+                    <button
+                      onClick={downloadQuotePDF}
+                      className="flex items-center px-3 py-2 text-orange-600 hover:text-orange-700 border border-orange-300 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors text-sm"
+                    >
+                      <Download size={16} className="mr-1" />
+                      Download PDF
+                    </button>
+                  </div>
 
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
@@ -1553,6 +1754,14 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                       </span>
                       <span className="font-medium text-gray-900 dark:text-white">
                         ${quote.subtotal}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">
+                        Distance:
+                      </span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {quote.distanceKm} km
                       </span>
                     </div>
                     {formData.insurance && (
@@ -1568,7 +1777,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                     {formData.fragile && (
                       <div className="flex justify-between">
                         <span className="text-gray-600 dark:text-gray-400">
-                          Fragile Handling:
+                          Fragile handling (25%):
                         </span>
                         <span className="font-medium text-gray-900 dark:text-white">
                           ${quote.fragileCharge}
@@ -1583,6 +1792,26 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                         <span className="text-orange-500">${quote.total}</span>
                       </div>
                     </div>
+                    {quote.fallback && (
+                      <p className="text-xs text-orange-600 dark:text-orange-400 mt-2">
+                        * Estimated pricing (backend calculation unavailable)
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Loading state for quote calculation */}
+              {isLoadingQuote && (
+                <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+                  <div className="flex items-center justify-center">
+                    <Loader2
+                      size={20}
+                      className="animate-spin mr-2 text-orange-500"
+                    />
+                    <span className="text-gray-600 dark:text-gray-400">
+                      Calculating quote...
+                    </span>
                   </div>
                 </div>
               )}
@@ -1617,10 +1846,20 @@ export default function GetQuoteModal({ isOpen, onClose }) {
             ) : (
               <button
                 onClick={handleSubmit}
-                className="flex items-center px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-lg transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                disabled={isLoadingQuote}
+                className="flex items-center px-6 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all transform hover:scale-105 disabled:transform-none focus:outline-none focus:ring-2 focus:ring-orange-500"
               >
-                <Calculator size={20} className="mr-2" />
-                Get Quote
+                {isLoadingQuote ? (
+                  <>
+                    <Loader2 size={20} className="mr-2 animate-spin" />
+                    Calculating...
+                  </>
+                ) : (
+                  <>
+                    <Calculator size={20} className="mr-2" />
+                    Get Quote & Continue
+                  </>
+                )}
               </button>
             )}
           </div>
