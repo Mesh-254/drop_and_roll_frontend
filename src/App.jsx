@@ -1,6 +1,6 @@
 // App.jsx
 import { Routes, Route } from "react-router-dom";
-import { GoogleOAuthProvider } from "@react-oauth/google"
+import { GoogleOAuthProvider } from "@react-oauth/google";
 import Header from "./components/common/Header";
 import Hero from "./components/landingPage/Hero";
 import Services from "./components/landingPage/Services";
@@ -14,12 +14,14 @@ import "./App.css";
 import ForgotPassword from "./components/auth/forgot-password";
 import ResetPassword from "./components/auth/reset-password";
 
+import LoginPage from "./components/auth/LoginPage";
+import RegisterPage from "./components/auth/RegisterPage";
+import EmailConfirmationPage from "./components/auth/EmailConfirmationPage";
+import AccountConfirmedPage from "./components/auth/AccountConfirmedPage";
+import ResendConfirmationPage from "./components/auth/ResendConfirmationPage";
+import BookingModal from "./components/bookings/BookingModal";
+import QuotePage from "./components/quote/QuotePage";
 
-import LoginPage from "./components/auth/LoginPage"
-import RegisterPage from "./components/auth/RegisterPage"
-import EmailConfirmationPage from "./components/auth/EmailConfirmationPage"
-import AccountConfirmedPage from "./components/auth/AccountConfirmedPage"
-import ResendConfirmationPage from './components/auth/ResendConfirmationPage'
 
 // Layout for pages with Header and Footer
 function MainLayout({ children }) {
@@ -49,39 +51,47 @@ function App() {
   const googleClientId = import.meta.env.VITE_PUBLIC_GOOGLE_CLIENT_ID;
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
-    <div className="min-h-screen bg-black text-white">
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <MainLayout>
-              <HomePage />
-            </MainLayout>
-          }
-        />
-        <Route
-          path="/faqs"
-          element={
-            <MainLayout>
-              <FAQ />
-            </MainLayout>
-          }
-        />
-        {/* <Route path="/login" element={<LoginPage />} />
+      <div className="min-h-screen bg-black text-white">
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <MainLayout>
+                <HomePage />
+              </MainLayout>
+            }
+          />
+          <Route
+            path="/faqs"
+            element={
+              <MainLayout>
+                <FAQ />
+              </MainLayout>
+            }
+          />
+          {/* <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
  
         
         <Route path="/reset-password/:token" element={<ResetPassword />} /> */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/email-confirmation" element={<EmailConfirmationPage />} />
-        <Route path="/account-confirmed" element={<AccountConfirmedPage />} />
-        <Route path="/resend-confirmation" element={<ResendConfirmationPage />} />
-        <Route path="/admin" element={<AdminDashboard />} />{" "}
-        {/* No header/footer for admin */}
-      </Routes>
-    </div>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route
+            path="/email-confirmation"
+            element={<EmailConfirmationPage />}
+          />
+          <Route path="/account-confirmed" element={<AccountConfirmedPage />} />
+          <Route
+            path="/resend-confirmation"
+            element={<ResendConfirmationPage />}
+          />
+          <Route path="/admin" element={<AdminDashboard />} />{" "}
+          {/* No header/footer for admin */}
+          <Route path="/quote" element={<QuotePage />} />
+          <Route path="/booking" element={<BookingModal />} />
+        </Routes>
+      </div>
     </GoogleOAuthProvider>
   );
 }
