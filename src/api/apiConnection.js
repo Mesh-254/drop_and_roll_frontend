@@ -231,6 +231,181 @@ class ApiConnection {
       throw new Error(error.data?.error || error.message || "Password change failed")
     }
   }
+
+  // QUOTE AND BOOKING API CONNECTIONS 
+
+
+
+  async createQuote(quoteData) {
+    try {
+      // Transform frontend data to match backend QuoteRequestSerializer
+      const backendData = {
+        shipment_type: quoteData.shipmentType,
+        service_tier: quoteData.serviceTier,
+        weight_kg: Number.parseFloat(quoteData.weightKg),
+        distance_km: Number.parseFloat(quoteData.distanceKm),
+        fragile: quoteData.fragile || false,
+        insurance_amount: Number.parseFloat(quoteData.insuranceAmount) || 0,
+        dimensions: quoteData.dimensions || {},
+        surge: Number.parseFloat(quoteData.surge) || 1.0,
+        discount: Number.parseFloat(quoteData.discount) || 0.0,
+      }
+      console.log("Quote payload:", backendData);  // Add this line for logging
+      const response = await this.request("/api/booking/quotes/compute/", {
+        method: "POST",
+        body: JSON.stringify(backendData),
+        includeAuth: false,
+      })
+      
+      return { success: true, data: response.data }
+      
+    } catch (error) {
+      return {
+        success: false,
+        code: error.data?.code || "QUOTE_ERROR",
+        message: error.data?.error || error.message || "Failed to compute quote",
+      }
+    }
+  }
+
+  async createBooking(bookingData) {
+    try {
+      // Transform frontend data to match backend BookingCreateSerializer
+      const backendData = {
+        shipment_type: bookingData.shipmentType,
+        service_tier: bookingData.serviceTier,
+        weight_kg: Number.parseFloat(bookingData.weightKg),
+        distance_km: Number.parseFloat(bookingData.distanceKm),
+        fragile: bookingData.fragile || false,
+        insurance_amount: Number.parseFloat(bookingData.insuranceAmount) || 0,
+        dimensions: bookingData.dimensions || {},
+        pickup_address: {
+          line1: bookingData.pickupAddress.street || bookingData.pickupAddress.line1,
+          line2: bookingData.pickupAddress.line2 || "",
+          city: bookingData.pickupAddress.city,
+          region: bookingData.pickupAddress.region || "",
+          postal_code: bookingData.pickupAddress.postalCode || bookingData.pickupAddress.postal_code,
+          country: "GB",
+          latitude: bookingData.pickupAddress.latitude || null,
+          longitude: bookingData.pickupAddress.longitude || null,
+        },
+        dropoff_address: {
+          line1: bookingData.dropoffAddress.street || bookingData.dropoffAddress.line1,
+          line2: bookingData.dropoffAddress.line2 || "",
+          city: bookingData.dropoffAddress.city,
+          region: bookingData.dropoffAddress.region || "",
+          postal_code: bookingData.dropoffAddress.postalCode || bookingData.dropoffAddress.postal_code,
+          country: "GB",
+          latitude: bookingData.dropoffAddress.latitude || null,
+          longitude: bookingData.dropoffAddress.longitude || null,
+        },
+        quote_id: bookingData.quoteId,
+        scheduled_pickup_at: bookingData.scheduledPickupAt,
+        scheduled_dropoff_at: bookingData.scheduledDropoffAt || null,
+        promo_code: bookingData.promoCode || null,
+        notes: bookingData.notes || null,
+      }
+
+      const response = await this.request("/api/bookings/", {
+        method: "POST",
+        body: JSON.stringify(backendData),
+        includeAuth: false,
+      })
+      return { success: true, data: response.data }
+    } catch (error) {
+      return {
+        success: false,
+        code: error.data?.code || "BOOKING_ERROR",
+        message: error.data?.error || error.message || "Failed to create booking",
+      }
+    }
+  }
+
+  async getQuote(quoteId) {
+    try {
+      const response = await this.request(`/api/quotes/${quoteId}/`)
+      return { success: true, data: response.data }
+    } catch (error) {
+      return {
+        success: false,
+        code: error.data?.code || "FETCH_ERROR",
+        message: error.data?.error || error.message || "Failed to fetch quote",
+      }
+    }
+  }
+
+  async getBooking(bookingId) {
+    try {
+      const response = await this.request(`/api/bookings/${bookingId}/`)
+      return { success: true, data: response.data }
+    } catch (error) {
+      return {
+        success: false,
+        code: error.data?.code || "FETCH_ERROR",
+        message: error.data?.error || error.message || "Failed to fetch booking",
+      }
+    }
+  }
+
+  async calculateDistance(pickupAddress, dropoffAddress) {
+    try {
+      // Simple distance calculation using Haversine formula
+      // In production, you might want to use Google Maps Distance Matrix API
+      const lat1 = Number.parseFloat(pickupAddress.latitude)
+      const lon1 = Number.parseFloat(pickupAddress.longitude)
+      const lat2 = Number.parseFloat(dropoffAddress.latitude)
+      const lon2 = Number.parseFloat(dropoffAddress.longitude)
+
+      if (!lat1 || !lon1 || !lat2 || !lon2) {
+        // Fallback: estimate based on city names
+        const pickupCity = pickupAddress.city?.toLowerCase()
+        const dropoffCity = dropoffAddress.city?.toLowerCase()
+
+        if (pickupCity?.includes("milton keynes") && dropoffCity?.includes("oxford")) {
+          return 35 // Approximate distance between Milton Keynes and Oxford
+        } else if (pickupCity?.includes("oxford") && dropoffCity?.includes("milton keynes")) {
+          return 35
+        } else {
+          return 15 // Default within-city distance
+        }
+      }
+
+      const R = 6371 // Radius of the Earth in kilometers
+      const dLat = this.deg2rad(lat2 - lat1)
+      const dLon = this.deg2rad(lon2 - lon1)
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(this.deg2rad(lat1)) * Math.cos(this.deg2rad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+      const distance = R * c // Distance in kilometers
+
+      return Math.round(distance * 100) / 100 // Round to 2 decimal places
+    } catch (error) {
+      console.error("Distance calculation failed:", error)
+      return 15 // Default fallback distance
+    }
+  }
+
+  deg2rad(deg) {
+    return deg * (Math.PI / 180)
+  }
+
+  async updateBookingStatus(bookingId, status) {
+    try {
+      const response = await this.request(`/api/bookings/${bookingId}/status/`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      })
+      return { success: true, data: response.data }
+    } catch (error) {
+      return {
+        success: false,
+        code: error.data?.code || "UPDATE_ERROR",
+        message: error.data?.error || error.message || "Failed to update booking status",
+      }
+    }
+  }
+
 }
 
 const apiConnection = new ApiConnection()
