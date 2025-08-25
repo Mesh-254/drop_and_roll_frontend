@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect } from "react";
-import apiConnection from "../api/apiConnection";
+import {authApi} from "../api/AuthApi";
 
 const AuthContext = createContext();
 
@@ -24,8 +24,8 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      if (apiConnection.isAuthenticated()) {
-        const userData = await apiConnection.getCurrentUser();
+      if (authApi.isAuthenticated()) {
+        const userData = await authApi.getCurrentUser();
         setUser(userData);
         setIsAuthenticated(true);
       }
@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password, rememberMe = false) => {
     try {
-      const response = await apiConnection.login(email, password);
+      const response = await authApi.login(email, password);
       if (response.success) {
         if (rememberMe) {
           localStorage.setItem("remember_me", "true");
@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }) => {
         } else {
           localStorage.removeItem("remember_me");
         }
-        const userData = await apiConnection.getCurrentUser();
+        const userData = await authApi.getCurrentUser();
         setUser(userData);
         setIsAuthenticated(true);
         return { success: true, data: response.data };
@@ -69,7 +69,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
-      const response = await apiConnection.register(userData);
+      const response = await authApi.register(userData);
       if (response.success) {
         return { success: true, data: response.data };
       } else {
@@ -91,7 +91,7 @@ export const AuthProvider = ({ children }) => {
 
   const confirmEmail = async (uid, token) => {
     try {
-      const response = await apiConnection.confirmEmail(uid, token);
+      const response = await authApi.confirmEmail(uid, token);
       return { success: true, data: response.data };
     } catch (error) {
       return {
@@ -103,9 +103,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const googleAuth = async (idToken) => {
-    const result = await apiConnection.googleAuth(idToken)
+    const result = await authApi.googleAuth(idToken)
     if (result.success) {
-      const userData = await apiConnection.getCurrentUser()
+      const userData = await authApi.getCurrentUser()
       setUser(userData)
     }
     return result
@@ -113,7 +113,7 @@ export const AuthProvider = ({ children }) => {
 
 
   const logout = () => {
-    apiConnection.logout();
+    authApi.logout();
     setUser(null);
     setIsAuthenticated(false);
     localStorage.removeItem("remember_me");

@@ -1,6 +1,6 @@
 "use client";
 import { useNavigate } from "react-router-dom";
-import apiConnection from "../../api/apiConnection";
+import {bookingApi} from "../../api/BookingApi";
 import jsPDF from "jspdf";
 import dayjs from "dayjs";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -531,7 +531,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
 
     try {
       // Calculate distance between addresses
-      const distance = await apiConnection.calculateDistance(
+      const distance = await bookingApi.calculateDistance(
         formData.pickupAddress,
         formData.dropoffAddress
       );
@@ -556,7 +556,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
       };
 
       // Call backend API to compute quote
-      const result = await apiConnection.createQuote(quoteData);
+      const result = await bookingApi.createQuote(quoteData);
 
       if (result.success) {
         const backendQuote = result.data;
@@ -1423,7 +1423,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                 </div>
 
                 {(formData.shipmentType?.id === "parcels" ||
-                  formData.shipmentType?.id === "business") && (
+                  formData.shipmentType?.id === "business" || formData.shipmentType?.id === "cargo") && (
                   <>
                     <div className="flex items-center space-x-3 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
                       <input
