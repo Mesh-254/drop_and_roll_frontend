@@ -1,6 +1,6 @@
 "use client";
 import { useNavigate } from "react-router-dom";
-import {bookingApi} from "../../api/BookingApi";
+import { bookingApi } from "../../api/BookingApi";
 import jsPDF from "jspdf";
 import dayjs from "dayjs";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -9,7 +9,6 @@ import {
   Package,
   Truck,
   FileText,
-  MapPin,
   Shield,
   Calculator,
   ChevronLeft,
@@ -20,63 +19,6 @@ import {
   Loader2,
 } from "lucide-react";
 
-// Shipment types as specified
-const shipmentTypes = [
-  {
-    id: "parcels",
-    title: "Parcels or Documents",
-    icon: Package,
-    description:
-      "Small packages, documents, and lightweight items up to 31.5kg",
-  },
-  {
-    id: "cargo",
-    title: "Cargo/Freight (More than 31.5 kg)",
-    icon: Truck,
-    description: "Heavy items, bulk shipments, and freight over 31.5kg",
-  },
-  {
-    id: "business",
-    title: "Business Mail",
-    icon: FileText,
-    description: "Corporate mail, contracts, and business documents",
-  },
-];
-
-// Service offerings as specified
-const services = [
-  {
-    id: "standard",
-    title: "Standard",
-    description:
-      "Same/Next-Day Delivery: Reliable delivery with guaranteed timeframes.",
-    price: "From $8",
-    basePrice: 8,
-  },
-  {
-    id: "express",
-    title: "Express",
-    description: "1-2 Hour Urban Drop: Ultra-fast delivery in urban areas.",
-    price: "From $25",
-    basePrice: 25,
-  },
-  {
-    id: "business",
-    title: "Business Solutions",
-    description: "Recurring Pickups: Scheduled pickups for regular shipping.",
-    price: "From $12",
-    basePrice: 12,
-  },
-  {
-    id: "specialized",
-    title: "Specialized",
-    description:
-      "Temp-Sensitive Shipping: Climate-controlled shipping for sensitive items.",
-    price: "From $30",
-    basePrice: 30,
-  },
-];
-
 const stepTitles = [
   "Shipment Type",
   "Service Offering",
@@ -85,9 +27,327 @@ const stepTitles = [
   "Insurance & Quote",
 ];
 
+const ShipmentTypeSelector = ({
+  shipmentTypes,
+  selectedType,
+  onSelect,
+  isLoading,
+  error,
+  firstInputRef,
+}) => {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 size={24} className="animate-spin mr-2 text-orange-500" />
+        <span className="text-gray-600 dark:text-gray-400">
+          Loading shipment types...
+        </span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+        <div className="flex items-center text-red-700 dark:text-red-300">
+          <AlertCircle size={20} className="mr-2" />
+          <span>Failed to load shipment types: {error}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {shipmentTypes.map((type, index) => {
+        const IconComponent =
+          type.name === "Parcels"
+            ? Package
+            : type.name === "Cargo"
+            ? Truck
+            : FileText;
+        const isSelected = selectedType?.id === type.id;
+
+        return (
+          <button
+            key={type.id}
+            ref={index === 0 ? firstInputRef : null}
+            onClick={() => onSelect(type)}
+            className={`
+              p-6 border-2 rounded-xl transition-all text-center hover:scale-105 focus:outline-none focus:ring-2 focus:ring-orange-500
+              ${
+                isSelected
+                  ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
+                  : "border-gray-200 dark:border-gray-700 hover:border-orange-500 hover:bg-gray-50 dark:hover:bg-gray-800"
+              }
+            `}
+          >
+            <div className="flex flex-col items-center">
+              <div
+                className={`
+                w-12 h-12 rounded-full flex items-center justify-center mb-4 transition-colors
+                ${
+                  isSelected
+                    ? "bg-orange-500 text-white"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                }
+              `}
+              >
+                <IconComponent size={24} />
+              </div>
+              <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                {type.name}
+              </h4>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {type.description}
+              </p>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+const ServiceSelector = ({
+  services,
+  selectedService,
+  onSelect,
+  isLoading,
+  error,
+  firstInputRef,
+}) => {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 size={24} className="animate-spin mr-2 text-orange-500" />
+        <span className="text-gray-600 dark:text-gray-400">
+          Loading services...
+        </span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+        <div className="flex items-center text-red-700 dark:text-red-300">
+          <AlertCircle size={20} className="mr-2" />
+          <span>Failed to load services: {error}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {services.map((service, index) => {
+        const isSelected = selectedService?.id === service.id;
+
+        return (
+          <button
+            key={service.id}
+            ref={index === 0 ? firstInputRef : null}
+            onClick={() => onSelect(service)}
+            className={`
+              p-6 border-2 rounded-xl transition-all text-left hover:scale-105 focus:outline-none focus:ring-2 focus:ring-orange-500
+              ${
+                isSelected
+                  ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
+                  : "border-gray-200 dark:border-gray-700 hover:border-orange-500 hover:bg-gray-50 dark:hover:bg-gray-800"
+              }
+            `}
+          >
+            <div className="flex justify-between items-start mb-3">
+              <h4 className="font-semibold text-gray-900 dark:text-white">
+                {service.name}
+              </h4>
+              <span className="text-orange-500 font-bold">
+                From ${service.price}
+              </span>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {service.description}
+            </p>
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+const AddressInput = ({
+  label,
+  postcode,
+  onPostcodeChange,
+  address,
+  onAddressSelect,
+  suggestions,
+  isLoading,
+  validation,
+  placeholder = "Enter postcode",
+}) => {
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          {label} Postcode *
+        </label>
+        <div className="relative">
+          <input
+            type="text"
+            value={postcode}
+            onChange={(e) => onPostcodeChange(e.target.value)}
+            placeholder={placeholder}
+            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+          />
+          {isLoading && (
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+              <Loader2 size={16} className="animate-spin text-orange-500" />
+            </div>
+          )}
+        </div>
+        {validation && (
+          <div className="flex items-center text-red-500 text-sm mt-2">
+            <AlertCircle size={16} className="mr-2" />
+            {validation}
+          </div>
+        )}
+      </div>
+
+      {suggestions.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Select {label} Address *
+          </label>
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {suggestions.map((suggestion, index) => (
+              <button
+                key={index}
+                onClick={() => onAddressSelect(suggestion)}
+                className={`
+                  w-full p-3 text-left border rounded-lg transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500
+                  ${
+                    address === suggestion
+                      ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
+                      : "border-gray-200 dark:border-gray-700"
+                  }
+                `}
+              >
+                <span className="text-sm text-gray-900 dark:text-white">
+                  {suggestion}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const QuoteDisplay = ({ quote, onDownloadPDF, isLoading, formData }) => {
+  if (isLoading) {
+    return (
+      <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+        <div className="flex items-center justify-center">
+          <Loader2 size={20} className="animate-spin mr-2 text-orange-500" />
+          <span className="text-gray-600 dark:text-gray-400">
+            Calculating quote...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!quote) return null;
+
+  return (
+    <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-6 animate-in slide-in-from-bottom duration-300">
+      <div className="flex items-center justify-between mb-4">
+        <h4 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+          <Calculator size={20} className="mr-2 text-orange-500" />
+          Quote Breakdown
+        </h4>
+        <button
+          onClick={onDownloadPDF}
+          className="flex items-center px-3 py-2 text-orange-600 hover:text-orange-700 border border-orange-300 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors text-sm"
+        >
+          <Download size={16} className="mr-1" />
+          Download PDF
+        </button>
+      </div>
+
+      <div className="space-y-2 text-sm">
+        <div className="flex justify-between">
+          <span className="text-gray-600 dark:text-gray-400">
+            Base shipping cost:
+          </span>
+          <span className="font-medium text-gray-900 dark:text-white">
+            ${quote.base_price || quote.subtotal}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-600 dark:text-gray-400">Distance:</span>
+          <span className="font-medium text-gray-900 dark:text-white">
+            {quote.distance_km || quote.distanceKm} km
+          </span>
+        </div>
+        {formData.insurance && (
+          <div className="flex justify-between">
+            <span className="text-gray-600 dark:text-gray-400">
+              Insurance fee:
+            </span>
+            <span className="font-medium text-gray-900 dark:text-white">
+              $
+              {quote.insuranceFee ||
+                (Number.parseFloat(formData.insuranceAmount) * 0.02).toFixed(2)}
+            </span>
+          </div>
+        )}
+        {formData.fragile && (
+          <div className="flex justify-between">
+            <span className="text-gray-600 dark:text-gray-400">
+              Fragile handling:
+            </span>
+            <span className="font-medium text-gray-900 dark:text-white">
+              $
+              {quote.fragileCharge ||
+                ((quote.base_price || quote.subtotal) * 0.25).toFixed(2)}
+            </span>
+          </div>
+        )}
+        <div className="border-t border-orange-200 dark:border-orange-800 pt-2 mt-2">
+          <div className="flex justify-between text-lg font-bold">
+            <span className="text-gray-900 dark:text-white">Total Quote:</span>
+            <span className="text-orange-500">
+              ${quote.final_price || quote.total}
+            </span>
+          </div>
+        </div>
+        {quote.fallback && (
+          <p className="text-xs text-orange-600 dark:text-orange-400 mt-2">
+            * Estimated pricing (backend calculation unavailable)
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default function GetQuoteModal({ isOpen, onClose }) {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
+
+  const [shipmentTypes, setShipmentTypes] = useState([]);
+  const [services, setServices] = useState([]);
+  const [isLoadingTypes, setIsLoadingTypes] = useState(false);
+  const [isLoadingServices, setIsLoadingServices] = useState(false);
+  const [typesError, setTypesError] = useState(null);
+  const [servicesError, setServicesError] = useState(null);
+  const [quoteId, setQuoteId] = useState(null); // Store quote ID to prevent duplicates
+  const [lastQuoteData, setLastQuoteData] = useState(null); // Track form data changes
+
   const [formData, setFormData] = useState({
     shipmentType: null,
     service: null,
@@ -113,329 +373,496 @@ export default function GetQuoteModal({ isOpen, onClose }) {
   const [quote, setQuote] = useState(null);
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
 
-  const [manualPickupStreet, setManualPickupStreet] = useState("");
-  const [manualPickupCity, setManualPickupCity] = useState("");
-  const [manualPickupPostcode, setManualPickupPostcode] = useState("");
-
-  const [manualDropoffStreet, setManualDropoffStreet] = useState("");
-  const [manualDropoffCity, setManualDropoffCity] = useState("");
-  const [manualDropoffPostcode, setManualDropoffPostcode] = useState("");
-
   const firstInputRef = useRef(null);
   const debounceRef = useRef(null);
 
-  const lookupPostcode = async (postcode, type) => {
+  useEffect(() => {
+    if (isOpen) {
+      fetchShipmentTypes();
+      fetchServiceTypes();
+    }
+  }, [isOpen]);
+
+  const fetchShipmentTypes = async () => {
+    setIsLoadingTypes(true);
+    setTypesError(null);
+
+    try {
+      const result = await bookingApi.getShippingTypes();
+      if (result.success) {
+        setShipmentTypes(result.data);
+      } else {
+        setTypesError(result.message);
+      }
+    } catch (error) {
+      console.error("Failed to fetch shipment types:", error);
+      setTypesError("Failed to load shipment types");
+    } finally {
+      setIsLoadingTypes(false);
+    }
+  };
+
+  const fetchServiceTypes = async () => {
+    setIsLoadingServices(true);
+    setServicesError(null);
+
+    try {
+      const result = await bookingApi.getServiceTypes();
+      if (result.success) {
+        setServices(result.data);
+      } else {
+        setServicesError(result.message);
+      }
+    } catch (error) {
+      console.error("Failed to fetch service types:", error);
+      setServicesError("Failed to load service types");
+    } finally {
+      setIsLoadingServices(false);
+    }
+  };
+
+  const lookupPostcode = useCallback(async (postcode, type) => {
     if (!postcode || postcode.length < 3) {
       setAddressSuggestions((prev) => ({ ...prev, [type]: [] }));
       return;
     }
 
-    setIsLoadingAddresses(true);
-
-    try {
-      // Real API integration with getaddress.io
-      const API_KEY = import.meta.env.VITE_GETADDRESS_API_KEY || "demo-api-key";
-
-      // First try autocomplete endpoint
-      let response = await fetch(
-        `https://api.getAddress.io/autocomplete/${encodeURIComponent(
-          postcode
-        )}?api-key=${API_KEY}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.status}`);
-      }
-
-      let data = await response.json();
-      let addresses = [];
-
-      if (data.suggestions && data.suggestions.length > 0) {
-        // Use autocomplete suggestions
-        addresses = data.suggestions.map((suggestion) => suggestion.address);
-      } else {
-        // Fallback to postcode lookup if autocomplete fails
-        try {
-          response = await fetch(
-            `https://api.getAddress.io/get/${encodeURIComponent(
-              postcode
-            )}?api-key=${API_KEY}`
-          );
-          if (response.ok) {
-            data = await response.json();
-            if (data.addresses && data.addresses.length > 0) {
-              addresses = data.addresses.map(
-                (addr) => `${addr}, ${postcode.toUpperCase()}`
-              );
-            }
-          }
-        } catch (fallbackError) {
-          console.warn("Fallback API call failed:", fallbackError);
-        }
-      }
-
-      // Filter addresses to only show Milton Keynes and Oxford locations
-      const filteredAddresses = addresses.filter((address) => {
-        const addressLower = address.toLowerCase();
-        return (
-          addressLower.includes("milton keynes") ||
-          addressLower.includes("oxford")
-        );
-      });
-
-      // If no valid addresses found in operating areas, show all but with warning
-      if (filteredAddresses.length === 0 && addresses.length > 0) {
-        setAddressSuggestions((prev) => ({ ...prev, [type]: addresses }));
-      } else {
-        setAddressSuggestions((prev) => ({
-          ...prev,
-          [type]: filteredAddresses,
-        }));
-      }
-    } catch (error) {
-      console.error("Address lookup failed:", error);
-
-      // Fallback to mock data for development/demo
-      const mockAddresses = [
-        `123 High Street, Milton Keynes, ${postcode.toUpperCase()}`,
-        `456 Main Road, Oxford, ${postcode.toUpperCase()}`,
-        `789 Church Lane, Milton Keynes, ${postcode.toUpperCase()}`,
-      ];
-
-      setAddressSuggestions((prev) => ({ ...prev, [type]: mockAddresses }));
-    } finally {
-      setIsLoadingAddresses(false);
-    }
-  };
-
-  const handlePostcodeChange = (value, type) => {
-    setFormData((prev) => ({ ...prev, [`${type}Postcode`]: value }));
-
-    // Clear previous timeout
+    // Clear previous debounce
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
 
-    // Debounce API call
-    debounceRef.current = setTimeout(() => {
-      lookupPostcode(value, type);
-    }, 500);
+    // Debounce the API call
+    debounceRef.current = setTimeout(async () => {
+      setIsLoadingAddresses(true);
+
+      try {
+        const API_KEY =
+          import.meta.env.VITE_GETADDRESS_API_KEY || "demo-api-key";
+
+        // First try autocomplete endpoint
+        let response = await fetch(
+          `https://api.getAddress.io/autocomplete/${encodeURIComponent(
+            postcode
+          )}?api-key=${API_KEY}`
+        );
+
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.status}`);
+        }
+
+        let data = await response.json();
+        let addresses = [];
+
+        if (data.suggestions && data.suggestions.length > 0) {
+          addresses = data.suggestions.map((suggestion) => suggestion.address);
+        } else {
+          // Fallback to postcode lookup
+          try {
+            response = await fetch(
+              `https://api.getAddress.io/get/${encodeURIComponent(
+                postcode
+              )}?api-key=${API_KEY}`
+            );
+            if (response.ok) {
+              data = await response.json();
+              if (data.addresses && data.addresses.length > 0) {
+                addresses = data.addresses.map(
+                  (addr) => `${addr}, ${postcode.toUpperCase()}`
+                );
+              }
+            }
+          } catch (fallbackError) {
+            console.warn("Fallback API call failed:", fallbackError);
+          }
+        }
+
+        // Filter addresses for operating areas
+        const filteredAddresses = addresses.filter((address) => {
+          const addressLower = address.toLowerCase();
+          return (
+            addressLower.includes("milton keynes") ||
+            addressLower.includes("oxford")
+          );
+        });
+
+        setAddressSuggestions((prev) => ({
+          ...prev,
+          [type]: filteredAddresses.length > 0 ? filteredAddresses : addresses,
+        }));
+      } catch (error) {
+        console.error("Address lookup failed:", error);
+
+        // Fallback to mock data
+        const mockAddresses = [
+          `123 High Street, Milton Keynes, ${postcode.toUpperCase()}`,
+          `456 Oxford Road, Oxford, ${postcode.toUpperCase()}`,
+          `789 Main Street, Milton Keynes, ${postcode.toUpperCase()}`,
+        ];
+        setAddressSuggestions((prev) => ({ ...prev, [type]: mockAddresses }));
+      } finally {
+        setIsLoadingAddresses(false);
+      }
+    }, 300); // 300ms debounce
+  }, []);
+
+  const calculateQuote = async () => {
+    if (!formData.shipmentType || !formData.service) {
+      console.error("Missing shipment type or service");
+      return;
+    }
+
+    // Check if form data has changed significantly
+    const currentQuoteData = {
+      shipmentType: formData.shipmentType.id,
+      service: formData.service.id,
+      weight: formData.weight,
+      pickupAddress: formData.pickupAddress,
+      dropoffAddress: formData.dropoffAddress,
+      fragile: formData.fragile,
+      insurance: formData.insurance,
+      insuranceAmount: formData.insuranceAmount,
+      dimensions: {
+        width: formData.width,
+        length: formData.length,
+        height: formData.height,
+      },
+    };
+
+    // If we have an existing quote and data hasn't changed, reuse it
+    if (
+      quoteId &&
+      lastQuoteData &&
+      JSON.stringify(currentQuoteData) === JSON.stringify(lastQuoteData)
+    ) {
+      console.log("[v0] Reusing existing quote:", quoteId);
+      return;
+    }
+
+    setIsLoadingQuote(true);
+
+    try {
+      const distance = await bookingApi.calculateDistance(
+        {
+          city:
+            formData.pickupAddress?.split(",")[1]?.trim() || "Milton Keynes",
+          latitude: null,
+          longitude: null,
+        },
+        {
+          city: formData.dropoffAddress?.split(",")[1]?.trim() || "Oxford",
+          latitude: null,
+          longitude: null,
+        }
+      );
+
+      // Prepare quote data for backend
+      const quoteData = {
+        shipmentType: formData.shipmentType,
+        service: formData.service,
+        weightKg: Number.parseFloat(formData.weight),
+        distanceKm: distance,
+        fragile: formData.fragile,
+        insuranceAmount: formData.insurance
+          ? Number.parseFloat(formData.insuranceAmount)
+          : 0,
+        dimensions: {
+          width: Number.parseFloat(formData.width) || null,
+          length: Number.parseFloat(formData.length) || null,
+          height: Number.parseFloat(formData.height) || null,
+        },
+        surge: 1.0,
+        discount: 0.0,
+      };
+
+      console.log("[v0] Creating new quote with data:", quoteData);
+
+      // Call backend API to compute quote
+      const result = await bookingApi.createQuote(quoteData);
+
+      if (result.success) {
+        const backendQuote = result.data;
+        setQuote(backendQuote);
+        setQuoteId(backendQuote.id); // Store quote ID
+        setLastQuoteData(currentQuoteData); // Store form data snapshot
+        console.log("[v0] Quote created successfully:", backendQuote.id);
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error) {
+      console.error("Quote calculation failed:", error);
+
+      // Enhanced fallback calculation
+      const service = formData.service;
+      const basePrice = service?.price || 15;
+      const weight = Number.parseFloat(formData.weight) || 1;
+      const weightMultiplier = weight > 5 ? 1 + (weight - 5) * 0.1 : 1;
+      const fragileMultiplier = formData.fragile ? 1.25 : 1;
+      const insuranceFee = formData.insurance
+        ? Number.parseFloat(formData.insuranceAmount) * 0.02
+        : 0;
+
+      const subtotal =
+        Math.round(basePrice * weightMultiplier * fragileMultiplier * 100) /
+        100;
+      const total = Math.round((subtotal + insuranceFee) * 100) / 100;
+
+      setQuote({
+        base_price: subtotal,
+        final_price: total,
+        distance_km: 15,
+        insuranceFee: Math.round(insuranceFee * 100) / 100,
+        fragileCharge: formData.fragile
+          ? Math.round((subtotal / fragileMultiplier) * 0.25 * 100) / 100
+          : 0,
+        fallback: true,
+      });
+    } finally {
+      setIsLoadingQuote(false);
+    }
   };
 
-  const validateStep = useCallback(
-    (step) => {
-      const errors = {};
+  const downloadQuotePDF = () => {
+    if (!quote) return;
 
-      switch (step) {
-        case 1: {
-          if (!formData.shipmentType)
-            errors.shipmentType = "Please select a shipment type";
-          break;
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+
+    // Header
+    doc.setFontSize(20);
+    doc.setTextColor(255, 87, 34); // Orange color
+    doc.text("Drop & Roll - Shipping Quote", pageWidth / 2, 30, {
+      align: "center",
+    });
+
+    // Quote ID and date
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Quote ID: ${quote.id || "FALLBACK-" + Date.now()}`, 20, 50);
+    doc.text(`Generated: ${dayjs().format("DD/MM/YYYY HH:mm")}`, 20, 60);
+
+    // Shipment details
+    doc.setFontSize(14);
+    doc.text("Shipment Details:", 20, 80);
+    doc.setFontSize(11);
+    doc.text(`Type: ${formData.shipmentType?.name || "N/A"}`, 20, 95);
+    doc.text(`Service: ${formData.service?.name || "N/A"}`, 20, 105);
+    doc.text(`Weight: ${formData.weight} kg`, 20, 115);
+    doc.text(
+      `Dimensions: ${formData.width}×${formData.length}×${formData.height} cm`,
+      20,
+      125
+    );
+    doc.text(`Fragile: ${formData.fragile ? "Yes" : "No"}`, 20, 135);
+
+    // Addresses
+    doc.text("Addresses:", 20, 155);
+    doc.text(`From: ${formData.pickupAddress}`, 20, 170);
+    doc.text(`To: ${formData.dropoffAddress}`, 20, 180);
+    doc.text(`Distance: ${quote.distance_km || quote.distanceKm} km`, 20, 190);
+
+    // Quote breakdown
+    doc.setFontSize(14);
+    doc.text("Quote Breakdown:", 20, 210);
+    doc.setFontSize(11);
+    doc.text(
+      `Base shipping cost: $${quote.base_price || quote.subtotal}`,
+      20,
+      225
+    );
+
+    if (formData.insurance) {
+      doc.text(
+        `Insurance fee: $${
+          quote.insuranceFee ||
+          (Number.parseFloat(formData.insuranceAmount) * 0.02).toFixed(2)
+        }`,
+        20,
+        235
+      );
+    }
+
+    if (formData.fragile) {
+      doc.text(
+        `Fragile handling: $${
+          quote.fragileCharge ||
+          ((quote.base_price || quote.subtotal) * 0.25).toFixed(2)
+        }`,
+        20,
+        245
+      );
+    }
+
+    // Total
+    doc.setFontSize(16);
+    doc.setTextColor(255, 87, 34);
+    doc.text(`Total: $${quote.final_price || quote.total}`, 20, 265);
+
+    if (quote.fallback) {
+      doc.setFontSize(10);
+      doc.setTextColor(255, 0, 0);
+      doc.text(
+        "* Estimated pricing (backend calculation unavailable)",
+        20,
+        280
+      );
+    }
+
+    doc.save(`drop-roll-quote-${quote.id || Date.now()}.pdf`);
+  };
+
+  const validateStep = (step) => {
+    const errors = {};
+
+    switch (step) {
+      case 1:
+        if (!formData.shipmentType) {
+          errors.shipmentType = "Please select a shipment type";
         }
-        case 2: {
-          if (!formData.service) errors.service = "Please select a service";
-          break;
+        break;
+      case 2:
+        if (!formData.service) {
+          errors.service = "Please select a service";
         }
-        case 3: {
-          if (!formData.pickupAddress)
-            errors.pickupAddress = "Please select pickup address";
-          if (!formData.dropoffAddress)
-            errors.dropoffAddress = "Please select dropoff address";
-
-          // Handle both string and object address formats
-          const getAddressString = (address) => {
-            if (typeof address === "string") return address;
-            if (typeof address === "object" && address.formatted_address)
-              return address.formatted_address;
-            if (typeof address === "object" && address.address)
-              return address.address;
-            return "";
-          };
-
-          const pickupStr = getAddressString(
-            formData.pickupAddress
-          ).toLowerCase();
-          const dropoffStr = getAddressString(
-            formData.dropoffAddress
-          ).toLowerCase();
-
-          const isPickupValid =
-            pickupStr.includes("milton keynes") || pickupStr.includes("oxford");
-          const isDropoffValid =
-            dropoffStr.includes("milton keynes") ||
-            dropoffStr.includes("oxford");
-
-          if (formData.pickupAddress && !isPickupValid)
-            errors.pickupAddress =
-              "Sorry, this location is not within our operating areas (Milton Keynes or Oxford)";
-          if (formData.dropoffAddress && !isDropoffValid)
-            errors.dropoffAddress =
-              "Sorry, this location is not within our operating areas (Milton Keynes or Oxford)";
-          break;
+        break;
+      case 3:
+        if (!formData.pickupPostcode.trim()) {
+          errors.pickupPostcode = "Pickup postcode is required";
         }
-        case 4: {
-          if (!formData.weight || formData.weight <= 0)
-            errors.weight = "Please enter a valid weight";
-          if (
-            formData.shipmentType?.id === "parcels" &&
-            formData.weight > 31.5
-          ) {
-            errors.weight = "Parcels must be 31.5kg or less";
-          }
-          if (formData.shipmentType?.id === "parcels") {
-            if (!formData.width || formData.width <= 0)
-              errors.width = "Please enter width";
-            if (!formData.length || formData.length <= 0)
-              errors.length = "Please enter length";
-            if (
-              formData.fragile &&
-              (!formData.height || formData.height <= 0)
-            ) {
-              errors.height = "Height is required for fragile items";
-            }
-          }
-          break;
+        if (!formData.pickupAddress.trim()) {
+          errors.pickupAddress = "Please select a pickup address";
         }
-        case 5: {
-          if (
-            formData.insurance &&
-            (!formData.insuranceAmount ||
-              formData.insuranceAmount < 50 ||
-              formData.insuranceAmount > 5000)
-          ) {
-            errors.insuranceAmount =
-              "Insurance amount must be between $50 and $5000";
-          }
-          break;
+        if (!formData.dropoffPostcode.trim()) {
+          errors.dropoffPostcode = "Dropoff postcode is required";
         }
-        default:
-          break;
-      }
+        if (!formData.dropoffAddress.trim()) {
+          errors.dropoffAddress = "Please select a dropoff address";
+        }
+        break;
+      case 4:
+        if (!formData.weight || Number.parseFloat(formData.weight) <= 0) {
+          errors.weight = "Weight must be greater than 0";
+        }
+        if (
+          formData.shipmentType?.name === "Parcels" &&
+          Number.parseFloat(formData.weight) > 31.5
+        ) {
+          errors.weight = "Parcels must be 31.5kg or less";
+        }
+        if (!formData.width || Number.parseFloat(formData.width) <= 0) {
+          errors.width = "Width is required";
+        }
+        if (!formData.length || Number.parseFloat(formData.length) <= 0) {
+          errors.length = "Length is required";
+        }
+        if (
+          formData.insurance &&
+          (!formData.insuranceAmount ||
+            Number.parseFloat(formData.insuranceAmount) <= 0)
+        ) {
+          errors.insuranceAmount = "Insurance amount must be greater than 0";
+        }
+        break;
+    }
 
-      setValidation(errors);
-      return Object.keys(errors).length === 0;
-    },
-    [formData]
-  );
+    setValidation(errors);
+    return Object.keys(errors).length === 0;
+  };
 
-  const nextStep = useCallback(() => {
+  const checkStepValidity = (data) => {
+    switch (currentStep) {
+      case 1:
+        return data.shipmentType !== null;
+      case 2:
+        return data.service !== null;
+      case 3:
+        return data.pickupAddress && data.dropoffAddress;
+      case 4:
+        return (
+          data.weight &&
+          data.width &&
+          data.length &&
+          (!data.insurance || data.insuranceAmount)
+        );
+      case 5:
+        return quote !== null;
+      default:
+        return false;
+    }
+  };
+
+  const nextStep = () => {
     if (validateStep(currentStep)) {
-      if (currentStep < 5) {
-        setCurrentStep(currentStep + 1);
+      if (currentStep === 4) {
+        calculateQuote();
       }
+      setCurrentStep((prev) => Math.min(prev + 1, 5));
     }
-  }, [currentStep, validateStep]);
+  };
 
-  const prevStep = useCallback(() => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-      setValidation({}); // Clear validation errors when going back
-    }
-  }, [currentStep]);
+  const prevStep = () => {
+    setCurrentStep((prev) => Math.max(prev - 1, 1));
+  };
 
-  const handleShipmentTypeSelect = useCallback((type) => {
+  const handleShipmentTypeSelect = (type) => {
     setFormData((prev) => ({ ...prev, shipmentType: type }));
-    setValidation({}); // Clear any validation errors
-    // Auto-advance after a short delay
-    setTimeout(() => {
-      setCurrentStep(2);
-    }, 300);
-  }, []);
+    setValidation((prev) => ({ ...prev, shipmentType: null }));
+  };
 
-  const handleServiceSelect = useCallback((service) => {
-    setFormData((prev) => ({ ...prev, service }));
-    setValidation({}); // Clear any validation errors
-    // Auto-advance after a short delay
-    setTimeout(() => {
-      setCurrentStep(3);
-    }, 300);
-  }, []);
+  const handleServiceSelect = (service) => {
+    setFormData((prev) => ({ ...prev, service: service }));
+    setValidation((prev) => ({ ...prev, service: null }));
+  };
 
-  const checkStepValidity = useCallback(
-    (data) => {
-      switch (currentStep) {
-        case 1: {
-          return data.shipmentType && data.shipmentType.id;
-        }
-        case 2: {
-          return data.service && data.service.id;
-        }
-        case 3: {
-          // Enhanced address validation
-          const getAddressString = (address) => {
-            if (typeof address === "string") return address;
-            if (typeof address === "object" && address?.formatted_address)
-              return address.formatted_address;
-            if (typeof address === "object" && address?.address)
-              return address.address;
-            if (typeof address === "object" && address?.line_1)
-              return `${address.line_1}, ${address.line_2 || ""}, ${
-                address.line_3 || ""
-              }`;
-            return "";
-          };
-
-          const pickupStr = getAddressString(data.pickupAddress).toLowerCase();
-          const dropoffStr = getAddressString(
-            data.dropoffAddress
-          ).toLowerCase();
-
-          const hasPickup = data.pickupAddress && pickupStr.length > 0;
-          const hasDropoff = data.dropoffAddress && dropoffStr.length > 0;
-
-          if (!hasPickup || !hasDropoff) return false;
-
-          // Check if addresses are in operating areas
-          const isPickupValid =
-            pickupStr.includes("milton keynes") || pickupStr.includes("oxford");
-          const isDropoffValid =
-            dropoffStr.includes("milton keynes") ||
-            dropoffStr.includes("oxford");
-
-          return isPickupValid && isDropoffValid;
-        }
-        case 4: {
-          const hasWeight = data.weight && Number.parseFloat(data.weight) > 0;
-          if (!hasWeight) return false;
-
-          // Check weight limits for parcels
-          if (
-            data.shipmentType?.id === "parcels" &&
-            Number.parseFloat(data.weight) > 31.5
-          ) {
-            return false;
-          }
-
-          // For parcels, check dimensions
-          if (data.shipmentType?.id === "parcels") {
-            const hasWidth = data.width && Number.parseFloat(data.width) > 0;
-            const hasLength = data.length && Number.parseFloat(data.length) > 0;
-            return hasWidth && hasLength;
-          }
-
-          return true;
-        }
-        case 5: {
-          if (data.insurance) {
-            const amount = Number.parseFloat(data.insuranceAmount);
-            return amount >= 50 && amount <= 5000;
-          }
-          return true;
-        }
-        default: {
-          return false;
-        }
-      }
-    },
-    [currentStep]
-  );
-
-  // Auto-focus first input when step changes
-  useEffect(() => {
-    if (firstInputRef.current) {
-      setTimeout(() => firstInputRef.current?.focus(), 100);
+  const handleSubmit = () => {
+    if (!quote || !quoteId) {
+      console.error("No quote available for booking");
+      return;
     }
-  }, [currentStep]);
+
+    // Structure form data for booking API compatibility
+    const structuredFormData = {
+      shipmentType: formData.shipmentType,
+      service: formData.service,
+      weightKg: Number.parseFloat(formData.weight),
+      distanceKm: quote.distance_km || quote.distanceKm,
+      fragile: formData.fragile,
+      insuranceAmount: formData.insurance
+        ? Number.parseFloat(formData.insuranceAmount)
+        : 0,
+      dimensions: {
+        width: Number.parseFloat(formData.width) || null,
+        length: Number.parseFloat(formData.length) || null,
+        height: Number.parseFloat(formData.height) || null,
+      },
+      pickupAddress: {
+        line1: formData.pickupAddress.split(",")[0]?.trim(),
+        city: formData.pickupAddress.split(",")[1]?.trim() || "Milton Keynes",
+        postalCode: formData.pickupPostcode,
+        country: "GB",
+      },
+      dropoffAddress: {
+        line1: formData.dropoffAddress.split(",")[0]?.trim(),
+        city: formData.dropoffAddress.split(",")[1]?.trim() || "Oxford",
+        postalCode: formData.dropoffPostcode,
+        country: "GB",
+      },
+    };
+
+    console.log("[v0] Navigating to booking with:", {
+      structuredFormData,
+      quote,
+      quoteId,
+    });
+
+    navigate("/booking", {
+      state: {
+        formData: structuredFormData,
+        quote: quote,
+        quoteId: quoteId,
+      },
+    });
+  };
 
   // Reset form when modal closes
   useEffect(() => {
@@ -458,368 +885,85 @@ export default function GetQuoteModal({ isOpen, onClose }) {
       });
       setValidation({});
       setQuote(null);
-      setManualPickupStreet("");
-      setManualPickupCity("");
-      setManualPickupPostcode("");
-      setManualDropoffStreet("");
-      setManualDropoffCity("");
-      setManualDropoffPostcode("");
+      setQuoteId(null);
+      setLastQuoteData(null);
+      setAddressSuggestions({ pickup: [], dropoff: [] });
     }
   }, [isOpen]);
 
-  const handleManualAddressSave = useCallback(
-    (type, street, city, postcode) => {
-      const fullAddress = `${street}, ${city}, ${postcode}`;
-      const cityLower = city.toLowerCase();
-
-      // Validate that the city is within operating areas
-      if (
-        !cityLower.includes("milton keynes") &&
-        !cityLower.includes("oxford")
-      ) {
-        setValidation((prev) => ({
-          ...prev,
-          [type === "pickup" ? "pickupAddress" : "dropoffAddress"]:
-            "Sorry, this location is not within our operating areas (Milton Keynes or Oxford)",
-        }));
-        return;
-      }
-
-      // Clear any previous validation errors
-      setValidation((prev) => {
-        const newValidation = { ...prev };
-        delete newValidation[
-          type === "pickup" ? "pickupAddress" : "dropoffAddress"
-        ];
-        return newValidation;
-      });
-
-      // Save the address
-      setFormData((prev) => ({
-        ...prev,
-        [type === "pickup" ? "pickupAddress" : "dropoffAddress"]: {
-          address: fullAddress,
-          formatted_address: fullAddress,
-          street,
-          city,
-          postcode,
-        },
-        [type === "pickup" ? "pickupPostcode" : "dropoffPostcode"]: "",
-      }));
-    },
-    []
-  );
-
+  // Focus management
   useEffect(() => {
-    if (currentStep === 3) {
-      // Run validation when addresses change
-      const timer = setTimeout(() => {
-        validateStep(3);
-      }, 300); // Debounce validation
-
-      return () => clearTimeout(timer);
+    if (isOpen && firstInputRef.current) {
+      setTimeout(() => firstInputRef.current?.focus(), 100);
     }
-  }, [
-    currentStep,
-    formData.pickupAddress,
-    formData.dropoffAddress,
-    validateStep,
-  ]);
-
-  const calculateQuote = async () => {
-    setIsLoadingQuote(true);
-
-    try {
-      // Calculate distance between addresses
-      const distance = await bookingApi.calculateDistance(
-        formData.pickupAddress,
-        formData.dropoffAddress
-      );
-
-      // Prepare quote data for backend
-      const quoteData = {
-        shipmentType: formData.shipmentType.id,
-        serviceTier: formData.service.id,
-        weightKg: Number.parseFloat(formData.weight),
-        distanceKm: distance,
-        fragile: formData.fragile,
-        insuranceAmount: formData.insurance
-          ? Number.parseFloat(formData.insuranceAmount)
-          : 0,
-        dimensions: {
-          width: Number.parseFloat(formData.width) || null,
-          length: Number.parseFloat(formData.length) || null,
-          height: Number.parseFloat(formData.height) || null,
-        },
-        surge: 1.0, // Default surge multiplier
-        discount: 0.0, // Default discount
-      };
-
-      // Call backend API to compute quote
-      const result = await bookingApi.createQuote(quoteData);
-
-      if (result.success) {
-        const backendQuote = result.data;
-        setQuote({
-          id: backendQuote.id,
-          subtotal: backendQuote.base_price,
-          insuranceFee: formData.insurance
-            ? Number.parseFloat(formData.insuranceAmount) * 0.02
-            : 0,
-          fragileCharge: formData.fragile ? backendQuote.base_price * 0.25 : 0,
-          total: backendQuote.final_price,
-          distanceKm: distance,
-          backendData: backendQuote, // Store full backend response
-        });
-      } else {
-        throw new Error(result.message);
-      }
-    } catch (error) {
-      console.error("Quote calculation failed:", error);
-      // Fallback to frontend calculation
-      const service = formData.service;
-      const basePrice = service?.basePrice || 15;
-      const weight = Number.parseFloat(formData.weight) || 1;
-      const weightMultiplier = weight > 5 ? 1 + (weight - 5) * 0.1 : 1;
-      const fragileMultiplier = formData.fragile ? 1.25 : 1;
-      const insuranceFee = formData.insurance
-        ? Number.parseFloat(formData.insuranceAmount) * 0.02
-        : 0;
-
-      const subtotal =
-        Math.round(basePrice * weightMultiplier * fragileMultiplier * 100) /
-        100;
-      const total = Math.round((subtotal + insuranceFee) * 100) / 100;
-
-      setQuote({
-        subtotal,
-        insuranceFee: Math.round(insuranceFee * 100) / 100,
-        fragileCharge: formData.fragile
-          ? Math.round((subtotal / fragileMultiplier) * 0.25 * 100) / 100
-          : 0,
-        total,
-        distanceKm: 15, // Default distance
-        fallback: true,
-      });
-    } finally {
-      setIsLoadingQuote(false);
-    }
-  };
-
-  const downloadQuotePDF = () => {
-    if (!quote) return;
-
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.width;
-
-    // Header
-    doc.setFontSize(20);
-    doc.text("Shipping Quote", pageWidth / 2, 20, { align: "center" });
-
-    // Quote details
-    doc.setFontSize(12);
-    let yPos = 40;
-
-    doc.text(`Quote ID: ${quote.id || "N/A"}`, 20, yPos);
-    yPos += 10;
-    doc.text(`Date: ${dayjs().format("DD/MM/YYYY HH:mm")}`, 20, yPos);
-    yPos += 20;
-
-    // Shipment details
-    doc.setFontSize(14);
-    doc.text("Shipment Details:", 20, yPos);
-    yPos += 10;
-
-    doc.setFontSize(10);
-    doc.text(`Type: ${formData.shipmentType?.title}`, 20, yPos);
-    yPos += 8;
-    doc.text(`Service: ${formData.service?.title}`, 20, yPos);
-    yPos += 8;
-    doc.text(`Weight: ${formData.weight} kg`, 20, yPos);
-    yPos += 8;
-
-    if (formData.width && formData.length) {
-      doc.text(
-        `Dimensions: ${formData.width} × ${formData.length}${
-          formData.height ? ` × ${formData.height}` : ""
-        } cm`,
-        20,
-        yPos
-      );
-      yPos += 8;
-    }
-
-    doc.text(`Fragile: ${formData.fragile ? "Yes" : "No"}`, 20, yPos);
-    yPos += 8;
-    doc.text(`Distance: ${quote.distanceKm} km`, 20, yPos);
-    yPos += 15;
-
-    // Addresses
-    doc.text(
-      `From: ${
-        typeof formData.pickupAddress === "string"
-          ? formData.pickupAddress
-          : formData.pickupAddress?.formatted_address || "N/A"
-      }`,
-      20,
-      yPos
-    );
-    yPos += 8;
-    doc.text(
-      `To: ${
-        typeof formData.dropoffAddress === "string"
-          ? formData.dropoffAddress
-          : formData.dropoffAddress?.formatted_address || "N/A"
-      }`,
-      20,
-      yPos
-    );
-    yPos += 20;
-
-    // Pricing breakdown
-    doc.setFontSize(14);
-    doc.text("Pricing Breakdown:", 20, yPos);
-    yPos += 10;
-
-    doc.setFontSize(10);
-    doc.text(`Base shipping cost: $${quote.subtotal}`, 20, yPos);
-    yPos += 8;
-
-    if (formData.insurance) {
-      doc.text(`Insurance fee (2%): $${quote.insuranceFee}`, 20, yPos);
-      yPos += 8;
-    }
-
-    if (formData.fragile) {
-      doc.text(`Fragile handling (25%): $${quote.fragileCharge}`, 20, yPos);
-      yPos += 8;
-    }
-
-    yPos += 5;
-    doc.setFontSize(12);
-    doc.text(`Total: $${quote.total}`, 20, yPos);
-
-    // Footer
-    doc.setFontSize(8);
-    doc.text(
-      "This quote is valid for 7 days from the date of issue.",
-      pageWidth / 2,
-      280,
-      { align: "center" }
-    );
-
-    doc.save(`shipping-quote-${dayjs().format("YYYY-MM-DD")}.pdf`);
-  };
-
-  const handleSubmit = async () => {
-    if (!validateStep(5)) return;
-
-    await calculateQuote();
-
-    // Wait for quote to be set
-    setTimeout(() => {
-      if (quote) {
-        // Navigate to booking page with state
-        navigate("/booking", {
-          state: {
-            formData: {
-              ...formData,
-
-              shipmentType: {
-                id: formData.shipmentType.id,
-                title: formData.shipmentType.title,
-              }, // Only serializable fields
-              service: {
-                id: formData.service.id,
-                title: formData.service.title,
-              },
-
-              // Transform addresses to consistent format
-              pickupAddress:
-                typeof formData.pickupAddress === "string"
-                  ? {
-                      formatted_address: formData.pickupAddress,
-                      line1: formData.pickupAddress,
-                    }
-                  : formData.pickupAddress,
-              dropoffAddress:
-                typeof formData.dropoffAddress === "string"
-                  ? {
-                      formatted_address: formData.dropoffAddress,
-                      line1: formData.dropoffAddress,
-                    }
-                  : formData.dropoffAddress,
-            },
-            quote: quote,
-          },
-        });
-        onClose();
-      }
-    }, 100);
-  };
+  }, [isOpen, currentStep]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-y-auto animate-in zoom-in-95 duration-300">
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Get Quote
-          </h2>
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-orange-500 text-white rounded-t-2xl">
+          <div>
+            <h2 className="text-2xl font-bold">Get Quote & Book</h2>
+            <p className="text-orange-100 text-sm">
+              Step {currentStep} of 5: {stepTitles[currentStep - 1]}
+            </p>
+          </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            className="p-2 hover:bg-orange-600 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-orange-300"
+            aria-label="Close modal"
           >
             <X size={24} />
           </button>
         </div>
 
-        {/* Progress Indicator */}
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-2">
+        {/* Progress Bar */}
+        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800">
+          <div className="flex items-center justify-between">
             {stepTitles.map((title, index) => {
-              const stepNum = index + 1;
-              const isActive = currentStep === stepNum;
-              const isCompleted = currentStep > stepNum;
+              const stepNumber = index + 1;
+              const isActive = stepNumber === currentStep;
+              const isCompleted = stepNumber < currentStep;
 
               return (
-                <div key={stepNum} className="flex items-center">
+                <div key={stepNumber} className="flex items-center">
                   <div
                     className={`
-                    w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all
-                    ${
-                      isCompleted
-                        ? "bg-green-500 text-white"
-                        : isActive
-                        ? "bg-orange-500 text-white"
-                        : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
-                    }
-                  `}
-                  >
-                    {isCompleted ? <Check size={16} /> : stepNum}
-                  </div>
-                  {index < stepTitles.length - 1 && (
-                    <div
-                      className={`
-                      w-16 h-1 mx-2 transition-all
+                      w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors
                       ${
-                        currentStep > stepNum
-                          ? "bg-green-500"
-                          : "bg-gray-200 dark:bg-gray-700"
+                        isCompleted
+                          ? "bg-green-500 text-white"
+                          : isActive
+                          ? "bg-orange-500 text-white"
+                          : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
                       }
                     `}
-                    />
+                  >
+                    {isCompleted ? <Check size={16} /> : stepNumber}
+                  </div>
+                  <span
+                    className={`
+                      ml-2 text-sm font-medium hidden sm:block
+                      ${
+                        isActive
+                          ? "text-orange-500"
+                          : isCompleted
+                          ? "text-green-500"
+                          : "text-gray-500 dark:text-gray-400"
+                      }
+                    `}
+                  >
+                    {title}
+                  </span>
+                  {index < stepTitles.length - 1 && (
+                    <div className="w-8 h-0.5 bg-gray-200 dark:bg-gray-700 mx-4 hidden sm:block" />
                   )}
                 </div>
               );
             })}
-          </div>
-          <div className="text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Step {currentStep} of 5: {stepTitles[currentStep - 1]}
-            </p>
           </div>
         </div>
 
@@ -837,49 +981,14 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {shipmentTypes.map((type) => {
-                  const IconComponent = type.icon;
-                  const isSelected = formData.shipmentType?.id === type.id;
-
-                  return (
-                    <button
-                      key={type.id}
-                      ref={type.id === "parcels" ? firstInputRef : null}
-                      onClick={() => handleShipmentTypeSelect(type)}
-                      className={`
-                        p-6 border-2 rounded-xl transition-all text-center hover:scale-105 focus:outline-none focus:ring-2 focus:ring-orange-500
-                        ${
-                          isSelected
-                            ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
-                            : "border-gray-200 dark:border-gray-700 hover:border-orange-500 hover:bg-gray-50 dark:hover:bg-gray-800"
-                        }
-                      `}
-                    >
-                      <div className="flex flex-col items-center">
-                        <div
-                          className={`
-                          w-12 h-12 rounded-full flex items-center justify-center mb-4 transition-colors
-                          ${
-                            isSelected
-                              ? "bg-orange-500 text-white"
-                              : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
-                          }
-                        `}
-                        >
-                          <IconComponent size={24} />
-                        </div>
-                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
-                          {type.title}
-                        </h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {type.description}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+              <ShipmentTypeSelector
+                shipmentTypes={shipmentTypes}
+                selectedType={formData.shipmentType}
+                onSelect={handleShipmentTypeSelect}
+                isLoading={isLoadingTypes}
+                error={typesError}
+                firstInputRef={firstInputRef}
+              />
 
               {validation.shipmentType && (
                 <div className="flex items-center text-red-500 text-sm">
@@ -899,7 +1008,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                     Choose Core Service Offering
                   </h3>
                   <p className="text-gray-600 dark:text-gray-400">
-                    Selected: {formData.shipmentType?.title}
+                    Selected: {formData.shipmentType?.name}
                   </p>
                 </div>
                 <button
@@ -911,39 +1020,14 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {services.map((service) => {
-                  const isSelected = formData.service?.id === service.id;
-
-                  return (
-                    <button
-                      key={service.id}
-                      ref={service.id === "standard" ? firstInputRef : null}
-                      onClick={() => handleServiceSelect(service)}
-                      className={`
-                        p-6 border-2 rounded-xl transition-all text-left hover:scale-105 focus:outline-none focus:ring-2 focus:ring-orange-500
-                        ${
-                          isSelected
-                            ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
-                            : "border-gray-200 dark:border-gray-700 hover:border-orange-500 hover:bg-gray-50 dark:hover:bg-gray-800"
-                        }
-                      `}
-                    >
-                      <div className="flex justify-between items-start mb-3">
-                        <h4 className="font-semibold text-gray-900 dark:text-white">
-                          {service.title}
-                        </h4>
-                        <span className="text-orange-500 font-bold">
-                          {service.price}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {service.description}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
+              <ServiceSelector
+                services={services}
+                selectedService={formData.service}
+                onSelect={handleServiceSelect}
+                isLoading={isLoadingServices}
+                error={servicesError}
+                firstInputRef={firstInputRef}
+              />
 
               {validation.service && (
                 <div className="flex items-center text-red-500 text-sm">
@@ -960,10 +1044,10 @@ export default function GetQuoteModal({ isOpen, onClose }) {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-                    Pickup and Drop-off Locations
+                    Pickup & Dropoff Locations
                   </h3>
                   <p className="text-gray-600 dark:text-gray-400">
-                    Enter postcode or full address for suggestions
+                    Service: {formData.service?.name}
                   </p>
                 </div>
                 <button
@@ -975,397 +1059,54 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Pickup Location */}
-                <div className="space-y-4">
-                  <h4 className="font-semibold text-gray-900 dark:text-white flex items-center">
-                    <MapPin size={20} className="mr-2 text-orange-500" />
-                    Pickup Location
-                  </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <AddressInput
+                  label="Pickup"
+                  postcode={formData.pickupPostcode}
+                  onPostcodeChange={(value) => {
+                    setFormData((prev) => ({ ...prev, pickupPostcode: value }));
+                    lookupPostcode(value, "pickup");
+                  }}
+                  address={formData.pickupAddress}
+                  onAddressSelect={(address) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      pickupAddress: address,
+                    }));
+                    setValidation((prev) => ({ ...prev, pickupAddress: null }));
+                  }}
+                  suggestions={addressSuggestions.pickup}
+                  isLoading={isLoadingAddresses}
+                  validation={validation.pickupAddress}
+                  placeholder="Enter pickup postcode"
+                />
 
-                  {!formData.pickupAddress ? (
-                    <div className="relative">
-                      <div className="relative">
-                        <input
-                          ref={firstInputRef}
-                          type="text"
-                          value={formData.pickupPostcode}
-                          onChange={(e) =>
-                            handlePostcodeChange(e.target.value, "pickup")
-                          }
-                          placeholder="Enter postcode or address (e.g., MK9 1AA or 123 High Street)"
-                          className="w-full pl-12 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                        />
-                        <MapPin
-                          size={20}
-                          className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
-                        />
-                        {isLoadingAddresses && (
-                          <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-500"></div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Suggestions Dropdown */}
-                      {addressSuggestions.pickup.length > 0 && (
-                        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                          {addressSuggestions.pickup.map((address, index) => (
-                            <button
-                              key={index}
-                              onClick={() => {
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  pickupAddress: address,
-                                  pickupPostcode: "",
-                                }));
-                                setAddressSuggestions((prev) => ({
-                                  ...prev,
-                                  pickup: [],
-                                }));
-                              }}
-                              className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0 transition-colors focus:outline-none focus:bg-gray-50 dark:focus:bg-gray-700"
-                            >
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                {address}
-                              </div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                Click to select
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* No results message */}
-                      {formData.pickupPostcode.length >= 3 &&
-                        addressSuggestions.pickup.length === 0 &&
-                        !isLoadingAddresses && (
-                          <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg p-4">
-                            <div className="text-center">
-                              <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                                No results found
-                              </p>
-                              <button
-                                onClick={() => {
-                                  // Switch to manual entry mode
-                                  setFormData((prev) => ({
-                                    ...prev,
-                                    pickupAddress: "manual_entry",
-                                    pickupPostcode: "",
-                                  }));
-                                }}
-                                className="text-orange-500 hover:text-orange-600 text-sm font-medium underline"
-                              >
-                                Can't find your address? Enter manually
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                    </div>
-                  ) : formData.pickupAddress === "manual_entry" ? (
-                    <div className="space-y-3 p-4 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800">
-                      <h5 className="font-medium text-gray-900 dark:text-white">
-                        Enter address manually
-                      </h5>
-                      <input
-                        type="text"
-                        placeholder="Street address"
-                        value={manualPickupStreet || ""}
-                        onChange={(e) => setManualPickupStreet(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                      />
-                      <div className="grid grid-cols-2 gap-3">
-                        <input
-                          type="text"
-                          placeholder="City (Milton Keynes or Oxford)"
-                          value={manualPickupCity || ""}
-                          onChange={(e) => setManualPickupCity(e.target.value)}
-                          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Postcode"
-                          value={manualPickupPostcode || ""}
-                          onChange={(e) =>
-                            setManualPickupPostcode(e.target.value)
-                          }
-                          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                        />
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() =>
-                            handleManualAddressSave(
-                              "pickup",
-                              manualPickupStreet,
-                              manualPickupCity,
-                              manualPickupPostcode
-                            )
-                          }
-                          disabled={
-                            !manualPickupStreet ||
-                            !manualPickupCity ||
-                            !manualPickupPostcode
-                          }
-                          className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm"
-                        >
-                          Save Address
-                        </button>
-                        <button
-                          onClick={() => {
-                            setFormData((prev) => ({
-                              ...prev,
-                              pickupAddress: "",
-                              pickupPostcode: "",
-                            }));
-                            setManualPickupStreet("");
-                            setManualPickupCity("");
-                            setManualPickupPostcode("");
-                          }}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm"
-                        >
-                          Back to Search
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    // Selected address card
-                    <div className="p-4 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center mb-2">
-                            <Check size={16} className="text-green-500 mr-2" />
-                            <span className="text-sm font-medium text-green-700 dark:text-green-300">
-                              Pickup Location Selected
-                            </span>
-                          </div>
-                          <p className="text-gray-900 dark:text-white font-medium">
-                            {formData.pickupAddress}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              pickupAddress: "",
-                              pickupPostcode: "",
-                            }))
-                          }
-                          className="ml-4 px-3 py-1 text-orange-500 hover:text-orange-600 border border-orange-500 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors text-sm font-medium"
-                        >
-                          Edit
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {validation.pickupAddress && (
-                    <div className="flex items-center text-red-500 text-sm">
-                      <AlertCircle size={16} className="mr-2" />
-                      {validation.pickupAddress}
-                    </div>
-                  )}
-                </div>
-
-                {/* Drop-off Location */}
-                <div className="space-y-4">
-                  <h4 className="font-semibold text-gray-900 dark:text-white flex items-center">
-                    <MapPin size={20} className="mr-2 text-orange-500" />
-                    Drop-off Location
-                  </h4>
-
-                  {!formData.dropoffAddress ? (
-                    <div className="relative">
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={formData.dropoffPostcode}
-                          onChange={(e) =>
-                            handlePostcodeChange(e.target.value, "dropoff")
-                          }
-                          placeholder="Enter postcode or address (e.g., OX1 1AA or 456 Main Road)"
-                          className="w-full pl-12 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                        />
-                        <MapPin
-                          size={20}
-                          className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"
-                        />
-                        {isLoadingAddresses && (
-                          <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-500"></div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Suggestions Dropdown */}
-                      {addressSuggestions.dropoff.length > 0 && (
-                        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                          {addressSuggestions.dropoff.map((address, index) => (
-                            <button
-                              key={index}
-                              onClick={() => {
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  dropoffAddress: address,
-                                  dropoffPostcode: "",
-                                }));
-                                setAddressSuggestions((prev) => ({
-                                  ...prev,
-                                  dropoff: [],
-                                }));
-                              }}
-                              className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0 transition-colors focus:outline-none focus:bg-gray-50 dark:focus:bg-gray-700"
-                            >
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                {address}
-                              </div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                Click to select
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* No results message */}
-                      {formData.dropoffPostcode.length >= 3 &&
-                        addressSuggestions.dropoff.length === 0 &&
-                        !isLoadingAddresses && (
-                          <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg p-4">
-                            <div className="text-center">
-                              <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                                No results found
-                              </p>
-                              <button
-                                onClick={() => {
-                                  // Switch to manual entry mode
-                                  setFormData((prev) => ({
-                                    ...prev,
-                                    dropoffAddress: "manual_entry",
-                                    dropoffPostcode: "",
-                                  }));
-                                }}
-                                className="text-orange-500 hover:text-orange-600 text-sm font-medium underline"
-                              >
-                                Can't find your address? Enter manually
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                    </div>
-                  ) : formData.dropoffAddress === "manual_entry" ? (
-                    <div className="space-y-3 p-4 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800">
-                      <h5 className="font-medium text-gray-900 dark:text-white">
-                        Enter address manually
-                      </h5>
-                      <input
-                        type="text"
-                        placeholder="Street address"
-                        value={manualDropoffStreet || ""}
-                        onChange={(e) => setManualDropoffStreet(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                      />
-                      <div className="grid grid-cols-2 gap-3">
-                        <input
-                          type="text"
-                          placeholder="City (Milton Keynes or Oxford)"
-                          value={manualDropoffCity || ""}
-                          onChange={(e) => setManualDropoffCity(e.target.value)}
-                          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Postcode"
-                          value={manualDropoffPostcode || ""}
-                          onChange={(e) =>
-                            setManualDropoffPostcode(e.target.value)
-                          }
-                          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                        />
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() =>
-                            handleManualAddressSave(
-                              "dropoff",
-                              manualDropoffStreet,
-                              manualDropoffCity,
-                              manualDropoffPostcode
-                            )
-                          }
-                          disabled={
-                            !manualDropoffStreet ||
-                            !manualDropoffCity ||
-                            !manualDropoffPostcode
-                          }
-                          className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm"
-                        >
-                          Save Address
-                        </button>
-                        <button
-                          onClick={() => {
-                            setFormData((prev) => ({
-                              ...prev,
-                              dropoffAddress: "",
-                              dropoffPostcode: "",
-                            }));
-                            setManualDropoffStreet("");
-                            setManualDropoffCity("");
-                            setManualDropoffPostcode("");
-                          }}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm"
-                        >
-                          Back to Search
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    // Selected address card
-                    <div className="p-4 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center mb-2">
-                            <Check size={16} className="text-green-500 mr-2" />
-                            <span className="text-sm font-medium text-green-700 dark:text-green-300">
-                              Drop-off Location Selected
-                            </span>
-                          </div>
-                          <p className="text-gray-900 dark:text-white font-medium">
-                            {formData.dropoffAddress}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              dropoffAddress: "",
-                              dropoffPostcode: "",
-                            }))
-                          }
-                          className="ml-4 px-3 py-1 text-orange-500 hover:text-orange-600 border border-orange-500 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors text-sm font-medium"
-                        >
-                          Edit
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {validation.dropoffAddress && (
-                    <div className="flex items-center text-red-500 text-sm">
-                      <AlertCircle size={16} className="mr-2" />
-                      {validation.dropoffAddress}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <p className="text-sm text-blue-800 dark:text-blue-200">
-                  <strong>Note:</strong> We operate only in Milton Keynes and
-                  Oxford areas. Enter at least 3 characters for address
-                  suggestions.
-                </p>
+                <AddressInput
+                  label="Dropoff"
+                  postcode={formData.dropoffPostcode}
+                  onPostcodeChange={(value) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      dropoffPostcode: value,
+                    }));
+                    lookupPostcode(value, "dropoff");
+                  }}
+                  address={formData.dropoffAddress}
+                  onAddressSelect={(address) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      dropoffAddress: address,
+                    }));
+                    setValidation((prev) => ({
+                      ...prev,
+                      dropoffAddress: null,
+                    }));
+                  }}
+                  suggestions={addressSuggestions.dropoff}
+                  isLoading={isLoadingAddresses}
+                  validation={validation.dropoffAddress}
+                  placeholder="Enter dropoff postcode"
+                />
               </div>
             </div>
           )}
@@ -1379,7 +1120,8 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                     Parcel Details
                   </h3>
                   <p className="text-gray-600 dark:text-gray-400">
-                    Provide accurate details for precise quote calculation
+                    From: {formData.pickupAddress?.split(",")[1]?.trim()} → To:{" "}
+                    {formData.dropoffAddress?.split(",")[1]?.trim()}
                   </p>
                 </div>
                 <button
@@ -1402,7 +1144,9 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                     step="0.1"
                     min="0.1"
                     max={
-                      formData.shipmentType?.id === "parcels" ? "31.5" : "1000"
+                      formData.shipmentType?.name === "Parcels"
+                        ? "31.5"
+                        : "1000"
                     }
                     value={formData.weight || ""}
                     onChange={(e) =>
@@ -1422,161 +1166,170 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                   )}
                 </div>
 
-                {(formData.shipmentType?.id === "parcels" ||
-                  formData.shipmentType?.id === "business" || formData.shipmentType?.id === "cargo") && (
-                  <>
-                    <div className="flex items-center space-x-3 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
-                      <input
-                        type="checkbox"
-                        id="fragile"
-                        checked={formData.fragile || false}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            fragile: e.target.checked,
-                          }))
-                        }
-                        className="w-5 h-5 text-orange-500 border-gray-300 dark:border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
-                      />
-                      <label
-                        htmlFor="fragile"
-                        className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-1"
-                      >
-                        Is this parcel fragile?
-                      </label>
-                      <div className="group relative">
-                        <AlertCircle
-                          size={16}
-                          className="text-gray-400 cursor-help"
-                        />
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-                          Extra handling for delicate items (may incur
-                          additional fees)
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <h4 className="text-lg font-medium text-gray-900 dark:text-white">
-                        Package Dimensions
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Width (cm) *
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={formData.width || ""}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                width: e.target.value,
-                              }))
-                            }
-                            placeholder="Width in centimeters"
-                            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                          />
-                          {validation.width && (
-                            <div className="flex items-center text-red-500 text-sm mt-2">
-                              <AlertCircle size={16} className="mr-2" />
-                              {validation.width}
-                            </div>
-                          )}
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Length (cm) *
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={formData.length || ""}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                length: e.target.value,
-                              }))
-                            }
-                            placeholder="Length in centimeters"
-                            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                          />
-                          {validation.length && (
-                            <div className="flex items-center text-red-500 text-sm mt-2">
-                              <AlertCircle size={16} className="mr-2" />
-                              {validation.length}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Height (cm) {formData.fragile ? "*" : ""}
-                          {formData.fragile && (
-                            <span className="text-orange-500 text-xs ml-1">
-                              (Required for fragile items)
-                            </span>
-                          )}
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={formData.height || ""}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              height: e.target.value,
-                            }))
-                          }
-                          placeholder="Height in centimeters"
-                          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                        />
-                        {validation.height && (
-                          <div className="flex items-center text-red-500 text-sm mt-2">
-                            <AlertCircle size={16} className="mr-2" />
-                            {validation.height}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                  <div className="flex items-start space-x-3">
-                    <Package
-                      size={20}
-                      className="text-orange-500 mt-0.5 flex-shrink-0"
+                <div className="flex items-center space-x-3 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                  <input
+                    type="checkbox"
+                    id="fragile"
+                    checked={formData.fragile || false}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        fragile: e.target.checked,
+                      }))
+                    }
+                    className="w-5 h-5 text-orange-500 border-gray-300 dark:border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
+                  />
+                  <label
+                    htmlFor="fragile"
+                    className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-1"
+                  >
+                    Is this parcel fragile?
+                  </label>
+                  <div className="group relative">
+                    <AlertCircle
+                      size={16}
+                      className="text-gray-400 cursor-help"
                     />
-                    <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        <strong>Note:</strong> Accurate dimensions help
-                        calculate precise quotes and ensure proper handling.
-                      </p>
-                      {formData.fragile && (
-                        <div className="mt-3 p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg border border-orange-200 dark:border-orange-800">
-                          <p className="text-sm text-orange-700 dark:text-orange-300">
-                            <strong>Fragile Item Handling:</strong> Your package
-                            will receive extra protection with specialized
-                            packaging and careful handling. A 25% surcharge
-                            applies for fragile items.
-                          </p>
-                        </div>
-                      )}
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                      Extra handling for delicate items (may incur additional
+                      fees)
                     </div>
                   </div>
                 </div>
 
-                {import.meta.env.NODE_ENV === "development" && (
-                  <div className="text-xs text-gray-500 p-2 bg-gray-100 dark:bg-gray-800 rounded">
-                    Debug: Step {currentStep}, Shipment Type:{" "}
-                    {formData.shipmentType?.id || "none"}, Fragile:{" "}
-                    {formData.fragile ? "yes" : "no"}
+                <div className="space-y-4">
+                  <h4 className="text-lg font-medium text-gray-900 dark:text-white">
+                    Package Dimensions
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Width (cm) *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.width || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            width: e.target.value,
+                          }))
+                        }
+                        placeholder="Width"
+                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                      />
+                      {validation.width && (
+                        <div className="flex items-center text-red-500 text-sm mt-2">
+                          <AlertCircle size={16} className="mr-2" />
+                          {validation.width}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Length (cm) *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.length || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            length: e.target.value,
+                          }))
+                        }
+                        placeholder="Length"
+                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                      />
+                      {validation.length && (
+                        <div className="flex items-center text-red-500 text-sm mt-2">
+                          <AlertCircle size={16} className="mr-2" />
+                          {validation.length}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Height (cm)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.height || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            height: e.target.value,
+                          }))
+                        }
+                        placeholder="Height (optional)"
+                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                      />
+                    </div>
                   </div>
-                )}
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <input
+                      type="checkbox"
+                      id="insurance"
+                      checked={formData.insurance || false}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          insurance: e.target.checked,
+                        }))
+                      }
+                      className="w-5 h-5 text-blue-500 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+                    />
+                    <label
+                      htmlFor="insurance"
+                      className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-1"
+                    >
+                      Add insurance coverage
+                    </label>
+                    <div className="group relative">
+                      <Shield size={16} className="text-blue-500 cursor-help" />
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                        Protect your shipment with insurance coverage (2% of
+                        declared value)
+                      </div>
+                    </div>
+                  </div>
+
+                  {formData.insurance && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Declared Value ($) *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="0.01"
+                        value={formData.insuranceAmount || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            insuranceAmount: e.target.value,
+                          }))
+                        }
+                        placeholder="Enter the value of your shipment"
+                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                      />
+                      {validation.insuranceAmount && (
+                        <div className="flex items-center text-red-500 text-sm mt-2">
+                          <AlertCircle size={16} className="mr-2" />
+                          {validation.insuranceAmount}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -1587,10 +1340,10 @@ export default function GetQuoteModal({ isOpen, onClose }) {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-                    Insurance & Quote Summary
+                    Quote Summary
                   </h3>
                   <p className="text-gray-600 dark:text-gray-400">
-                    Review your shipment details and add insurance if needed
+                    Review your shipment details and get your quote
                   </p>
                 </div>
                 <button
@@ -1598,81 +1351,24 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                   className="flex items-center text-orange-500 hover:text-orange-600 text-sm font-medium px-4 py-2 border border-orange-500 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
                 >
                   <ChevronLeft size={16} className="mr-1" />
-                  Change Details
+                  Edit Details
                 </button>
               </div>
 
-              {/* Insurance Section */}
-              <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
-                <div className="flex items-center space-x-3 mb-4">
-                  <input
-                    ref={firstInputRef}
-                    type="checkbox"
-                    id="insurance"
-                    checked={formData.insurance}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        insurance: e.target.checked,
-                      }))
-                    }
-                    className="w-5 h-5 text-orange-500 border-gray-300 dark:border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
-                  />
-                  <label
-                    htmlFor="insurance"
-                    className="text-lg font-medium text-gray-900 dark:text-white flex items-center"
-                  >
-                    <Shield size={20} className="mr-2 text-orange-500" />
-                    Add insurance to this shipment?
-                  </label>
-                </div>
-
-                {formData.insurance && (
-                  <div className="mt-4 animate-in slide-in-from-top duration-300">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Insurance Amount ($) *
-                    </label>
-                    <input
-                      type="number"
-                      min="50"
-                      max="5000"
-                      value={formData.insuranceAmount}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          insuranceAmount: e.target.value,
-                        }))
-                      }
-                      placeholder="Enter insurance amount (50-5000)"
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                    />
-                    {validation.insuranceAmount && (
-                      <div className="flex items-center text-red-500 text-sm mt-2">
-                        <AlertCircle size={16} className="mr-2" />
-                        {validation.insuranceAmount}
-                      </div>
-                    )}
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                      Insurance covers loss or damage up to the selected amount.
-                      Fee: 2% of insured value.
-                    </p>
-                  </div>
-                )}
-              </div>
-
               {/* Summary */}
-              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
-                <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                  <Package size={20} className="mr-2 text-orange-500" />
                   Shipment Summary
                 </h4>
 
-                <div className="space-y-3 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">
-                      Shipment Type:
+                      Type:
                     </span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {formData.shipmentType?.title}
+                      {formData.shipmentType?.name}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -1680,7 +1376,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                       Service:
                     </span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {formData.service?.title}
+                      {formData.service?.name}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -1691,26 +1387,25 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                       {formData.weight} kg
                     </span>
                   </div>
-                  {formData.shipmentType?.id === "parcels" && (
-                    <>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">
-                          Dimensions:
-                        </span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {formData.width} × {formData.length} cm
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">
-                          Fragile:
-                        </span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {formData.fragile ? "Yes" : "No"}
-                        </span>
-                      </div>
-                    </>
+                  {formData.width && formData.length && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">
+                        Dimensions:
+                      </span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {formData.width} × {formData.length}{" "}
+                        {formData.height && `× ${formData.height}`} cm
+                      </span>
+                    </div>
                   )}
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">
+                      Fragile:
+                    </span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {formData.fragile ? "Yes" : "No"}
+                    </span>
+                  </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">
                       From:
@@ -1727,94 +1422,25 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                       {formData.dropoffAddress}
                     </span>
                   </div>
+                  {formData.insurance && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">
+                        Insurance:
+                      </span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        ${formData.insuranceAmount}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Quote Display */}
-              {quote && (
-                <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-6 animate-in slide-in-from-bottom duration-300">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                      <Calculator size={20} className="mr-2 text-orange-500" />
-                      Quote Breakdown
-                    </h4>
-                    <button
-                      onClick={downloadQuotePDF}
-                      className="flex items-center px-3 py-2 text-orange-600 hover:text-orange-700 border border-orange-300 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors text-sm"
-                    >
-                      <Download size={16} className="mr-1" />
-                      Download PDF
-                    </button>
-                  </div>
-
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">
-                        Base shipping cost:
-                      </span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        ${quote.subtotal}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">
-                        Distance:
-                      </span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {quote.distanceKm} km
-                      </span>
-                    </div>
-                    {formData.insurance && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">
-                          Insurance fee (2%):
-                        </span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          ${quote.insuranceFee}
-                        </span>
-                      </div>
-                    )}
-                    {formData.fragile && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">
-                          Fragile handling (25%):
-                        </span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          ${quote.fragileCharge}
-                        </span>
-                      </div>
-                    )}
-                    <div className="border-t border-orange-200 dark:border-orange-800 pt-2 mt-2">
-                      <div className="flex justify-between text-lg font-bold">
-                        <span className="text-gray-900 dark:text-white">
-                          Total Quote:
-                        </span>
-                        <span className="text-orange-500">${quote.total}</span>
-                      </div>
-                    </div>
-                    {quote.fallback && (
-                      <p className="text-xs text-orange-600 dark:text-orange-400 mt-2">
-                        * Estimated pricing (backend calculation unavailable)
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Loading state for quote calculation */}
-              {isLoadingQuote && (
-                <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
-                  <div className="flex items-center justify-center">
-                    <Loader2
-                      size={20}
-                      className="animate-spin mr-2 text-orange-500"
-                    />
-                    <span className="text-gray-600 dark:text-gray-400">
-                      Calculating quote...
-                    </span>
-                  </div>
-                </div>
-              )}
+              <QuoteDisplay
+                quote={quote}
+                onDownloadPDF={downloadQuotePDF}
+                isLoading={isLoadingQuote}
+                formData={formData}
+              />
             </div>
           )}
         </div>
@@ -1846,7 +1472,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
             ) : (
               <button
                 onClick={handleSubmit}
-                disabled={isLoadingQuote}
+                disabled={isLoadingQuote || !quote}
                 className="flex items-center px-6 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all transform hover:scale-105 disabled:transform-none focus:outline-none focus:ring-2 focus:ring-orange-500"
               >
                 {isLoadingQuote ? (
@@ -1856,8 +1482,8 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                   </>
                 ) : (
                   <>
-                    <Calculator size={20} className="mr-2" />
                     Get Quote & Continue
+                    <ChevronRight size={16} className="ml-1" />
                   </>
                 )}
               </button>
