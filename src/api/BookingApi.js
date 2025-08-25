@@ -4,7 +4,7 @@ import { ApiBase } from './ApiBase';
 export class BookingApi extends ApiBase {
   async getShippingTypes() {
     try {
-      const response = await this.request('/api/shipping-types/', {
+      const response = await this.request('/api/booking/shipping-types/', {
         method: 'GET',
         includeAuth: false,
       });
@@ -20,7 +20,7 @@ export class BookingApi extends ApiBase {
 
   async getServiceTypes() {
     try {
-      const response = await this.request('/api/service-types/', {
+      const response = await this.request('/api/booking/service-types/', {
         method: 'GET',
         includeAuth: false,
       });
@@ -48,7 +48,7 @@ export class BookingApi extends ApiBase {
         discount: parseFloat(quoteData.discount) || 0.0,
       };
       console.log('Quote payload:', backendData);
-      const response = await this.request('/api/bookings/quotes/compute/', {
+      const response = await this.request('/api/booking/quotes/compute/', {
         method: 'POST',
         data: backendData,
         includeAuth: false,
@@ -100,7 +100,7 @@ export class BookingApi extends ApiBase {
         notes: bookingData.notes || null,
         guest_email: bookingData.guestEmail || null,
       };
-      const response = await this.request('/api/bookings/', {
+      const response = await this.request('/api/booking/bookings/', {
         method: 'POST',
         data: backendData,
         includeAuth: false,
@@ -117,7 +117,7 @@ export class BookingApi extends ApiBase {
 
   async getQuote(quoteId) {
     try {
-      const response = await this.request(`/api/bookings/quotes/${quoteId}/`);
+      const response = await this.request(`/api/booking/quotes/${quoteId}/`);
       return { success: true, data: response.data };
     } catch (error) {
       return {
