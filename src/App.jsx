@@ -19,8 +19,8 @@ import RegisterPage from "./components/auth/RegisterPage";
 import EmailConfirmationPage from "./components/auth/EmailConfirmationPage";
 import AccountConfirmedPage from "./components/auth/AccountConfirmedPage";
 import ResendConfirmationPage from "./components/auth/ResendConfirmationPage";
-import BookingModal from "./components/bookings/BookingModal";
 import QuotePage from "./components/quote/QuotePage";
+import BookingPage from "./components/bookings/BookingPage";
 
 
 // Layout for pages with Header and Footer
@@ -88,8 +88,10 @@ function App() {
           />
           <Route path="/admin" element={<AdminDashboard />} />{" "}
           {/* No header/footer for admin */}
+
+          
           <Route path="/quote" element={<QuotePage />} />
-          <Route path="/booking" element={<BookingModal />} />
+          <Route path="/booking" element={<BookingPage />} />
         </Routes>
       </div>
     </GoogleOAuthProvider>
