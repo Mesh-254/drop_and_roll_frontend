@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Mail, ArrowRight, RefreshCw, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import apiConnection from "../../api/apiConnection";
+import {authApi} from "../../api/AuthApi";
 
 const EmailConfirmationPage = () => {
   const location = useLocation();
@@ -33,7 +33,7 @@ const EmailConfirmationPage = () => {
     setStatus("idle");
     setMessage("");
     try {
-      const result = await apiConnection.resendConfirmation(email);
+      const result = await authApi.resendConfirmation(email);
       setIsLoading(false);
       if (result.success) {
         setStatus("success");

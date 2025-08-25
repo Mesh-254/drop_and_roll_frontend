@@ -10,7 +10,7 @@ import {
   ArrowLeft,
 } from "lucide-react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
-import apiConnection from "../../api/apiConnection"
+import {authApi} from "../../api/AuthApi"
 
 const ResendConfirmationPage = () => {
   const [email, setEmail] = useState("")
@@ -45,7 +45,7 @@ const ResendConfirmationPage = () => {
       return
     }
     setIsLoading(true)
-    const result = await apiConnection.resendConfirmation(email)
+    const result = await authApi.resendConfirmation(email)
     setIsLoading(false)
     if (result.success) {
       setStatus("success")
