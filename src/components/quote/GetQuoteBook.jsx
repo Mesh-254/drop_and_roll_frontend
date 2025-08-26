@@ -8,8 +8,6 @@ import {
   X,
   Package,
   Truck,
-  FileText,
-  Shield,
   Calculator,
   ChevronLeft,
   ChevronRight,
@@ -17,7 +15,9 @@ import {
   AlertCircle,
   Download,
   Loader2,
+  MapPin,
 } from "lucide-react";
+import MapComponent from "../map/MapComponent";
 
 const stepTitles = [
   "Shipment Type",
@@ -26,6 +26,125 @@ const stepTitles = [
   "Parcel Details",
   "Insurance & Quote",
 ];
+
+const AddressInput = ({
+  label,
+  postcode,
+  onPostcodeChange,
+  address,
+  onAddressSelect,
+  suggestions,
+  isLoading,
+  validation,
+  placeholder,
+}) => {
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isEditing, setIsEditing] = useState(!address);
+
+  const handleAddressSelect = (selectedAddress) => {
+    onAddressSelect(selectedAddress);
+    setShowSuggestions(false);
+    setIsEditing(false);
+  };
+
+  const handleEdit = () => {
+    setIsEditing(true);
+    setShowSuggestions(true);
+  };
+
+  // Show selected address display when address is selected and not editing
+  if (address && !isEditing) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center space-x-2">
+          <MapPin className="h-5 w-5 text-orange-500" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+            {label} Location
+          </h3>
+        </div>
+
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center justify-center w-6 h-6 bg-green-500 rounded-full">
+                <Check className="h-4 w-4 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                  {label} Location Selected
+                </p>
+                <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                  {address}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleEdit}
+              className="px-3 py-1 text-sm font-medium text-orange-600 hover:text-orange-700 border border-orange-300 hover:border-orange-400 rounded-md hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+            >
+              Edit
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show input form when editing or no address selected
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center space-x-2">
+        <MapPin className="h-5 w-5 text-orange-500" />
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+          {label} Location
+        </h3>
+      </div>
+
+      <div className="relative">
+        <input
+          type="text"
+          value={postcode}
+          onChange={(e) => {
+            onPostcodeChange(e.target.value);
+            setShowSuggestions(true);
+          }}
+          onFocus={() => setShowSuggestions(true)}
+          placeholder={placeholder}
+          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+        />
+
+        {isLoading && (
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+            <Loader2 size={16} className="animate-spin text-orange-500" />
+          </div>
+        )}
+
+        {showSuggestions && suggestions.length > 0 && (
+          <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+            {suggestions.map((suggestion, index) => (
+              <button
+                key={index}
+                onClick={() => handleAddressSelect(suggestion)}
+                className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0 transition-colors"
+              >
+                <div className="text-sm text-gray-900 dark:text-white">
+                  {suggestion}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {validation && (
+        <div className="flex items-center text-red-500 text-sm">
+          <AlertCircle size={16} className="mr-2" />
+          {validation}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const ShipmentTypeSelector = ({
   shipmentTypes,
@@ -38,73 +157,47 @@ const ShipmentTypeSelector = ({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={24} className="animate-spin mr-2 text-orange-500" />
-        <span className="text-gray-600 dark:text-gray-400">
-          Loading shipment types...
-        </span>
+        <Loader2 size={32} className="animate-spin text-orange-500" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-        <div className="flex items-center text-red-700 dark:text-red-300">
-          <AlertCircle size={20} className="mr-2" />
-          <span>Failed to load shipment types: {error}</span>
-        </div>
+      <div className="text-center py-12">
+        <AlertCircle size={48} className="mx-auto text-red-500 mb-4" />
+        <p className="text-red-600 dark:text-red-400">{error}</p>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {shipmentTypes.map((type, index) => {
-        const IconComponent =
-          type.name === "Parcels"
-            ? Package
-            : type.name === "Cargo"
-            ? Truck
-            : FileText;
-        const isSelected = selectedType?.id === type.id;
-
-        return (
-          <button
-            key={type.id}
-            ref={index === 0 ? firstInputRef : null}
-            onClick={() => onSelect(type)}
-            className={`
-              p-6 border-2 rounded-xl transition-all text-center hover:scale-105 focus:outline-none focus:ring-2 focus:ring-orange-500
-              ${
-                isSelected
-                  ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
-                  : "border-gray-200 dark:border-gray-700 hover:border-orange-500 hover:bg-gray-50 dark:hover:bg-gray-800"
-              }
-            `}
-          >
-            <div className="flex flex-col items-center">
-              <div
-                className={`
-                w-12 h-12 rounded-full flex items-center justify-center mb-4 transition-colors
-                ${
-                  isSelected
-                    ? "bg-orange-500 text-white"
-                    : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
-                }
-              `}
-              >
-                <IconComponent size={24} />
-              </div>
-              <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
-                {type.name}
-              </h4>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {type.description}
-              </p>
-            </div>
-          </button>
-        );
-      })}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {shipmentTypes.map((type, index) => (
+        <button
+          key={type.id}
+          ref={index === 0 ? firstInputRef : null}
+          onClick={() => onSelect(type)}
+          className={`
+            p-6 rounded-xl border-2 transition-all transform hover:scale-105 text-left
+            ${
+              selectedType?.id === type.id
+                ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
+                : "border-gray-200 dark:border-gray-700 hover:border-orange-300 dark:hover:border-orange-600"
+            }
+          `}
+        >
+          <div className="flex items-center mb-3">
+            <Package className="h-8 w-8 text-orange-500 mr-3" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {type.name}
+            </h3>
+          </div>
+          <p className="text-gray-600 dark:text-gray-400 text-sm">
+            {type.description}
+          </p>
+        </button>
+      ))}
     </div>
   );
 };
@@ -120,128 +213,52 @@ const ServiceSelector = ({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={24} className="animate-spin mr-2 text-orange-500" />
-        <span className="text-gray-600 dark:text-gray-400">
-          Loading services...
-        </span>
+        <Loader2 size={32} className="animate-spin text-orange-500" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-        <div className="flex items-center text-red-700 dark:text-red-300">
-          <AlertCircle size={20} className="mr-2" />
-          <span>Failed to load services: {error}</span>
-        </div>
+      <div className="text-center py-12">
+        <AlertCircle size={48} className="mx-auto text-red-500 mb-4" />
+        <p className="text-red-600 dark:text-red-400">{error}</p>
       </div>
     );
   }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {services.map((service, index) => {
-        const isSelected = selectedService?.id === service.id;
-
-        return (
-          <button
-            key={service.id}
-            ref={index === 0 ? firstInputRef : null}
-            onClick={() => onSelect(service)}
-            className={`
-              p-6 border-2 rounded-xl transition-all text-left hover:scale-105 focus:outline-none focus:ring-2 focus:ring-orange-500
-              ${
-                isSelected
-                  ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
-                  : "border-gray-200 dark:border-gray-700 hover:border-orange-500 hover:bg-gray-50 dark:hover:bg-gray-800"
-              }
-            `}
-          >
-            <div className="flex justify-between items-start mb-3">
-              <h4 className="font-semibold text-gray-900 dark:text-white">
+      {services.map((service, index) => (
+        <button
+          key={service.id}
+          ref={index === 0 ? firstInputRef : null}
+          onClick={() => onSelect(service)}
+          className={`
+            p-6 rounded-xl border-2 transition-all transform hover:scale-105 text-left
+            ${
+              selectedService?.id === service.id
+                ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
+                : "border-gray-200 dark:border-gray-700 hover:border-orange-300 dark:hover:border-orange-600"
+            }
+          `}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center">
+              <Truck className="h-8 w-8 text-orange-500 mr-3" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {service.name}
-              </h4>
-              <span className="text-orange-500 font-bold">
-                From ${service.price}
-              </span>
+              </h3>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {service.description}
-            </p>
-          </button>
-        );
-      })}
-    </div>
-  );
-};
-
-const AddressInput = ({
-  label,
-  postcode,
-  onPostcodeChange,
-  address,
-  onAddressSelect,
-  suggestions,
-  isLoading,
-  validation,
-  placeholder = "Enter postcode",
-}) => {
-  return (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          {label} Postcode *
-        </label>
-        <div className="relative">
-          <input
-            type="text"
-            value={postcode}
-            onChange={(e) => onPostcodeChange(e.target.value)}
-            placeholder={placeholder}
-            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-          />
-          {isLoading && (
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-              <Loader2 size={16} className="animate-spin text-orange-500" />
-            </div>
-          )}
-        </div>
-        {validation && (
-          <div className="flex items-center text-red-500 text-sm mt-2">
-            <AlertCircle size={16} className="mr-2" />
-            {validation}
+            <span className="text-lg font-bold text-orange-500">
+              £{service.price}
+            </span>
           </div>
-        )}
-      </div>
-
-      {suggestions.length > 0 && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Select {label} Address *
-          </label>
-          <div className="space-y-2 max-h-40 overflow-y-auto">
-            {suggestions.map((suggestion, index) => (
-              <button
-                key={index}
-                onClick={() => onAddressSelect(suggestion)}
-                className={`
-                  w-full p-3 text-left border rounded-lg transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500
-                  ${
-                    address === suggestion
-                      ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
-                      : "border-gray-200 dark:border-gray-700"
-                  }
-                `}
-              >
-                <span className="text-sm text-gray-900 dark:text-white">
-                  {suggestion}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+          <p className="text-gray-600 dark:text-gray-400 text-sm">
+            {service.description}
+          </p>
+        </button>
+      ))}
     </div>
   );
 };
@@ -249,9 +266,9 @@ const AddressInput = ({
 const QuoteDisplay = ({ quote, onDownloadPDF, isLoading, formData }) => {
   if (isLoading) {
     return (
-      <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
-        <div className="flex items-center justify-center">
-          <Loader2 size={20} className="animate-spin mr-2 text-orange-500" />
+      <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6">
+        <div className="flex items-center justify-center py-8">
+          <Loader2 size={32} className="animate-spin text-orange-500 mr-3" />
           <span className="text-gray-600 dark:text-gray-400">
             Calculating quote...
           </span>
@@ -260,76 +277,104 @@ const QuoteDisplay = ({ quote, onDownloadPDF, isLoading, formData }) => {
     );
   }
 
-  if (!quote) return null;
+  if (!quote) {
+    return (
+      <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6">
+        <div className="text-center py-8">
+          <Calculator className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">
+            Complete the form to see your quote
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const breakdown = quote.meta || {};
 
   return (
-    <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-6 animate-in slide-in-from-bottom duration-300">
-      <div className="flex items-center justify-between mb-4">
-        <h4 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-          <Calculator size={20} className="mr-2 text-orange-500" />
-          Quote Breakdown
-        </h4>
+    <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-xl p-6 border border-orange-200 dark:border-orange-800">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center">
+          <Calculator className="h-6 w-6 text-orange-500 mr-3" />
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+            Quote Breakdown
+          </h3>
+        </div>
         <button
           onClick={onDownloadPDF}
-          className="flex items-center px-3 py-2 text-orange-600 hover:text-orange-700 border border-orange-300 rounded-lg hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors text-sm"
+          className="flex items-center px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors"
         >
-          <Download size={16} className="mr-1" />
+          <Download size={16} className="mr-2" />
           Download PDF
         </button>
       </div>
 
-      <div className="space-y-2 text-sm">
-        <div className="flex justify-between">
-          <span className="text-gray-600 dark:text-gray-400">
-            Base shipping cost:
+      <div className="space-y-3">
+        <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
+          <span className="text-gray-700 dark:text-gray-300">
+            Base Price ({breakdown.service_type})
           </span>
           <span className="font-medium text-gray-900 dark:text-white">
-            ${quote.base_price || quote.subtotal}
+            £{breakdown.base_price?.toFixed(2) || "0.00"}
           </span>
         </div>
-        <div className="flex justify-between">
-          <span className="text-gray-600 dark:text-gray-400">Distance:</span>
+
+        <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
+          <span className="text-gray-700 dark:text-gray-300">
+            Weight Charge ({formData.weight}kg × £0.50)
+          </span>
           <span className="font-medium text-gray-900 dark:text-white">
-            {quote.distance_km || quote.distanceKm} km
+            £{breakdown.weight_charge?.toFixed(2) || "0.00"}
           </span>
         </div>
-        {formData.insurance && (
-          <div className="flex justify-between">
-            <span className="text-gray-600 dark:text-gray-400">
-              Insurance fee:
-            </span>
-            <span className="font-medium text-gray-900 dark:text-white">
-              $
-              {quote.insuranceFee ||
-                (Number.parseFloat(formData.insuranceAmount) * 0.02).toFixed(2)}
-            </span>
-          </div>
-        )}
-        {formData.fragile && (
-          <div className="flex justify-between">
-            <span className="text-gray-600 dark:text-gray-400">
-              Fragile handling:
-            </span>
-            <span className="font-medium text-gray-900 dark:text-white">
-              $
-              {quote.fragileCharge ||
-                ((quote.base_price || quote.subtotal) * 0.25).toFixed(2)}
-            </span>
-          </div>
-        )}
-        <div className="border-t border-orange-200 dark:border-orange-800 pt-2 mt-2">
-          <div className="flex justify-between text-lg font-bold">
-            <span className="text-gray-900 dark:text-white">Total Quote:</span>
-            <span className="text-orange-500">
-              ${quote.final_price || quote.total}
-            </span>
-          </div>
+
+        <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
+          <span className="text-gray-700 dark:text-gray-300">
+            Distance Charge ({quote.distance_km}km × £0.10)
+          </span>
+          <span className="font-medium text-gray-900 dark:text-white">
+            £{breakdown.distance_charge?.toFixed(2) || "0.00"}
+          </span>
         </div>
-        {quote.fallback && (
-          <p className="text-xs text-orange-600 dark:text-orange-400 mt-2">
-            * Estimated pricing (backend calculation unavailable)
-          </p>
+
+        <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
+          <span className="text-gray-700 dark:text-gray-300">Subtotal</span>
+          <span className="font-medium text-gray-900 dark:text-white">
+            £{breakdown.subtotal?.toFixed(2) || "0.00"}
+          </span>
+        </div>
+
+        {breakdown.fragile_charge > 0 && (
+          <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
+            <span className="text-gray-700 dark:text-gray-300">
+              Fragile Surcharge (25%)
+            </span>
+            <span className="font-medium text-gray-900 dark:text-white">
+              £{breakdown.fragile_charge?.toFixed(2) || "0.00"}
+            </span>
+          </div>
         )}
+
+        {breakdown.insurance_fee > 0 && (
+          <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
+            <span className="text-gray-700 dark:text-gray-300">
+              Insurance Fee (2%)
+            </span>
+            <span className="font-medium text-gray-900 dark:text-white">
+              £{breakdown.insurance_fee?.toFixed(2) || "0.00"}
+            </span>
+          </div>
+        )}
+
+        <div className="flex justify-between items-center py-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg px-4 mt-4">
+          <span className="text-lg font-bold text-gray-900 dark:text-white">
+            Total Price
+          </span>
+          <span className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+            £{quote.final_price?.toFixed(2) || "0.00"}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -345,15 +390,15 @@ export default function GetQuoteModal({ isOpen, onClose }) {
   const [isLoadingServices, setIsLoadingServices] = useState(false);
   const [typesError, setTypesError] = useState(null);
   const [servicesError, setServicesError] = useState(null);
-  const [quoteId, setQuoteId] = useState(null); // Store quote ID to prevent duplicates
-  const [lastQuoteData, setLastQuoteData] = useState(null); // Track form data changes
+  const [quoteId, setQuoteId] = useState(null);
+  const [lastQuoteData, setLastQuoteData] = useState(null);
 
   const [formData, setFormData] = useState({
     shipmentType: null,
     service: null,
-    pickupPostcode: "",
+    pickupPostcode: "", // London dummy postcode
     pickupAddress: "",
-    dropoffPostcode: "",
+    dropoffPostcode: "", // Oxford dummy postcode
     dropoffAddress: "",
     weight: "",
     fragile: false,
@@ -376,17 +421,17 @@ export default function GetQuoteModal({ isOpen, onClose }) {
   const firstInputRef = useRef(null);
   const debounceRef = useRef(null);
 
+  // Load shipping types on mount
   useEffect(() => {
     if (isOpen) {
-      fetchShipmentTypes();
-      fetchServiceTypes();
+      loadShipmentTypes();
+      loadServices();
     }
   }, [isOpen]);
 
-  const fetchShipmentTypes = async () => {
+  const loadShipmentTypes = async () => {
     setIsLoadingTypes(true);
     setTypesError(null);
-
     try {
       const result = await bookingApi.getShippingTypes();
       if (result.success) {
@@ -395,17 +440,15 @@ export default function GetQuoteModal({ isOpen, onClose }) {
         setTypesError(result.message);
       }
     } catch (error) {
-      console.error("Failed to fetch shipment types:", error);
       setTypesError("Failed to load shipment types");
     } finally {
       setIsLoadingTypes(false);
     }
   };
 
-  const fetchServiceTypes = async () => {
+  const loadServices = async () => {
     setIsLoadingServices(true);
     setServicesError(null);
-
     try {
       const result = await bookingApi.getServiceTypes();
       if (result.success) {
@@ -414,8 +457,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
         setServicesError(result.message);
       }
     } catch (error) {
-      console.error("Failed to fetch service types:", error);
-      setServicesError("Failed to load service types");
+      setServicesError("Failed to load services");
     } finally {
       setIsLoadingServices(false);
     }
@@ -427,346 +469,96 @@ export default function GetQuoteModal({ isOpen, onClose }) {
       return;
     }
 
-    // Clear previous debounce
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
 
-    // Debounce the API call
     debounceRef.current = setTimeout(async () => {
       setIsLoadingAddresses(true);
-
       try {
-        const API_KEY =
-          import.meta.env.VITE_GETADDRESS_API_KEY || "demo-api-key";
+        // Mock address lookup - replace with actual API
+        const mockAddresses = [
+          `${postcode.toUpperCase()}, Milton Keynes, MK1 1AA`,
+          `${postcode.toUpperCase()}, Oxford, OX1 1AA`,
+          `${postcode.toUpperCase()}, London, SW1A 1AA`,
+        ];
 
-        // First try autocomplete endpoint
-        let response = await fetch(
-          `https://api.getAddress.io/autocomplete/${encodeURIComponent(
-            postcode
-          )}?api-key=${API_KEY}`
-        );
-
-        if (!response.ok) {
-          throw new Error(`API Error: ${response.status}`);
-        }
-
-        let data = await response.json();
-        let addresses = [];
-
-        if (data.suggestions && data.suggestions.length > 0) {
-          addresses = data.suggestions.map((suggestion) => suggestion.address);
-        } else {
-          // Fallback to postcode lookup
-          try {
-            response = await fetch(
-              `https://api.getAddress.io/get/${encodeURIComponent(
-                postcode
-              )}?api-key=${API_KEY}`
-            );
-            if (response.ok) {
-              data = await response.json();
-              if (data.addresses && data.addresses.length > 0) {
-                addresses = data.addresses.map(
-                  (addr) => `${addr}, ${postcode.toUpperCase()}`
-                );
-              }
-            }
-          } catch (fallbackError) {
-            console.warn("Fallback API call failed:", fallbackError);
-          }
-        }
-
-        // Filter addresses for operating areas
-        const filteredAddresses = addresses.filter((address) => {
-          const addressLower = address.toLowerCase();
-          return (
-            addressLower.includes("milton keynes") ||
-            addressLower.includes("oxford")
-          );
-        });
-
-        setAddressSuggestions((prev) => ({
-          ...prev,
-          [type]: filteredAddresses.length > 0 ? filteredAddresses : addresses,
-        }));
+        setAddressSuggestions((prev) => ({ ...prev, [type]: mockAddresses }));
       } catch (error) {
         console.error("Address lookup failed:", error);
-
-        // Fallback to mock data
-        const mockAddresses = [
-          `123 High Street, Milton Keynes, ${postcode.toUpperCase()}`,
-          `456 Oxford Road, Oxford, ${postcode.toUpperCase()}`,
-          `789 Main Street, Milton Keynes, ${postcode.toUpperCase()}`,
-        ];
-        setAddressSuggestions((prev) => ({ ...prev, [type]: mockAddresses }));
       } finally {
         setIsLoadingAddresses(false);
       }
-    }, 300); // 300ms debounce
+    }, 300);
   }, []);
 
-  const calculateQuote = async () => {
-    if (!formData.shipmentType || !formData.service) {
-      console.error("Missing shipment type or service");
+  const calculateQuote = useCallback(async () => {
+    if (
+      !formData.shipmentType ||
+      !formData.service ||
+      !formData.weight ||
+      !formData.pickupAddress ||
+      !formData.dropoffAddress
+    ) {
       return;
     }
 
-    // Check if form data has changed significantly
-    const currentQuoteData = {
-      shipmentType: formData.shipmentType.id,
-      service: formData.service.id,
-      weight: formData.weight,
-      pickupAddress: formData.pickupAddress,
-      dropoffAddress: formData.dropoffAddress,
+    const quoteData = {
+      shipmentType: formData.shipmentType,
+      service: formData.service,
+      weightKg: formData.weight,
+      distanceKm: await bookingApi.calculateDistance(
+        { city: formData.pickupAddress.split(",")[1]?.trim() },
+        { city: formData.dropoffAddress.split(",")[1]?.trim() }
+      ),
       fragile: formData.fragile,
-      insurance: formData.insurance,
-      insuranceAmount: formData.insuranceAmount,
+      insuranceAmount: formData.insurance ? formData.insuranceAmount : 0,
       dimensions: {
         width: formData.width,
         length: formData.length,
         height: formData.height,
+        unit: "cm",
       },
     };
 
-    // If we have an existing quote and data hasn't changed, reuse it
-    if (
-      quoteId &&
-      lastQuoteData &&
-      JSON.stringify(currentQuoteData) === JSON.stringify(lastQuoteData)
-    ) {
-      console.log("[v0] Reusing existing quote:", quoteId);
-      return;
+    // Check if quote data has changed
+    const quoteDataString = JSON.stringify(quoteData);
+    if (quoteDataString === lastQuoteData) {
+      return; // No change, don't recalculate
     }
 
     setIsLoadingQuote(true);
-
     try {
-      const distance = await bookingApi.calculateDistance(
-        {
-          city:
-            formData.pickupAddress?.split(",")[1]?.trim() || "Milton Keynes",
-          latitude: null,
-          longitude: null,
-        },
-        {
-          city: formData.dropoffAddress?.split(",")[1]?.trim() || "Oxford",
-          latitude: null,
-          longitude: null,
-        }
-      );
-
-      // Prepare quote data for backend
-      const quoteData = {
-        shipmentType: formData.shipmentType,
-        service: formData.service,
-        weightKg: Number.parseFloat(formData.weight),
-        distanceKm: distance,
-        fragile: formData.fragile,
-        insuranceAmount: formData.insurance
-          ? Number.parseFloat(formData.insuranceAmount)
-          : 0,
-        dimensions: {
-          width: Number.parseFloat(formData.width) || null,
-          length: Number.parseFloat(formData.length) || null,
-          height: Number.parseFloat(formData.height) || null,
-        },
-        surge: 1.0,
-        discount: 0.0,
-      };
-
-      console.log("[v0] Creating new quote with data:", quoteData);
-
-      // Call backend API to compute quote
       const result = await bookingApi.createQuote(quoteData);
-
       if (result.success) {
-        const backendQuote = result.data;
-        setQuote(backendQuote);
-        setQuoteId(backendQuote.id); // Store quote ID
-        setLastQuoteData(currentQuoteData); // Store form data snapshot
-        console.log("[v0] Quote created successfully:", backendQuote.id);
+        setQuote(result.data);
+        setQuoteId(result.data.id);
+        setLastQuoteData(quoteDataString);
       } else {
-        throw new Error(result.message);
+        console.error("Quote calculation failed:", result.message);
       }
     } catch (error) {
-      console.error("Quote calculation failed:", error);
-
-      // Enhanced fallback calculation
-      const service = formData.service;
-      const basePrice = service?.price || 15;
-      const weight = Number.parseFloat(formData.weight) || 1;
-      const weightMultiplier = weight > 5 ? 1 + (weight - 5) * 0.1 : 1;
-      const fragileMultiplier = formData.fragile ? 1.25 : 1;
-      const insuranceFee = formData.insurance
-        ? Number.parseFloat(formData.insuranceAmount) * 0.02
-        : 0;
-
-      const subtotal =
-        Math.round(basePrice * weightMultiplier * fragileMultiplier * 100) /
-        100;
-      const total = Math.round((subtotal + insuranceFee) * 100) / 100;
-
-      setQuote({
-        base_price: subtotal,
-        final_price: total,
-        distance_km: 15,
-        insuranceFee: Math.round(insuranceFee * 100) / 100,
-        fragileCharge: formData.fragile
-          ? Math.round((subtotal / fragileMultiplier) * 0.25 * 100) / 100
-          : 0,
-        fallback: true,
-      });
+      console.error("Quote calculation error:", error);
     } finally {
       setIsLoadingQuote(false);
     }
+  }, [formData, lastQuoteData]);
+
+  // Auto-calculate quote when form data changes
+  useEffect(() => {
+    if (currentStep === 5) {
+      calculateQuote();
+    }
+  }, [currentStep, calculateQuote]);
+
+  const handleShipmentTypeSelect = (type) => {
+    setFormData((prev) => ({ ...prev, shipmentType: type }));
+    setValidation((prev) => ({ ...prev, shipmentType: null }));
   };
 
-  const downloadQuotePDF = () => {
-    if (!quote) return;
-
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.width;
-
-    // Header
-    doc.setFontSize(20);
-    doc.setTextColor(255, 87, 34); // Orange color
-    doc.text("Drop & Roll - Shipping Quote", pageWidth / 2, 30, {
-      align: "center",
-    });
-
-    // Quote ID and date
-    doc.setFontSize(12);
-    doc.setTextColor(0, 0, 0);
-    doc.text(`Quote ID: ${quote.id || "FALLBACK-" + Date.now()}`, 20, 50);
-    doc.text(`Generated: ${dayjs().format("DD/MM/YYYY HH:mm")}`, 20, 60);
-
-    // Shipment details
-    doc.setFontSize(14);
-    doc.text("Shipment Details:", 20, 80);
-    doc.setFontSize(11);
-    doc.text(`Type: ${formData.shipmentType?.name || "N/A"}`, 20, 95);
-    doc.text(`Service: ${formData.service?.name || "N/A"}`, 20, 105);
-    doc.text(`Weight: ${formData.weight} kg`, 20, 115);
-    doc.text(
-      `Dimensions: ${formData.width}×${formData.length}×${formData.height} cm`,
-      20,
-      125
-    );
-    doc.text(`Fragile: ${formData.fragile ? "Yes" : "No"}`, 20, 135);
-
-    // Addresses
-    doc.text("Addresses:", 20, 155);
-    doc.text(`From: ${formData.pickupAddress}`, 20, 170);
-    doc.text(`To: ${formData.dropoffAddress}`, 20, 180);
-    doc.text(`Distance: ${quote.distance_km || quote.distanceKm} km`, 20, 190);
-
-    // Quote breakdown
-    doc.setFontSize(14);
-    doc.text("Quote Breakdown:", 20, 210);
-    doc.setFontSize(11);
-    doc.text(
-      `Base shipping cost: $${quote.base_price || quote.subtotal}`,
-      20,
-      225
-    );
-
-    if (formData.insurance) {
-      doc.text(
-        `Insurance fee: $${
-          quote.insuranceFee ||
-          (Number.parseFloat(formData.insuranceAmount) * 0.02).toFixed(2)
-        }`,
-        20,
-        235
-      );
-    }
-
-    if (formData.fragile) {
-      doc.text(
-        `Fragile handling: $${
-          quote.fragileCharge ||
-          ((quote.base_price || quote.subtotal) * 0.25).toFixed(2)
-        }`,
-        20,
-        245
-      );
-    }
-
-    // Total
-    doc.setFontSize(16);
-    doc.setTextColor(255, 87, 34);
-    doc.text(`Total: $${quote.final_price || quote.total}`, 20, 265);
-
-    if (quote.fallback) {
-      doc.setFontSize(10);
-      doc.setTextColor(255, 0, 0);
-      doc.text(
-        "* Estimated pricing (backend calculation unavailable)",
-        20,
-        280
-      );
-    }
-
-    doc.save(`drop-roll-quote-${quote.id || Date.now()}.pdf`);
-  };
-
-  const validateStep = (step) => {
-    const errors = {};
-
-    switch (step) {
-      case 1:
-        if (!formData.shipmentType) {
-          errors.shipmentType = "Please select a shipment type";
-        }
-        break;
-      case 2:
-        if (!formData.service) {
-          errors.service = "Please select a service";
-        }
-        break;
-      case 3:
-        if (!formData.pickupPostcode.trim()) {
-          errors.pickupPostcode = "Pickup postcode is required";
-        }
-        if (!formData.pickupAddress.trim()) {
-          errors.pickupAddress = "Please select a pickup address";
-        }
-        if (!formData.dropoffPostcode.trim()) {
-          errors.dropoffPostcode = "Dropoff postcode is required";
-        }
-        if (!formData.dropoffAddress.trim()) {
-          errors.dropoffAddress = "Please select a dropoff address";
-        }
-        break;
-      case 4:
-        if (!formData.weight || Number.parseFloat(formData.weight) <= 0) {
-          errors.weight = "Weight must be greater than 0";
-        }
-        if (
-          formData.shipmentType?.name === "Parcels" &&
-          Number.parseFloat(formData.weight) > 31.5
-        ) {
-          errors.weight = "Parcels must be 31.5kg or less";
-        }
-        if (!formData.width || Number.parseFloat(formData.width) <= 0) {
-          errors.width = "Width is required";
-        }
-        if (!formData.length || Number.parseFloat(formData.length) <= 0) {
-          errors.length = "Length is required";
-        }
-        if (
-          formData.insurance &&
-          (!formData.insuranceAmount ||
-            Number.parseFloat(formData.insuranceAmount) <= 0)
-        ) {
-          errors.insuranceAmount = "Insurance amount must be greater than 0";
-        }
-        break;
-    }
-
-    setValidation(errors);
-    return Object.keys(errors).length === 0;
+  const handleServiceSelect = (service) => {
+    setFormData((prev) => ({ ...prev, service }));
+    setValidation((prev) => ({ ...prev, service: null }));
   };
 
   const checkStepValidity = (data) => {
@@ -778,12 +570,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
       case 3:
         return data.pickupAddress && data.dropoffAddress;
       case 4:
-        return (
-          data.weight &&
-          data.width &&
-          data.length &&
-          (!data.insurance || data.insuranceAmount)
-        );
+        return data.weight && data.width && data.length && data.height;
       case 5:
         return quote !== null;
       default:
@@ -791,112 +578,175 @@ export default function GetQuoteModal({ isOpen, onClose }) {
     }
   };
 
+  const validateStep = (step, data) => {
+    const errors = {};
+
+    switch (step) {
+      case 1:
+        if (!data.shipmentType) {
+          errors.shipmentType = "Please select a shipment type";
+        }
+        break;
+      case 2:
+        if (!data.service) {
+          errors.service = "Please select a service";
+        }
+        break;
+      case 3:
+        if (!data.pickupAddress) {
+          errors.pickupAddress = "Please select a pickup address";
+        }
+        if (!data.dropoffAddress) {
+          errors.dropoffAddress = "Please select a dropoff address";
+        }
+        break;
+      case 4:
+        if (!data.weight || Number.parseFloat(data.weight) <= 0) {
+          errors.weight = "Please enter a valid weight";
+        } else if (
+          data.shipmentType?.name === "Parcels" &&
+          Number.parseFloat(data.weight) > 31.5
+        ) {
+          errors.weight = "Parcel weight cannot exceed 31.5kg";
+        }
+        if (!data.width || Number.parseFloat(data.width) <= 0) {
+          errors.width = "Please enter a valid width";
+        }
+        if (!data.length || Number.parseFloat(data.length) <= 0) {
+          errors.length = "Please enter a valid length";
+        }
+        if (!data.height || Number.parseFloat(data.height) <= 0) {
+          errors.height = "Please enter a valid height";
+        }
+        break;
+    }
+
+    return errors;
+  };
+
   const nextStep = () => {
-    if (validateStep(currentStep)) {
-      if (currentStep === 4) {
-        calculateQuote();
-      }
-      setCurrentStep((prev) => Math.min(prev + 1, 5));
+    const errors = validateStep(currentStep, formData);
+    if (Object.keys(errors).length > 0) {
+      setValidation(errors);
+      return;
+    }
+
+    setValidation({});
+    if (currentStep < 5) {
+      setCurrentStep(currentStep + 1);
+      setTimeout(() => firstInputRef.current?.focus(), 100);
     }
   };
 
   const prevStep = () => {
-    setCurrentStep((prev) => Math.max(prev - 1, 1));
-  };
-
-  const handleShipmentTypeSelect = (type) => {
-    setFormData((prev) => ({ ...prev, shipmentType: type }));
-    setValidation((prev) => ({ ...prev, shipmentType: null }));
-  };
-
-  const handleServiceSelect = (service) => {
-    setFormData((prev) => ({ ...prev, service: service }));
-    setValidation((prev) => ({ ...prev, service: null }));
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+      setValidation({});
+    }
   };
 
   const handleSubmit = () => {
-    if (!quote || !quoteId) {
-      console.error("No quote available for booking");
-      return;
+    if (quote) {
+      navigate("/booking", {
+        state: {
+          quote,
+          formData: {
+            ...formData,
+            // Pass postcodes to BookingModal
+            pickupPostcode: formData.pickupPostcode || "Enter postcode",
+            dropoffPostcode: formData.dropoffPostcode || "Enter postcode",
+            pickupAddress: {
+              line1: formData.pickupAddress.split(",")[0]?.trim(),
+              city: formData.pickupAddress.split(",")[1]?.trim(),
+              postal_code: formData.pickupAddress.split(",")[2]?.trim(),
+            },
+            dropoffAddress: {
+              line1: formData.dropoffAddress.split(",")[0]?.trim(),
+              city: formData.dropoffAddress.split(",")[1]?.trim(),
+              postal_code: formData.dropoffAddress.split(",")[2]?.trim(),
+            },
+          },
+        },
+      });
+      onClose();
     }
-
-    // Structure form data for booking API compatibility
-    const structuredFormData = {
-      shipmentType: formData.shipmentType,
-      service: formData.service,
-      weightKg: Number.parseFloat(formData.weight),
-      distanceKm: quote.distance_km || quote.distanceKm,
-      fragile: formData.fragile,
-      insuranceAmount: formData.insurance
-        ? Number.parseFloat(formData.insuranceAmount)
-        : 0,
-      dimensions: {
-        width: Number.parseFloat(formData.width) || null,
-        length: Number.parseFloat(formData.length) || null,
-        height: Number.parseFloat(formData.height) || null,
-      },
-      pickupAddress: {
-        line1: formData.pickupAddress.split(",")[0]?.trim(),
-        city: formData.pickupAddress.split(",")[1]?.trim() || "Milton Keynes",
-        postalCode: formData.pickupPostcode,
-        country: "GB",
-      },
-      dropoffAddress: {
-        line1: formData.dropoffAddress.split(",")[0]?.trim(),
-        city: formData.dropoffAddress.split(",")[1]?.trim() || "Oxford",
-        postalCode: formData.dropoffPostcode,
-        country: "GB",
-      },
-    };
-
-    console.log("[v0] Navigating to booking with:", {
-      structuredFormData,
-      quote,
-      quoteId,
-    });
-
-    navigate("/booking", {
-      state: {
-        formData: structuredFormData,
-        quote: quote,
-        quoteId: quoteId,
-      },
-    });
   };
 
-  // Reset form when modal closes
-  useEffect(() => {
-    if (!isOpen) {
-      setCurrentStep(1);
-      setFormData({
-        shipmentType: null,
-        service: null,
-        pickupPostcode: "",
-        pickupAddress: "",
-        dropoffPostcode: "",
-        dropoffAddress: "",
-        weight: "",
-        fragile: false,
-        width: "",
-        length: "",
-        height: "",
-        insurance: false,
-        insuranceAmount: "",
-      });
-      setValidation({});
-      setQuote(null);
-      setQuoteId(null);
-      setLastQuoteData(null);
-      setAddressSuggestions({ pickup: [], dropoff: [] });
-    }
-  }, [isOpen]);
+  const downloadQuotePDF = () => {
+    if (!quote) return;
 
-  // Focus management
-  useEffect(() => {
-    if (isOpen && firstInputRef.current) {
-      setTimeout(() => firstInputRef.current?.focus(), 100);
+    const doc = new jsPDF();
+    const breakdown = quote.meta || {};
+
+    // Header
+    doc.setFontSize(20);
+    doc.text("Delivery Quote", 20, 30);
+
+    // Quote details
+    doc.setFontSize(12);
+    let yPos = 50;
+
+    doc.text(`Quote ID: ${quote.id}`, 20, yPos);
+    yPos += 10;
+    doc.text(`Date: ${dayjs().format("DD/MM/YYYY")}`, 20, yPos);
+    yPos += 20;
+
+    // Service details
+    doc.text("Service Details:", 20, yPos);
+    yPos += 10;
+    doc.text(`Service Type: ${breakdown.service_type}`, 30, yPos);
+    yPos += 8;
+    doc.text(`Shipment Type: ${breakdown.shipment_type}`, 30, yPos);
+    yPos += 8;
+    doc.text(`Weight: ${formData.weight}kg`, 30, yPos);
+    yPos += 8;
+    doc.text(`Distance: ${quote.distance_km}km`, 30, yPos);
+    yPos += 20;
+
+    // Pricing breakdown
+    doc.text("Pricing Breakdown:", 20, yPos);
+    yPos += 10;
+    doc.text(`Base Price: £${breakdown.base_price?.toFixed(2)}`, 30, yPos);
+    yPos += 8;
+    doc.text(
+      `Weight Charge: £${breakdown.weight_charge?.toFixed(2)}`,
+      30,
+      yPos
+    );
+    yPos += 8;
+    doc.text(
+      `Distance Charge: £${breakdown.distance_charge?.toFixed(2)}`,
+      30,
+      yPos
+    );
+    yPos += 8;
+    doc.text(`Subtotal: £${breakdown.subtotal?.toFixed(2)}`, 30, yPos);
+    yPos += 8;
+
+    if (breakdown.fragile_charge > 0) {
+      doc.text(
+        `Fragile Surcharge: £${breakdown.fragile_charge?.toFixed(2)}`,
+        30,
+        yPos
+      );
+      yPos += 8;
     }
-  }, [isOpen, currentStep]);
+
+    if (breakdown.insurance_fee > 0) {
+      doc.text(
+        `Insurance Fee: £${breakdown.insurance_fee?.toFixed(2)}`,
+        30,
+        yPos
+      );
+      yPos += 8;
+    }
+
+    yPos += 10;
+    doc.setFontSize(14);
+    doc.text(`Total: £${quote.final_price?.toFixed(2)}`, 30, yPos);
+
+    doc.save(`quote-${quote.id}.pdf`);
+  };
 
   if (!isOpen) return null;
 
@@ -1108,6 +958,20 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                   placeholder="Enter dropoff postcode"
                 />
               </div>
+
+              {(formData.pickupAddress || formData.dropoffAddress) && (
+                <div className="mt-6">
+                  <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                    Route Preview
+                  </h4>
+                  <MapComponent
+                    pickupAddress={formData.pickupAddress}
+                    dropoffAddress={formData.dropoffAddress}
+                    isLoading={isLoadingAddresses}
+                    className="w-full h-64 rounded-lg border border-gray-300 dark:border-gray-600"
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -1254,7 +1118,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Height (cm)
+                        Height (cm) *
                       </label>
                       <input
                         type="number"
@@ -1266,15 +1130,21 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                             height: e.target.value,
                           }))
                         }
-                        placeholder="Height (optional)"
+                        placeholder="Height"
                         className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
                       />
+                      {validation.height && (
+                        <div className="flex items-center text-red-500 text-sm mt-2">
+                          <AlertCircle size={16} className="mr-2" />
+                          {validation.height}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <div className="flex items-center space-x-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center space-x-3">
                     <input
                       type="checkbox"
                       id="insurance"
@@ -1285,31 +1155,24 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                           insurance: e.target.checked,
                         }))
                       }
-                      className="w-5 h-5 text-blue-500 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+                      className="w-5 h-5 text-orange-500 border-gray-300 dark:border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
                     />
                     <label
                       htmlFor="insurance"
-                      className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-1"
+                      className="text-sm font-medium text-gray-700 dark:text-gray-300"
                     >
                       Add insurance coverage
                     </label>
-                    <div className="group relative">
-                      <Shield size={16} className="text-blue-500 cursor-help" />
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-                        Protect your shipment with insurance coverage (2% of
-                        declared value)
-                      </div>
-                    </div>
                   </div>
 
                   {formData.insurance && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Declared Value ($) *
+                        Insurance Amount (£)
                       </label>
                       <input
                         type="number"
-                        min="1"
+                        min="0"
                         step="0.01"
                         value={formData.insuranceAmount || ""}
                         onChange={(e) =>
@@ -1318,15 +1181,9 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                             insuranceAmount: e.target.value,
                           }))
                         }
-                        placeholder="Enter the value of your shipment"
+                        placeholder="Enter insurance value"
                         className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
                       />
-                      {validation.insuranceAmount && (
-                        <div className="flex items-center text-red-500 text-sm mt-2">
-                          <AlertCircle size={16} className="mr-2" />
-                          {validation.insuranceAmount}
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -1340,10 +1197,10 @@ export default function GetQuoteModal({ isOpen, onClose }) {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-                    Quote Summary
+                    Insurance & Quote
                   </h3>
                   <p className="text-gray-600 dark:text-gray-400">
-                    Review your shipment details and get your quote
+                    Review your quote and proceed to booking
                   </p>
                 </div>
                 <button
@@ -1351,88 +1208,8 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                   className="flex items-center text-orange-500 hover:text-orange-600 text-sm font-medium px-4 py-2 border border-orange-500 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
                 >
                   <ChevronLeft size={16} className="mr-1" />
-                  Edit Details
+                  Change Details
                 </button>
-              </div>
-
-              {/* Summary */}
-              <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
-                <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-                  <Package size={20} className="mr-2 text-orange-500" />
-                  Shipment Summary
-                </h4>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">
-                      Type:
-                    </span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {formData.shipmentType?.name}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">
-                      Service:
-                    </span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {formData.service?.name}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">
-                      Weight:
-                    </span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {formData.weight} kg
-                    </span>
-                  </div>
-                  {formData.width && formData.length && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">
-                        Dimensions:
-                      </span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {formData.width} × {formData.length}{" "}
-                        {formData.height && `× ${formData.height}`} cm
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">
-                      Fragile:
-                    </span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {formData.fragile ? "Yes" : "No"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">
-                      From:
-                    </span>
-                    <span className="font-medium text-gray-900 dark:text-white text-right">
-                      {formData.pickupAddress}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">
-                      To:
-                    </span>
-                    <span className="font-medium text-gray-900 dark:text-white text-right">
-                      {formData.dropoffAddress}
-                    </span>
-                  </div>
-                  {formData.insurance && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">
-                        Insurance:
-                      </span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        ${formData.insuranceAmount}
-                      </span>
-                    </div>
-                  )}
-                </div>
               </div>
 
               <QuoteDisplay
