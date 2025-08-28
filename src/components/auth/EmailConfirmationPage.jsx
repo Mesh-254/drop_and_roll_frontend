@@ -2,9 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Mail, ArrowRight, RefreshCw, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import {
+  Mail,
+  ArrowRight,
+  RefreshCw,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import {authApi} from "../../api/AuthApi";
+import { authApi } from "../../api/AuthApi";
 
 const EmailConfirmationPage = () => {
   const location = useLocation();
@@ -91,7 +98,9 @@ const EmailConfirmationPage = () => {
           className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed"
         >
           We've sent a confirmation link to{" "}
-          <span className="font-medium text-orange-500">{email || "your email"}</span>
+          <span className="font-medium text-orange-500">
+            {email || "your email"}
+          </span>
         </motion.p>
 
         {status === "success" && (

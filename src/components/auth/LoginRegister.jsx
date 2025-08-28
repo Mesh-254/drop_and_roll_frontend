@@ -1,160 +1,162 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { X, Mail, Lock, Eye, EyeOff, Loader2, Chrome } from "lucide-react"
-import { useNavigate } from "react-router-dom"
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { X, Mail, Lock, Eye, EyeOff, Loader2, Chrome } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const LoginPage = ({ isOpen = true, onClose = () => {} }) => {
-  const [mode, setMode] = useState("login") // "login" or "signup"
-  const [showEmailForm, setShowEmailForm] = useState(false)
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [errors, setErrors] = useState({})
-  const [isLoading, setIsLoading] = useState({})
+  const [mode, setMode] = useState("login"); // "login" or "signup"
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState({});
 
-  const navigate = useNavigate() // Initialize Next.js router
+  const navigate = useNavigate(); // Initialize Next.js router
 
   const handleClose = () => {
     if (mode === "signup") {
       // When in register mode, go back to login instead of closing
-      setMode("login")
-      setShowEmailForm(false)
-      setErrors({})
+      setMode("login");
+      setShowEmailForm(false);
+      setErrors({});
       // Reset form fields
-      setEmail("")
-      setPassword("")
-      setConfirmPassword("")
-      navigate("/login") // Navigate to login page
+      setEmail("");
+      setPassword("");
+      setConfirmPassword("");
+      navigate("/login"); // Navigate to login page
     } else {
       // When in login mode, close and go to home page
-      onClose()
-      navigate("/")
+      onClose();
+      navigate("/");
     }
-  }
+  };
 
   // Validation functions
   const validateEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return emailRegex.test(email)
-  }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
 
   const validatePassword = (password) => {
-    return password.length >= 8
-  }
+    return password.length >= 8;
+  };
 
   const validateForm = () => {
-    const newErrors = {}
+    const newErrors = {};
 
     if (!email) {
-      newErrors.email = "Email is required"
+      newErrors.email = "Email is required";
     } else if (!validateEmail(email)) {
-      newErrors.email = "Please enter a valid email"
+      newErrors.email = "Please enter a valid email";
     }
 
     if (!password) {
-      newErrors.password = "Password is required"
+      newErrors.password = "Password is required";
     } else if (!validatePassword(password)) {
-      newErrors.password = "Password must be at least 8 characters"
+      newErrors.password = "Password must be at least 8 characters";
     }
 
     if (mode === "signup") {
       if (!confirmPassword) {
-        newErrors.confirmPassword = "Please confirm your password"
+        newErrors.confirmPassword = "Please confirm your password";
       } else if (password !== confirmPassword) {
-        newErrors.confirmPassword = "Passwords do not match"
+        newErrors.confirmPassword = "Passwords do not match";
       }
     }
 
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   // Real-time validation
   useEffect(() => {
     if (email && !validateEmail(email)) {
-      setErrors((prev) => ({ ...prev, email: "Please enter a valid email" }))
+      setErrors((prev) => ({ ...prev, email: "Please enter a valid email" }));
     } else {
-      setErrors((prev) => ({ ...prev, email: "" }))
+      setErrors((prev) => ({ ...prev, email: "" }));
     }
-  }, [email])
+  }, [email]);
 
   useEffect(() => {
     if (password && !validatePassword(password)) {
       setErrors((prev) => ({
         ...prev,
         password: "Password must be at least 8 characters",
-      }))
+      }));
     } else {
-      setErrors((prev) => ({ ...prev, password: "" }))
+      setErrors((prev) => ({ ...prev, password: "" }));
     }
-  }, [password])
+  }, [password]);
 
   useEffect(() => {
     if (mode === "signup" && confirmPassword && password !== confirmPassword) {
       setErrors((prev) => ({
         ...prev,
         confirmPassword: "Passwords do not match",
-      }))
+      }));
     } else {
-      setErrors((prev) => ({ ...prev, confirmPassword: "" }))
+      setErrors((prev) => ({ ...prev, confirmPassword: "" }));
     }
-  }, [confirmPassword, password, mode])
+  }, [confirmPassword, password, mode]);
 
   const handleSocialSignIn = async (provider) => {
-    setIsLoading((prev) => ({ ...prev, [provider]: true }))
+    setIsLoading((prev) => ({ ...prev, [provider]: true }));
     setTimeout(() => {
-      console.log(`Sign in with ${provider}`)
-      setIsLoading((prev) => ({ ...prev, [provider]: false }))
-    }, 2000)
-  }
+      console.log(`Sign in with ${provider}`);
+      setIsLoading((prev) => ({ ...prev, [provider]: false }));
+    }, 2000);
+  };
 
   const handleSignWithEmail = () => {
-    setShowEmailForm(true)
-  }
+    setShowEmailForm(true);
+  };
 
   const handleCreateAccount = () => {
-    setMode("signup")
-    setShowEmailForm(false)
-    setErrors({})
-  }
+    setMode("signup");
+    setShowEmailForm(false);
+    setErrors({});
+  };
 
   const handleSignIn = (e) => {
-    e.preventDefault()
+    e.preventDefault();
     if (validateForm()) {
-      console.log("Sign in with", email, password)
+      console.log("Sign in with", email, password);
     }
-  }
+  };
 
   const handleSignUp = (e) => {
-    e.preventDefault()
+    e.preventDefault();
     if (validateForm()) {
-      console.log("Sign up with", email, password)
+      console.log("Sign up with", email, password);
     }
-  }
+  };
 
   const handleBackToLogin = () => {
-    setMode("login")
-    setShowEmailForm(false)
-    setErrors({})
-  }
+    setMode("login");
+    setShowEmailForm(false);
+    setErrors({});
+  };
 
   const handleKeyPress = (e) => {
     if (e.key === "Enter") {
       if (mode === "login") {
-        handleSignIn(e)
+        handleSignIn(e);
       } else {
-        handleSignUp(e)
+        handleSignUp(e);
       }
     }
-  }
+  };
 
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
-  const socialButtons = [{ name: "google", icon: Chrome, label: "Continue with Google" }]
+  const socialButtons = [
+    { name: "google", icon: Chrome, label: "Continue with Google" },
+  ];
 
   return (
     <motion.div
@@ -418,10 +420,16 @@ const LoginPage = ({ isOpen = true, onClose = () => {} }) => {
                     />
                     <button
                       type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      onClick={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
                       className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                     >
-                      {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                      {showConfirmPassword ? (
+                        <EyeOff size={20} />
+                      ) : (
+                        <Eye size={20} />
+                      )}
                     </button>
                     {errors.confirmPassword && (
                       <motion.p
@@ -445,7 +453,11 @@ const LoginPage = ({ isOpen = true, onClose = () => {} }) => {
                 </motion.form>
               )}
 
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+              >
                 {mode === "login" ? (
                   <p className="text-gray-600 dark:text-gray-400 text-sm">
                     No account?{" "}
@@ -478,14 +490,19 @@ const LoginPage = ({ isOpen = true, onClose = () => {} }) => {
             className="text-gray-500 dark:text-gray-400 text-xs mt-8 text-center leading-relaxed"
           >
             By continuing, you agree to Drop 'N Roll's{" "}
-            <span className="text-orange-500 hover:text-orange-600 cursor-pointer">Terms of Service</span> and
-            acknowledge that our{" "}
-            <span className="text-orange-500 hover:text-orange-600 cursor-pointer">Privacy Policy</span> applies to you.
+            <span className="text-orange-500 hover:text-orange-600 cursor-pointer">
+              Terms of Service
+            </span>{" "}
+            and acknowledge that our{" "}
+            <span className="text-orange-500 hover:text-orange-600 cursor-pointer">
+              Privacy Policy
+            </span>{" "}
+            applies to you.
           </motion.p>
         </div>
       </motion.div>
     </motion.div>
-  )
-}
+  );
+};
 
-export default LoginPage
+export default LoginPage;

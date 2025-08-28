@@ -9,7 +9,7 @@ export default function BookingPage() {
   const { formData, quote } = location.state || { formData: {}, quote: {} };
 
   const handleBack = () => {
-    navigate("/quote");  // Back to quote page
+    navigate("/quote"); // Back to quote page
   };
 
   return (

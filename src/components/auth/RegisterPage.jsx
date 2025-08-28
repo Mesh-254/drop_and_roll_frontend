@@ -1,11 +1,19 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { motion } from "framer-motion"
-import { Mail, Lock, Eye, EyeOff, Loader2, User, AlertCircle } from "lucide-react"
-import { Link, useNavigate, useLocation } from "react-router-dom"
-import { useAuth } from "../../contexts/AuthContext"
-import { GoogleLogin } from "@react-oauth/google"
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  Loader2,
+  User,
+  AlertCircle,
+} from "lucide-react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
+import { GoogleLogin } from "@react-oauth/google";
 
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
@@ -14,147 +22,149 @@ const RegisterPage = () => {
     email: "",
     password: "",
     confirmPassword: "",
-  })
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [errors, setErrors] = useState({})
-  const [isLoading, setIsLoading] = useState(false)
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
 
-  const { register, googleAuth } = useAuth()
-  const navigate = useNavigate()
-  const location = useLocation()
+  const { register, googleAuth } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     if (location.state?.email) {
-      setFormData((prev) => ({ ...prev, email: location.state.email }))
+      setFormData((prev) => ({ ...prev, email: location.state.email }));
     }
-  }, [location.state])
+  }, [location.state]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target
+    const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-    }))
+    }));
 
     if (errors[name] || errors.general) {
       setErrors((prev) => ({
         ...prev,
         [name]: "",
         general: "",
-      }))
+      }));
     }
-  }
+  };
 
   const validateForm = () => {
-    const newErrors = {}
+    const newErrors = {};
 
     if (!formData.firstName.trim()) {
-      newErrors.firstName = "First name is required"
+      newErrors.firstName = "First name is required";
     }
 
     if (!formData.lastName.trim()) {
-      newErrors.lastName = "Last name is required"
+      newErrors.lastName = "Last name is required";
     }
 
     if (!formData.email) {
-      newErrors.email = "Email is required"
+      newErrors.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email"
+      newErrors.email = "Please enter a valid email";
     }
 
     if (!formData.password) {
-      newErrors.password = "Password is required"
+      newErrors.password = "Password is required";
     } else if (formData.password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters"
+      newErrors.password = "Password must be at least 8 characters";
     }
 
     if (!formData.confirmPassword) {
-      newErrors.confirmPassword = "Please confirm your password"
+      newErrors.confirmPassword = "Please confirm your password";
     } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match"
+      newErrors.confirmPassword = "Passwords do not match";
     }
 
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
 
-    if (!validateForm()) return
+    if (!validateForm()) return;
 
-    setIsLoading(true)
-    setErrors({})
+    setIsLoading(true);
+    setErrors({});
 
     try {
       const result = await register({
         full_name: `${formData.firstName} ${formData.lastName}`.trim(),
         email: formData.email,
         password: formData.password,
-      })
+      });
 
       if (result.success) {
         navigate("/email-confirmation", {
           state: { email: formData.email.toLowerCase() },
-        })
+        });
       } else {
         switch (result.code) {
           case "ACCOUNT_ALREADY_EXISTS":
             setErrors({
               general: "Account already exists. Redirecting to sign in...",
-            })
+            });
             setTimeout(() => {
               navigate("/login", {
                 state: { email: formData.email.toLowerCase() },
-              })
-            }, 2000)
-            break
+              });
+            }, 2000);
+            break;
           case "ACCOUNT_NOT_ACTIVATED":
             setErrors({
-              general: "Account exists but is not activated. Redirecting to resend confirmation...",
-            })
+              general:
+                "Account exists but is not activated. Redirecting to resend confirmation...",
+            });
             setTimeout(() => {
               navigate("/resend-confirmation", {
                 state: { email: formData.email.toLowerCase() },
-              })
-            }, 2000)
-            break
+              });
+            }, 2000);
+            break;
           default:
             setErrors({
-              general: result.message || "Registration failed. Please try again.",
-            })
+              general:
+                result.message || "Registration failed. Please try again.",
+            });
         }
       }
     } catch (error) {
-      setErrors({ general: "An unexpected error occurred. Please try again." })
+      setErrors({ general: "An unexpected error occurred. Please try again." });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleGoogleSuccess = async (credentialResponse) => {
-    setIsLoading(true)
-    setErrors({})
+    setIsLoading(true);
+    setErrors({});
 
     try {
-      const result = await googleAuth(credentialResponse.credential)
+      const result = await googleAuth(credentialResponse.credential);
       if (result.success) {
-        navigate("/", { replace: true })
+        navigate("/", { replace: true });
       } else {
-        setErrors({ general: result.message || "Google registration failed." })
+        setErrors({ general: result.message || "Google registration failed." });
       }
     } catch (error) {
-      setErrors({ general: "Google registration failed. Please try again." })
+      setErrors({ general: "Google registration failed. Please try again." });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleGoogleError = () => {
-    setErrors({ general: "Google registration failed. Please try again." })
-    setIsLoading(false)
-  }
+    setErrors({ general: "Google registration failed. Please try again." });
+    setIsLoading(false);
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-orange-50 via-white to-orange-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
@@ -338,8 +348,12 @@ const RegisterPage = () => {
               buttonText="Sign up with Google"
               className="w-full py-3 bg-white text-gray-700 rounded-full border border-gray-300 hover:bg-gray-100 transition-all duration-200 flex items-center justify-center gap-2"
             >
-              <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-              Sign  with Google
+              <img
+                src="https://www.google.com/favicon.ico"
+                alt="Google"
+                className="w-5 h-5"
+              />
+              Sign with Google
             </GoogleLogin>
           </div>
         </form>
@@ -371,7 +385,7 @@ const RegisterPage = () => {
         </div>
       </motion.div>
     </div>
-  )
-}
+  );
+};
 
-export default RegisterPage
+export default RegisterPage;

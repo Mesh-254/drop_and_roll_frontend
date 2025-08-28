@@ -1,54 +1,54 @@
-"use client"
-import { useState, useEffect, useRef } from "react"
-import { useNavigate } from "react-router-dom"
-import { Settings, Lock, History, LogOut, ChevronDown } from "lucide-react"
-import { useAuth } from "../../contexts/AuthContext"
+"use client";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { Settings, Lock, History, LogOut, ChevronDown } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function ProfileDropdown() {
-  const navigate = useNavigate()
-  const { user, logout } = useAuth()
-  const [isOpen, setIsOpen] = useState(false)
-  const dropdownRef = useRef(null)
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false)
+        setIsOpen(false);
       }
-    }
+    };
 
     const handleEscapeKey = (event) => {
       if (event.key === "Escape") {
-        setIsOpen(false)
+        setIsOpen(false);
       }
-    }
+    };
 
     if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside)
-      document.addEventListener("keydown", handleEscapeKey)
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleEscapeKey);
     }
 
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-      document.removeEventListener("keydown", handleEscapeKey)
-    }
-  }, [isOpen])
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscapeKey);
+    };
+  }, [isOpen]);
 
   const handleLogout = async () => {
     try {
-      await logout()
-      navigate("/")
-      setIsOpen(false)
+      await logout();
+      navigate("/");
+      setIsOpen(false);
     } catch (error) {
-      console.error("Logout failed:", error)
+      console.error("Logout failed:", error);
     }
-  }
+  };
 
   const handleNavigation = (path) => {
-    navigate(path)
-    setIsOpen(false)
-  }
+    navigate(path);
+    setIsOpen(false);
+  };
 
   // Generate avatar from email initials
   const getInitials = (email, fullName) => {
@@ -58,10 +58,10 @@ export default function ProfileDropdown() {
         .map((name) => name[0])
         .join("")
         .toUpperCase()
-        .slice(0, 2)
+        .slice(0, 2);
     }
-    return email ? email.slice(0, 2).toUpperCase() : "U"
-  }
+    return email ? email.slice(0, 2).toUpperCase() : "U";
+  };
 
   const menuItems = [
     {
@@ -89,7 +89,7 @@ export default function ProfileDropdown() {
       onClick: handleLogout,
       className: "text-red-400 hover:text-red-300 hover:bg-red-500/10",
     },
-  ]
+  ];
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -104,7 +104,10 @@ export default function ProfileDropdown() {
         <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
           {getInitials(user?.email, user?.full_name)}
         </div>
-        <ChevronDown size={16} className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        <ChevronDown
+          size={16}
+          className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+        />
       </button>
 
       {/* Dropdown Menu */}
@@ -117,7 +120,9 @@ export default function ProfileDropdown() {
                 {getInitials(user?.email, user?.full_name)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-white font-medium truncate">{user?.full_name || "User"}</p>
+                <p className="text-white font-medium truncate">
+                  {user?.full_name || "User"}
+                </p>
                 <p className="text-gray-400 text-sm truncate">{user?.email}</p>
               </div>
             </div>
@@ -126,7 +131,7 @@ export default function ProfileDropdown() {
           {/* Menu Items */}
           <div className="py-1">
             {menuItems.map((item, index) => {
-              const Icon = item.icon
+              const Icon = item.icon;
               return (
                 <button
                   key={index}
@@ -138,11 +143,11 @@ export default function ProfileDropdown() {
                   <Icon size={18} />
                   <span className="font-medium">{item.label}</span>
                 </button>
-              )
+              );
             })}
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }

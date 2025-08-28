@@ -1,84 +1,86 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { motion } from "framer-motion"
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import {
   Mail,
   Loader2,
   CheckCircle,
   AlertCircle,
   ArrowLeft,
-} from "lucide-react"
-import { Link, useLocation, useNavigate } from "react-router-dom"
-import {authApi} from "../../api/AuthApi"
+} from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { authApi } from "../../api/AuthApi";
 
 const ResendConfirmationPage = () => {
-  const [email, setEmail] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [status, setStatus] = useState("idle") // 'idle', 'success', 'error'
-  const [message, setMessage] = useState("")
-  const [countdown, setCountdown] = useState(0)
+  const [email, setEmail] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState("idle"); // 'idle', 'success', 'error'
+  const [message, setMessage] = useState("");
+  const [countdown, setCountdown] = useState(0);
 
-  const location = useLocation()
-  const navigate = useNavigate()
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (location.state?.email) {
-      setEmail(location.state.email)
+      setEmail(location.state.email);
     }
-  }, [location.state])
+  }, [location.state]);
 
   useEffect(() => {
     if (status === "success" && countdown > 0) {
       const timer = setTimeout(() => {
-        setCountdown(countdown - 1)
-      }, 1000)
-      return () => clearTimeout(timer)
+        setCountdown(countdown - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
     }
-  }, [status, countdown])
+  }, [status, countdown]);
 
   const handleResendConfirmation = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
     if (!email) {
-      setStatus("error")
-      setMessage("Please enter your email address")
-      return
+      setStatus("error");
+      setMessage("Please enter your email address");
+      return;
     }
-    setIsLoading(true)
-    const result = await authApi.resendConfirmation(email)
-    setIsLoading(false)
+    setIsLoading(true);
+    const result = await authApi.resendConfirmation(email);
+    setIsLoading(false);
     if (result.success) {
-      setStatus("success")
-      setMessage("Confirmation email sent! Check your inbox/spam.")
-      setCountdown(30)
+      setStatus("success");
+      setMessage("Confirmation email sent! Check your inbox/spam.");
+      setCountdown(30);
     } else {
-      setStatus("error")
+      setStatus("error");
       switch (result.code) {
         case "ACCOUNT_ALREADY_ACTIVATED":
-          setMessage("Account is already activated. Redirecting to sign in...")
+          setMessage("Account is already activated. Redirecting to sign in...");
           setTimeout(() => {
-            navigate("/login")
-          }, 4000)
-          break
+            navigate("/login");
+          }, 4000);
+          break;
         case "EMAIL_NOT_FOUND":
-          setMessage("No account found with this email. Redirecting to register...")
+          setMessage(
+            "No account found with this email. Redirecting to register...",
+          );
           setTimeout(() => {
-            navigate("/register")
-          }, 4000)
-          break
+            navigate("/register");
+          }, 4000);
+          break;
         default:
-          setMessage(result.message || "Failed to send email. Try again.")
+          setMessage(result.message || "Failed to send email. Try again.");
       }
     }
-  }
+  };
 
   const handleEmailChange = (e) => {
-    setEmail(e.target.value)
+    setEmail(e.target.value);
     if (status === "error") {
-      setStatus("idle")
-      setMessage("")
+      setStatus("idle");
+      setMessage("");
     }
-  }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-orange-50 via-white to-orange-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
@@ -184,7 +186,7 @@ const ResendConfirmationPage = () => {
         </div>
       </motion.div>
     </div>
-  )
-}
+  );
+};
 
-export default ResendConfirmationPage
+export default ResendConfirmationPage;

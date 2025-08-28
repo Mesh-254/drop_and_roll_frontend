@@ -25,7 +25,7 @@ const AccountConfirmedPage = () => {
       console.log("Missing uid or token in URL parameters");
       setConfirmationStatus("invalid");
       setErrorMessage(
-        "Invalid confirmation link. Please check your email and try again."
+        "Invalid confirmation link. Please check your email and try again.",
       );
     }
   }, [searchParams]);
@@ -53,17 +53,17 @@ const AccountConfirmedPage = () => {
         if (result.code === "ACCOUNT_ALREADY_ACTIVATED") {
           setConfirmationStatus("already_activated");
           setErrorMessage(
-            "This account has already been activated. Please sign in."
+            "This account has already been activated. Please sign in.",
           );
         } else if (result.code === "INVALID_CONFIRMATION_LINK") {
           setConfirmationStatus("invalid");
           setErrorMessage(
-            "The confirmation link is invalid or expired. Please request a new one."
+            "The confirmation link is invalid or expired. Please request a new one.",
           );
         } else {
           setConfirmationStatus("invalid");
           setErrorMessage(
-            result.message || "Email confirmation failed. Please try again."
+            result.message || "Email confirmation failed. Please try again.",
           );
         }
       }
@@ -71,7 +71,7 @@ const AccountConfirmedPage = () => {
       console.error("Unexpected error in handleEmailConfirmation:", error);
       setConfirmationStatus("invalid");
       setErrorMessage(
-        "An unexpected error occurred during confirmation. Please try again."
+        "An unexpected error occurred during confirmation. Please try again.",
       );
     }
   };

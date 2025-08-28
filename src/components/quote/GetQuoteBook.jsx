@@ -372,7 +372,10 @@ const QuoteDisplay = ({ quote, onDownloadPDF, isLoading, formData }) => {
             Total Price
           </span>
           <span className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-            £{quote.final_price ? Number.parseFloat(quote.final_price).toFixed(2) : "0.00"}
+            £
+            {quote.final_price
+              ? Number.parseFloat(quote.final_price).toFixed(2)
+              : "0.00"}
           </span>
         </div>
       </div>
@@ -509,7 +512,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
       weightKg: formData.weight,
       distanceKm: await bookingApi.calculateDistance(
         { city: formData.pickupAddress.split(",")[1]?.trim() },
-        { city: formData.dropoffAddress.split(",")[1]?.trim() }
+        { city: formData.dropoffAddress.split(",")[1]?.trim() },
       ),
       fragile: formData.fragile,
       insuranceAmount: formData.insurance ? formData.insuranceAmount : 0,
@@ -711,13 +714,13 @@ export default function GetQuoteModal({ isOpen, onClose }) {
     doc.text(
       `Weight Charge: £${breakdown.weight_charge?.toFixed(2)}`,
       30,
-      yPos
+      yPos,
     );
     yPos += 8;
     doc.text(
       `Distance Charge: £${breakdown.distance_charge?.toFixed(2)}`,
       30,
-      yPos
+      yPos,
     );
     yPos += 8;
     doc.text(`Subtotal: £${breakdown.subtotal?.toFixed(2)}`, 30, yPos);
@@ -727,7 +730,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
       doc.text(
         `Fragile Surcharge: £${breakdown.fragile_charge?.toFixed(2)}`,
         30,
-        yPos
+        yPos,
       );
       yPos += 8;
     }
@@ -736,7 +739,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
       doc.text(
         `Insurance Fee: £${breakdown.insurance_fee?.toFixed(2)}`,
         30,
-        yPos
+        yPos,
       );
       yPos += 8;
     }
@@ -787,8 +790,8 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                         isCompleted
                           ? "bg-green-500 text-white"
                           : isActive
-                          ? "bg-orange-500 text-white"
-                          : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                            ? "bg-orange-500 text-white"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
                       }
                     `}
                   >
@@ -801,8 +804,8 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                         isActive
                           ? "text-orange-500"
                           : isCompleted
-                          ? "text-green-500"
-                          : "text-gray-500 dark:text-gray-400"
+                            ? "text-green-500"
+                            : "text-gray-500 dark:text-gray-400"
                       }
                     `}
                   >

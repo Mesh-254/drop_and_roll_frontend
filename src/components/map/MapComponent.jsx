@@ -49,8 +49,8 @@ const MapComponent = React.memo(
         // Simple geocoding using Nominatim (OpenStreetMap)
         const response = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-            address
-          )}&limit=1`
+            address,
+          )}&limit=1`,
         );
         const data = await response.json();
 
@@ -79,7 +79,7 @@ const MapComponent = React.memo(
         // Initialize map centered on UK
         mapInstanceRef.current = L.map(mapRef.current).setView(
           [52.3555, -1.1743],
-          6
+          6,
         );
 
         // Add OpenStreetMap tiles
@@ -165,7 +165,7 @@ const MapComponent = React.memo(
           // Center on single marker
           mapInstanceRef.current.setView(
             [coordinates[0].lat, coordinates[0].lng],
-            12
+            12,
           );
         }
       };
@@ -243,7 +243,7 @@ const MapComponent = React.memo(
         <div ref={mapRef} className="w-full h-full rounded-lg" />
       </div>
     );
-  }
+  },
 );
 
 MapComponent.displayName = "MapComponent";

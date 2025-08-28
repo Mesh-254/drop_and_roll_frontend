@@ -21,7 +21,7 @@ import AccountConfirmedPage from "./components/auth/AccountConfirmedPage";
 import ResendConfirmationPage from "./components/auth/ResendConfirmationPage";
 import QuotePage from "./components/quote/QuotePage";
 import BookingPage from "./components/bookings/BookingPage";
-import BookingHistory from "./components/bookings/BookingHistory"
+import BookingHistory from "./components/bookings/BookingHistory";
 
 // Layout for pages with Header and Footer
 function MainLayout({ children }) {

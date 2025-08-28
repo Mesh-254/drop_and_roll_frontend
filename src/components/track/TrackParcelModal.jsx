@@ -1,22 +1,30 @@
-"use client"
-import { useState } from "react"
-import { X, Search, Package, MapPin, Clock, Truck, CheckCircle } from "lucide-react"
+"use client";
+import { useState } from "react";
+import {
+  X,
+  Search,
+  Package,
+  MapPin,
+  Clock,
+  Truck,
+  CheckCircle,
+} from "lucide-react";
 
 export default function TrackParcelModal({ isOpen, onClose }) {
-  const [trackingNumber, setTrackingNumber] = useState("")
-  const [trackingData, setTrackingData] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
+  const [trackingNumber, setTrackingNumber] = useState("");
+  const [trackingData, setTrackingData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleTrack = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
     if (!trackingNumber.trim()) {
-      setError("Please enter a tracking number")
-      return
+      setError("Please enter a tracking number");
+      return;
     }
 
-    setLoading(true)
-    setError("")
+    setLoading(true);
+    setError("");
 
     // Simulate API call
     setTimeout(() => {
@@ -52,29 +60,29 @@ export default function TrackParcelModal({ isOpen, onClose }) {
             completed: false,
           },
         ],
-      })
-      setLoading(false)
-    }, 1500)
-  }
+      });
+      setLoading(false);
+    }, 1500);
+  };
 
   const getStatusIcon = (status, completed) => {
     if (completed) {
-      return <CheckCircle className="text-green-400" size={20} />
+      return <CheckCircle className="text-green-400" size={20} />;
     }
 
     switch (status) {
       case "picked-up":
-        return <Package className="text-orange-500" size={20} />
+        return <Package className="text-orange-500" size={20} />;
       case "in-transit":
-        return <Truck className="text-blue-400" size={20} />
+        return <Truck className="text-blue-400" size={20} />;
       case "out-for-delivery":
-        return <MapPin className="text-yellow-400" size={20} />
+        return <MapPin className="text-yellow-400" size={20} />;
       case "delivered":
-        return <CheckCircle className="text-gray-400" size={20} />
+        return <CheckCircle className="text-gray-400" size={20} />;
       default:
-        return <Clock className="text-gray-400" size={20} />
+        return <Clock className="text-gray-400" size={20} />;
     }
-  }
+  };
 
   const getStatusText = (status) => {
     const statusMap = {
@@ -82,11 +90,11 @@ export default function TrackParcelModal({ isOpen, onClose }) {
       "in-transit": "In Transit",
       "out-for-delivery": "Out for Delivery",
       delivered: "Delivered",
-    }
-    return statusMap[status] || status
-  }
+    };
+    return statusMap[status] || status;
+  };
 
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -94,7 +102,10 @@ export default function TrackParcelModal({ isOpen, onClose }) {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-800">
           <h2 className="text-xl font-bold text-white">Track Your Parcel</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors p-1">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white transition-colors p-1"
+          >
             <X size={24} />
           </button>
         </div>
@@ -135,7 +146,9 @@ export default function TrackParcelModal({ isOpen, onClose }) {
               {/* Status Overview */}
               <div className="bg-gray-900 rounded-lg p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white">Tracking #{trackingData.id}</h3>
+                  <h3 className="text-lg font-semibold text-white">
+                    Tracking #{trackingData.id}
+                  </h3>
                   <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-sm font-medium border border-blue-500/30">
                     {getStatusText(trackingData.status)}
                   </span>
@@ -146,15 +159,21 @@ export default function TrackParcelModal({ isOpen, onClose }) {
                     <MapPin className="text-orange-500" size={20} />
                     <div>
                       <p className="text-gray-400 text-sm">Current Location</p>
-                      <p className="text-white font-medium">{trackingData.currentLocation}</p>
+                      <p className="text-white font-medium">
+                        {trackingData.currentLocation}
+                      </p>
                     </div>
                   </div>
 
                   <div className="flex items-center space-x-3">
                     <Clock className="text-green-400" size={20} />
                     <div>
-                      <p className="text-gray-400 text-sm">Estimated Delivery</p>
-                      <p className="text-white font-medium">{trackingData.estimatedDelivery}</p>
+                      <p className="text-gray-400 text-sm">
+                        Estimated Delivery
+                      </p>
+                      <p className="text-white font-medium">
+                        {trackingData.estimatedDelivery}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -162,23 +181,33 @@ export default function TrackParcelModal({ isOpen, onClose }) {
 
               {/* Timeline */}
               <div className="bg-gray-900 rounded-lg p-6">
-                <h4 className="text-lg font-semibold text-white mb-4">Tracking Timeline</h4>
+                <h4 className="text-lg font-semibold text-white mb-4">
+                  Tracking Timeline
+                </h4>
 
                 <div className="space-y-4">
                   {trackingData.timeline.map((event, index) => (
                     <div key={index} className="flex items-start space-x-4">
-                      <div className="flex-shrink-0 mt-1">{getStatusIcon(event.status, event.completed)}</div>
+                      <div className="flex-shrink-0 mt-1">
+                        {getStatusIcon(event.status, event.completed)}
+                      </div>
 
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
-                          <h5 className={`font-medium ${event.completed ? "text-white" : "text-gray-400"}`}>
+                          <h5
+                            className={`font-medium ${event.completed ? "text-white" : "text-gray-400"}`}
+                          >
                             {getStatusText(event.status)}
                           </h5>
-                          <span className={`text-sm ${event.completed ? "text-gray-300" : "text-gray-500"}`}>
+                          <span
+                            className={`text-sm ${event.completed ? "text-gray-300" : "text-gray-500"}`}
+                          >
                             {event.timestamp}
                           </span>
                         </div>
-                        <p className={`text-sm ${event.completed ? "text-gray-300" : "text-gray-500"}`}>
+                        <p
+                          className={`text-sm ${event.completed ? "text-gray-300" : "text-gray-500"}`}
+                        >
                           {event.location}
                         </p>
                       </div>
@@ -193,9 +222,12 @@ export default function TrackParcelModal({ isOpen, onClose }) {
 
               {/* Help Section */}
               <div className="bg-gray-900 rounded-lg p-6">
-                <h4 className="text-lg font-semibold text-white mb-3">Need Help?</h4>
+                <h4 className="text-lg font-semibold text-white mb-3">
+                  Need Help?
+                </h4>
                 <p className="text-gray-400 mb-4">
-                  If you have any questions about your delivery, our support team is here to help.
+                  If you have any questions about your delivery, our support
+                  team is here to help.
                 </p>
                 <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
                   <button className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
@@ -213,14 +245,17 @@ export default function TrackParcelModal({ isOpen, onClose }) {
           {!trackingData && !loading && trackingNumber && (
             <div className="text-center py-8">
               <Package className="mx-auto text-gray-600 mb-4" size={48} />
-              <h3 className="text-lg font-medium text-white mb-2">Enter a tracking number</h3>
+              <h3 className="text-lg font-medium text-white mb-2">
+                Enter a tracking number
+              </h3>
               <p className="text-gray-400">
-                Enter your tracking number above to see the latest updates on your parcel.
+                Enter your tracking number above to see the latest updates on
+                your parcel.
               </p>
             </div>
           )}
         </div>
       </div>
     </div>
-  )
+  );
 }

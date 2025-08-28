@@ -104,8 +104,8 @@ export default function Header() {
                       isActive && !item.onClick
                         ? "text-orange-500 font-bold"
                         : isScrolled
-                        ? "text-white/90 hover:text-orange-500"
-                        : "text-white/90 hover:text-orange-500"
+                          ? "text-white/90 hover:text-orange-500"
+                          : "text-white/90 hover:text-orange-500"
                     }`
                   }
                 >
