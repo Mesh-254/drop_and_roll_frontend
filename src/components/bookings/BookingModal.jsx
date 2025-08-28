@@ -200,8 +200,12 @@ export default function BookingModal({
         scheduledDropoffAt: formData.scheduledDropoffAt || null,
         promoCode: formData.promoCode || null,
         notes: formData.notes || null,
-        guestEmail: !isAuthenticated ? formData.guestEmail : null,
       };
+
+      // Only include guestEmail if not authenticated and email is provided
+      if (!isAuthenticated && formData.guestEmail) {
+        payload.guestEmail = formData.guestEmail.trim();
+      }
 
       console.log("Payload before send:", payload);
       console.log("Is authenticated?", isAuthenticated);

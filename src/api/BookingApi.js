@@ -109,18 +109,22 @@ export class BookingApi extends ApiBase {
         scheduled_dropoff_at: bookingData.scheduledDropoffAt || null,
         promo_code: bookingData.promoCode || null,
         notes: bookingData.notes || null,
-        guest_email: bookingData.guestEmail || null,
       };
+
+      if (bookingData.guestEmail) {
+        bacendData.guest_email = bookingData.guestEmail.trim();
+      }
 
       console.log("Booking payload:", backendData);
 
       const response = await this.request("/api/booking/bookings/", {
         method: "POST",
         data: backendData,
-        includeAuth: false,
+        includeAuth: true,
       });
       return { success: true, data: response.data };
     } catch (error) {
+      console.log(error)
       return {
         success: false,
         code: error.code || "BOOKING_ERROR",
@@ -219,9 +223,9 @@ export class BookingApi extends ApiBase {
       const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(this.deg2rad(lat1)) *
-          Math.cos(this.deg2rad(lat2)) *
-          Math.sin(dLon / 2) *
-          Math.sin(dLon / 2);
+        Math.cos(this.deg2rad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       const distance = R * c;
       return Math.round(distance * 100) / 100;
