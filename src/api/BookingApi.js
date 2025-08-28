@@ -112,7 +112,7 @@ export class BookingApi extends ApiBase {
       };
 
       if (bookingData.guestEmail) {
-        bacendData.guest_email = bookingData.guestEmail.trim();
+        backendData.guest_email = bookingData.guestEmail.trim();
       }
 
       console.log("Booking payload:", backendData);
