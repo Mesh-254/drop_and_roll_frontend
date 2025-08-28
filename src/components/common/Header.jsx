@@ -5,9 +5,12 @@ import { Menu, X } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import TrackParcelModal from "../track/TrackParcelModal";
 import GetQuoteBook from "../quote/GetQuoteBook";
+import ProfileDropdown from "../profile/ProfileDropdown";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function Header() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showTrackModal, setShowTrackModal] = useState(false);
@@ -53,6 +56,7 @@ export default function Header() {
       name: "Tracking",
       onClick: handleTracking,
     },
+    ...(isAuthenticated ? [{ name: "History", href: "/history" }] : []),
     { name: "Support", href: "#support" },
     { name: "FAQ", href: "/faqs" },
   ];
@@ -112,25 +116,28 @@ export default function Header() {
             </nav>
 
             <div className="hidden md:flex items-center space-x-4">
-              {/* Auth Buttons */}
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={handleLogin}
-                  className={`font-medium px-4 py-2 rounded-lg transition-all duration-300 border ${
-                    isScrolled
-                      ? "text-white/90 border-white/20 hover:border-orange-500 hover:text-orange-500 hover:bg-orange-500/10"
-                      : "text-white/90 border-white/20 hover:border-orange-500 hover:text-orange-500 hover:bg-orange-500/10"
-                  }`}
-                >
-                  Login
-                </button>
-                <button
-                  onClick={handleRegister}
-                  className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium px-4 py-2 rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-orange-500/25"
-                >
-                  Register
-                </button>
-              </div>
+              {isAuthenticated ? (
+                <ProfileDropdown />
+              ) : (
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={handleLogin}
+                    className={`font-medium px-4 py-2 rounded-lg transition-all duration-300 border ${
+                      isScrolled
+                        ? "text-white/90 border-white/20 hover:border-orange-500 hover:text-orange-500 hover:bg-orange-500/10"
+                        : "text-white/90 border-white/20 hover:border-orange-500 hover:text-orange-500 hover:bg-orange-500/10"
+                    }`}
+                  >
+                    Login
+                  </button>
+                  <button
+                    onClick={handleRegister}
+                    className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium px-4 py-2 rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-orange-500/25"
+                  >
+                    Register
+                  </button>
+                </div>
+              )}
 
               {/* Divider */}
               <div className="w-px h-6 bg-white/20"></div>
@@ -182,26 +189,54 @@ export default function Header() {
                   </NavLink>
                 ))}
 
-                {/* Auth Buttons for Mobile */}
+                {/* Auth Section for Mobile */}
                 <div className="px-3 py-2 space-y-2 border-t border-white/10 mt-2 pt-4">
-                  <button
-                    onClick={() => {
-                      handleLogin();
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className="w-full text-white/90 border border-white/20 hover:border-orange-500 hover:text-orange-500 hover:bg-orange-500/10 font-medium px-4 py-2 rounded-lg transition-all duration-300"
-                  >
-                    Login
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleRegister();
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium px-4 py-2 rounded-lg transition-all duration-300"
-                  >
-                    Register
-                  </button>
+                  {isAuthenticated ? (
+                    <div className="space-y-2">
+                      <div className="text-white/90 font-medium mb-2">
+                        Profile
+                      </div>
+                      <button
+                        onClick={() => {
+                          navigate("/profile-settings");
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className="w-full text-left text-white/90 hover:text-orange-500 hover:bg-orange-500/10 font-medium px-4 py-2 rounded-lg transition-all duration-300"
+                      >
+                        Profile Settings
+                      </button>
+                      <button
+                        onClick={() => {
+                          navigate("/history");
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className="w-full text-left text-white/90 hover:text-orange-500 hover:bg-orange-500/10 font-medium px-4 py-2 rounded-lg transition-all duration-300"
+                      >
+                        Booking History
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => {
+                          handleLogin();
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className="w-full text-white/90 border border-white/20 hover:border-orange-500 hover:text-orange-500 hover:bg-orange-500/10 font-medium px-4 py-2 rounded-lg transition-all duration-300"
+                      >
+                        Login
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleRegister();
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium px-4 py-2 rounded-lg transition-all duration-300"
+                      >
+                        Register
+                      </button>
+                    </>
+                  )}
                 </div>
 
                 <div className="px-3 py-2">
