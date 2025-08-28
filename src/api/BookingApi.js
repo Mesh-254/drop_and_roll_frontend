@@ -79,7 +79,7 @@ export class BookingApi extends ApiBase {
             : 123,
         },
         dropoff_address: {
-          line1: bookingData.dropoffAddress?.line1 || bookingData.dropoffAddress?.street  || 'Default Pickup Street',
+          line1: bookingData.dropoffAddress?.line1 || bookingData.dropoffAddress?.street || 'Default dropoff Street',
           line2: bookingData.dropoffAddress?.line2 || "",
           city: bookingData.dropoffAddress?.city || 'Default City',
           region: bookingData.dropoffAddress?.region || "",
@@ -117,6 +117,40 @@ export class BookingApi extends ApiBase {
     }
   }
 
+
+
+  async getBookings() {
+    try {
+      const response = await this.request("/api/booking/bookings/", {
+        method: "GET",
+        includeAuth: true,
+      })
+      return { success: true, data: response.data }
+    } catch (error) {
+      return {
+        success: false,
+        code: error.code || "FETCH_ERROR",
+        message: error.message || "Failed to fetch bookings",
+      }
+    }
+  }
+
+  async getQuotes() {
+    try {
+      const response = await this.request("/api/booking/quotes/", {
+        method: "GET",
+        includeAuth: true,
+      })
+      return { success: true, data: response.data }
+    } catch (error) {
+      return {
+        success: false,
+        code: error.code || "FETCH_ERROR",
+        message: error.message || "Failed to fetch quotes",
+      }
+    }
+  }
+  
   async getQuote(quoteId) {
     try {
       const response = await this.request(`/api/booking/quotes/${quoteId}/`)
