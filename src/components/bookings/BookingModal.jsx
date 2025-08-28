@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { bookingApi } from "../../api/BookingApi";
+import { useAuth } from "../../contexts/AuthContext"; // Import AuthContext
 import dayjs from "dayjs";
 import {
   X,
@@ -104,14 +105,14 @@ export default function BookingModal({
   const [validation, setValidation] = useState({});
 
   // Check if user is authenticated (mock implementation)
-  const [isAuthenticated] = useState(false); // Replace with actual auth check
+  const { isAuthenticated, user } = useAuth(); // Use AuthContext
 
   const [formData, setFormData] = useState({
     scheduledPickupAt: "",
     scheduledDropoffAt: "",
     promoCode: "",
     notes: "",
-    guestEmail: "",
+    guestEmail: user?.email || "", // Pre-fill with user email if authenticated,
     pickupPostcode:
       location.state?.formData?.pickupPostcode ||
       initialFormData.pickupPostcode ||
@@ -162,9 +163,9 @@ export default function BookingModal({
     }
 
     if (!isAuthenticated) {
-      if (!formData.guestEmail?.trim()) {
+      if (!isAuthenticated && !formData.guestEmail?.trim()) {
         errors.guestEmail = "Email is required";
-      } else if (!validateEmail(formData.guestEmail)) {
+      } else if (!isAuthenticated && !validateEmail(formData.guestEmail)) {
         errors.guestEmail = "Please enter a valid email address";
       }
     }
@@ -183,10 +184,18 @@ export default function BookingModal({
     setSubmitError(null);
 
     try {
+      // Provide default address data if pickupAddress or dropoffAddress is undefined
+      const defaultAddress = {
+        line1: "Default Street",
+        city: "Default City",
+        country: "GB",
+        latitude: 123,
+        longitude: 123,
+      };
       const payload = {
         quoteId: quote.id,
-        pickupAddress: initialFormData.pickupAddress,
-        dropoffAddress: initialFormData.dropoffAddress,
+        pickupAddress: initialFormData.pickupAddress || defaultAddress,
+        dropoffAddress: initialFormData.dropoffAddress || defaultAddress,
         scheduledPickupAt: formData.scheduledPickupAt,
         scheduledDropoffAt: formData.scheduledDropoffAt || null,
         promoCode: formData.promoCode || null,
@@ -194,7 +203,10 @@ export default function BookingModal({
         guestEmail: !isAuthenticated ? formData.guestEmail : null,
       };
 
-      console.log("Booking payload:", payload);
+      console.log("Payload before send:", payload);
+      console.log("Is authenticated?", isAuthenticated);
+      console.log("Token in storage:", localStorage.getItem("access_token"));
+      console.log("Logged-in user:", user);
 
       const result = await bookingApi.createBooking(payload);
 
@@ -268,6 +280,7 @@ export default function BookingModal({
                   {quote.weight_kg}kg
                 </span>
               </div>
+
               <div className="md:col-span-2">
                 <div className="flex items-start space-x-2">
                   <MapPin className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
