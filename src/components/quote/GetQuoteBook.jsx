@@ -372,7 +372,7 @@ const QuoteDisplay = ({ quote, onDownloadPDF, isLoading, formData }) => {
             Total Price
           </span>
           <span className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-            £{quote.final_price?.toFixed(2) || "0.00"}
+            £{quote.final_price ? Number.parseFloat(quote.final_price).toFixed(2) : "0.00"}
           </span>
         </div>
       </div>
