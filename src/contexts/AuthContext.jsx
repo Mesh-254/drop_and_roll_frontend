@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect } from "react";
-import {authApi} from "../api/AuthApi";
+import { authApi } from "../api/AuthApi";
 
 const AuthContext = createContext();
 
@@ -23,15 +23,21 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const checkAuthStatus = async () => {
+    setLoading(true);
     try {
       if (authApi.isAuthenticated()) {
         const userData = await authApi.getCurrentUser();
         setUser(userData);
         setIsAuthenticated(true);
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
       }
     } catch (error) {
       console.error("Auth check failed:", error);
-      logout();
+      authApi.logout(); // Clear invalid tokens
+      setUser(null);
+      setIsAuthenticated(false);
     } finally {
       setLoading(false);
     }
@@ -47,17 +53,14 @@ export const AuthProvider = ({ children }) => {
         } else {
           localStorage.removeItem("remember_me");
         }
-        const userData = await authApi.getCurrentUser();
-        setUser(userData);
-        setIsAuthenticated(true);
+        await checkAuthStatus(); // Refresh user data
         return { success: true, data: response.data };
-      } else {
-        return {
-          success: false,
-          code: response.code,
-          message: response.message,
-        };
       }
+      return {
+        success: false,
+        code: response.code,
+        message: response.message,
+      };
     } catch (error) {
       return {
         success: false,
@@ -103,14 +106,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   const googleAuth = async (idToken) => {
-    const result = await authApi.googleAuth(idToken)
+    const result = await authApi.googleAuth(idToken);
     if (result.success) {
-      const userData = await authApi.getCurrentUser()
-      setUser(userData)
+      const userData = await authApi.getCurrentUser();
+      setUser(userData);
     }
-    return result
-  }
-
+    return result;
+  };
 
   const logout = () => {
     authApi.logout();
