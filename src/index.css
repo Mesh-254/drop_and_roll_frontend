@@ -1,1 +1,57 @@
 @import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base styles */
+@layer base {
+  html {
+    font-family: "Inter", system-ui, sans-serif;
+  }
+
+  body {
+    @apply bg-black text-white antialiased;
+  }
+}
+
+/* Component styles */
+@layer components {
+  .btn-primary {
+    @apply bg-orange-500 hover:bg-orange-600 text-white font-medium px-6 py-3 rounded-lg transition-all duration-300 transform hover:scale-105;
+  }
+
+  .btn-secondary {
+    @apply border border-gray-600 hover:border-orange-500 text-gray-300 hover:text-orange-500 px-6 py-3 rounded-lg font-medium transition-colors;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:border-orange-500 focus:outline-none;
+  }
+
+  .card {
+    @apply bg-gray-900 rounded-lg border border-gray-800 hover:border-orange-500/30 transition-colors;
+  }
+
+  .modal {
+    @apply fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4;
+  }
+
+  .modal-content {
+    @apply bg-black border border-orange-500/20 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto;
+  }
+}
+
+/* Utility styles */
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent;
+  }
+
+  .shadow-orange {
+    box-shadow: 0 10px 25px rgba(249, 115, 22, 0.1);
+  }
+
+  .border-gradient {
+    border-image: linear-gradient(135deg, #f97316, #ea580c) 1;
+  }
+}
