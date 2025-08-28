@@ -21,7 +21,7 @@ import AccountConfirmedPage from "./components/auth/AccountConfirmedPage";
 import ResendConfirmationPage from "./components/auth/ResendConfirmationPage";
 import QuotePage from "./components/quote/QuotePage";
 import BookingPage from "./components/bookings/BookingPage";
-
+import BookingHistory from "./components/bookings/BookingHistory"
 
 // Layout for pages with Header and Footer
 function MainLayout({ children }) {
@@ -88,10 +88,35 @@ function App() {
           />
           <Route path="/admin" element={<AdminDashboard />} />{" "}
           {/* No header/footer for admin */}
-
-          
           <Route path="/quote" element={<QuotePage />} />
           <Route path="/booking" element={<BookingPage />} />
+          <Route
+            path="/history"
+            element={
+              <MainLayout>
+                <BookingHistory />
+              </MainLayout>
+            }
+          />
+          <Route
+            path="/profile-settings"
+            element={
+              <MainLayout>
+                <div className="min-h-screen bg-black pt-24 pb-12">
+                  <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <h1 className="text-3xl font-bold text-white mb-8">
+                      Profile Settings
+                    </h1>
+                    <div className="bg-gray-900 rounded-lg p-6">
+                      <p className="text-gray-400">
+                        Profile settings page coming soon...
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </MainLayout>
+            }
+          />
         </Routes>
       </div>
     </GoogleOAuthProvider>
