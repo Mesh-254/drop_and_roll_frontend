@@ -1,4 +1,4 @@
-// BookingApi.js (updated with full methods)
+// BookingApi.js (Fixed inconsistent URLs: use "/api/booking/bookings/" consistently for bookings)
 import { ApiBase } from "./ApiBase";
 
 export class BookingApi extends ApiBase {
@@ -180,7 +180,7 @@ export class BookingApi extends ApiBase {
 
   async getBooking(bookingId) {
     try {
-      const response = await this.request(`/api/bookings/${bookingId}/`);
+      const response = await this.request(`/api/booking/bookings/${bookingId}/`);  // Fixed URL
       return { success: true, data: response.data };
     } catch (error) {
       return {
@@ -242,7 +242,7 @@ export class BookingApi extends ApiBase {
   async updateBookingStatus(bookingId, status) {
     try {
       const response = await this.request(
-        `/api/bookings/${bookingId}/set-status/`,
+        `/api/booking/bookings/${bookingId}/set-status/`,  // Fixed URL
         {
           method: "POST",
           data: { status },
