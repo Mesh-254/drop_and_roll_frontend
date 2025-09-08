@@ -23,6 +23,10 @@ import QuotePage from "./components/quote/QuotePage";
 import BookingPage from "./components/bookings/BookingPage";
 import BookingHistory from "./components/bookings/BookingHistory";
 
+import PaymentPage from "./components/payments/PaymentPage";
+import PaymentSuccess from "./components/payments/PaymentSuccess";
+import PaymentCancel from "./components/payments/PaymentCancel";
+
 // Layout for pages with Header and Footer
 function MainLayout({ children }) {
   return (
@@ -114,6 +118,31 @@ function App() {
                     </div>
                   </div>
                 </div>
+              </MainLayout>
+            }
+          />
+          {/* Payment routes */}
+          <Route
+            path="/pay/:txId"
+            element={
+              <MainLayout>
+                <PaymentPage />
+              </MainLayout>
+            }
+          />
+          <Route
+            path="/pay/success"
+            element={
+              <MainLayout>
+                <PaymentSuccess />
+              </MainLayout>
+            }
+          />
+          <Route
+            path="/pay/cancel"
+            element={
+              <MainLayout>
+                <PaymentCancel />
               </MainLayout>
             }
           />
