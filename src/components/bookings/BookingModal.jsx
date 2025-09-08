@@ -2,7 +2,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { bookingApi } from "../../api/BookingApi";
-import { useAuth } from "../../contexts/AuthContext"; // Import AuthContext
+import { paymentApi } from "../../api/PaymentApi";
+import { useAuth } from "../../contexts/AuthContext";
 import dayjs from "dayjs";
 import {
   X,
@@ -17,7 +18,7 @@ import {
 
 const ContactInfo = ({ formData, onUpdate, validation, isAuthenticated }) => {
   if (isAuthenticated) {
-    return null; // Don't show contact form for authenticated users
+    return null;
   }
 
   return (
@@ -55,27 +56,24 @@ const ContactInfo = ({ formData, onUpdate, validation, isAuthenticated }) => {
 const generateTimeSlots = (serviceType) => {
   const slots = [];
   const now = dayjs();
-  const startDate = now.add(1, "hour"); // Start from next hour
+  const startDate = now.add(1, "hour");
 
-  // Generate slots for next 7 days
   for (let day = 0; day < 7; day++) {
     const date = startDate.add(day, "day");
 
-    // Different time ranges based on service type
     let startHour = 8;
     let endHour = 18;
-    let interval = 2; // 2-hour slots by default
+    let interval = 2;
 
     if (serviceType?.name?.toLowerCase().includes("express")) {
       startHour = 8;
       endHour = 20;
-      interval = 1; // 1-hour slots for express
+      interval = 1;
     }
 
     for (let hour = startHour; hour < endHour; hour += interval) {
       const slotTime = date.hour(hour).minute(0).second(0);
 
-      // Skip past times for today
       if (day === 0 && slotTime.isBefore(now)) {
         continue;
       }
@@ -104,15 +102,14 @@ export default function BookingModal({
   const [submitError, setSubmitError] = useState(null);
   const [validation, setValidation] = useState({});
 
-  // Check if user is authenticated (mock implementation)
-  const { isAuthenticated, user } = useAuth(); // Use AuthContext
+  const { isAuthenticated, user } = useAuth();
 
   const [formData, setFormData] = useState({
     scheduledPickupAt: "",
     scheduledDropoffAt: "",
     promoCode: "",
     notes: "",
-    guestEmail: user?.email || "", // Pre-fill with user email if authenticated,
+    guestEmail: user?.email || "",
     pickupPostcode:
       location.state?.formData?.pickupPostcode ||
       initialFormData.pickupPostcode ||
@@ -139,7 +136,6 @@ export default function BookingModal({
 
   const updateFormData = useCallback((updates) => {
     setFormData((prev) => ({ ...prev, ...updates }));
-    // Clear validation errors for updated fields
     setValidation((prev) => {
       const newValidation = { ...prev };
       Object.keys(updates).forEach((key) => {
@@ -149,7 +145,6 @@ export default function BookingModal({
     });
   }, []);
 
-  // Email validation
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
@@ -163,9 +158,9 @@ export default function BookingModal({
     }
 
     if (!isAuthenticated) {
-      if (!isAuthenticated && !formData.guestEmail?.trim()) {
+      if (!formData.guestEmail?.trim()) {
         errors.guestEmail = "Email is required";
-      } else if (!isAuthenticated && !validateEmail(formData.guestEmail)) {
+      } else if (!validateEmail(formData.guestEmail)) {
         errors.guestEmail = "Please enter a valid email address";
       }
     }
@@ -184,7 +179,6 @@ export default function BookingModal({
     setSubmitError(null);
 
     try {
-      // Provide default address data if pickupAddress or dropoffAddress is undefined
       const defaultAddress = {
         line1: "Default Street",
         city: "Default City",
@@ -192,6 +186,7 @@ export default function BookingModal({
         latitude: 123,
         longitude: 123,
       };
+
       const payload = {
         quoteId: quote.id,
         pickupAddress: initialFormData.pickupAddress || defaultAddress,
@@ -202,49 +197,54 @@ export default function BookingModal({
         notes: formData.notes || null,
       };
 
-      // Only include guestEmail if not authenticated and email is provided
       if (!isAuthenticated && formData.guestEmail) {
         payload.guestEmail = formData.guestEmail.trim();
       }
 
-      console.log("Payload before send:", payload);
-      console.log("Is authenticated?", isAuthenticated);
-      console.log("Token in storage:", localStorage.getItem("access_token"));
-      console.log("Logged-in user:", user);
+      console.log("Booking payload:", payload);
 
       const result = await bookingApi.createBooking(payload);
 
       if (result.success) {
-        navigate("/payment", {
+        const transaction = result.data;
+        console.log("Transaction:", transaction);
+
+        // Ensure transaction has an id
+        if (!transaction.id) {
+          throw new Error("Transaction ID is missing");
+        }
+
+        // Navigate to payment page for all bookings (even if amount is 0, to handle edge cases)
+        navigate(`/pay/${transaction.id}`, {
           state: {
-            bookingId: result.data.id,
+            transaction,
             quote,
-            booking: result.data,
+            booking: transaction.booking,
+            guestEmail: payload.guestEmail, // Pass guest_email to PaymentPage
           },
         });
-        onClose();
       } else {
-        setSubmitError(result.message || "Failed to create booking");
+        throw new Error(result.message || "Failed to create booking");
       }
     } catch (error) {
-      console.error("Booking creation failed:", error);
-      setSubmitError("An unexpected error occurred. Please try again.");
+      console.error("Booking error:", error);
+      setSubmitError(
+        error.message || "An error occurred while creating the booking"
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
-
   if (!isOpen || !quote) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-y-auto animate-in zoom-in-95 duration-300">
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-orange-500 text-white rounded-t-2xl">
           <div>
             <h2 className="text-2xl font-bold">Complete Your Booking</h2>
             <p className="text-orange-100 text-sm">
-              Total: £
+              Total: KSh{" "}
               {quote.final_price
                 ? Number.parseFloat(quote.final_price).toFixed(2)
                 : "0.00"}
@@ -259,9 +259,7 @@ export default function BookingModal({
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6 space-y-6">
-          {/* Quote Summary */}
           <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center">
               <Package className="h-5 w-5 text-orange-500 mr-2" />
@@ -318,7 +316,6 @@ export default function BookingModal({
             </div>
           </div>
 
-          {/* Contact Information for unauthenticated users */}
           <ContactInfo
             formData={formData}
             onUpdate={updateFormData}
@@ -326,7 +323,7 @@ export default function BookingModal({
             isAuthenticated={isAuthenticated}
           />
 
-          {/* Scheduling */}
+          {/* ... existing scheduling and additional options code ... */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
               <Calendar className="h-5 w-5 text-orange-500 mr-2" />
@@ -380,7 +377,6 @@ export default function BookingModal({
             </div>
           </div>
 
-          {/* Additional Options */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               Additional Options
@@ -413,7 +409,6 @@ export default function BookingModal({
             </div>
           </div>
 
-          {/* Error Display */}
           {submitError && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
               <div className="flex items-center">
@@ -426,12 +421,11 @@ export default function BookingModal({
           )}
         </div>
 
-        {/* Footer */}
         <div className="flex justify-between items-center p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-b-2xl">
           <div className="text-sm text-gray-600 dark:text-gray-400">
             Total:{" "}
             <span className="font-bold text-gray-900 dark:text-white">
-              £
+              KSh{" "}
               {quote.final_price
                 ? Number.parseFloat(quote.final_price).toFixed(2)
                 : "0.00"}
