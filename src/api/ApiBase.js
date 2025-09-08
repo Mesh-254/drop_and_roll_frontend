@@ -31,7 +31,8 @@ export class ApiBase {
         if (
           error.response?.status === 401 &&
           !originalRequest._retry &&
-          originalRequest.url !== "/api/users/auth/jwt/refresh/"
+          originalRequest.url !== "/api/users/auth/jwt/refresh/" &&
+          originalRequest.includeAuth !== false // Only retry if auth was included
         ) {
           originalRequest._retry = true;
           try {
