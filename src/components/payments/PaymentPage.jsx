@@ -1,8 +1,23 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements } from "@stripe/react-stripe-js";
 import { paymentApi } from "../../api/PaymentApi";
 import { useAuth } from "../../contexts/AuthContext";
-import { Loader2, CreditCard, AlertCircle, ArrowLeft } from "lucide-react";
+import StripeCreditCard from "./StripeCreditCard";
+import StripeApplePay from "./StripeApplePay";
+import {
+  Loader2,
+  CreditCard,
+  AlertCircle,
+  ArrowLeft,
+  Shield,
+} from "lucide-react";
+
+// Initialize Stripe
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 export default function PaymentPage() {
   const { txId } = useParams();
@@ -19,10 +34,22 @@ export default function PaymentPage() {
     location.state?.guestEmail?.toLowerCase() || ""
   );
 
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("paypal");
+  const [applePayAvailable, setApplePayAvailable] = useState(false);
+
   const queryParams = new URLSearchParams(location.search);
   const paypalToken = queryParams.get("token");
   const isCancelled = queryParams.has("cancelled");
   const [hasCaptured, setHasCaptured] = useState(false);
+
+  useEffect(() => {
+    const checkApplePayAvailability = async () => {
+      if (window.ApplePaySession && window.ApplePaySession.canMakePayments()) {
+        setApplePayAvailable(true);
+      }
+    };
+    checkApplePayAvailability();
+  }, []);
 
   useEffect(() => {
     const loadTransactionData = async () => {
@@ -215,6 +242,7 @@ export default function PaymentPage() {
       setProcessing(false);
     }
   };
+
   const handleCancel = async () => {
     try {
       const result = await paymentApi.cancelTransaction(
@@ -234,6 +262,16 @@ export default function PaymentPage() {
         localStorage.removeItem("guestEmail");
       }
     }
+  };
+
+  const handleStripeSuccess = () => {
+    navigate("/pay/success", {
+      state: { transaction, guestEmail },
+    });
+  };
+
+  const handleStripeError = (errorMessage) => {
+    setError(errorMessage);
   };
 
   if (loading) {
@@ -283,7 +321,7 @@ export default function PaymentPage() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Complete Payment
           </h1>
-          <p className="text-gray-600">Secure payment powered by PayPal</p>
+          <p className="text-gray-600">Choose your preferred payment method</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
@@ -332,6 +370,68 @@ export default function PaymentPage() {
             Choose Payment Method
           </h2>
 
+          <div className="space-y-4 mb-6">
+            {/* PayPal Option */}
+            <label className="flex items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="paypal"
+                checked={selectedPaymentMethod === "paypal"}
+                onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                className="h-4 w-4 text-orange-500 focus:ring-orange-500 border-gray-300"
+              />
+              <div className="ml-3 flex items-center">
+                <div className="bg-blue-600 text-white px-3 py-1 rounded text-sm font-bold mr-3">
+                  PayPal
+                </div>
+                <span className="text-gray-900 font-medium">
+                  Pay with PayPal
+                </span>
+              </div>
+            </label>
+
+            {/* Credit Card Option */}
+            <label className="flex items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="creditcard"
+                checked={selectedPaymentMethod === "creditcard"}
+                onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                className="h-4 w-4 text-orange-500 focus:ring-orange-500 border-gray-300"
+              />
+              <div className="ml-3 flex items-center">
+                <CreditCard className="h-6 w-6 text-gray-600 mr-3" />
+                <span className="text-gray-900 font-medium">
+                  Credit or Debit Card
+                </span>
+              </div>
+            </label>
+
+            {/* Apple Pay Option - Only show if available */}
+            {applePayAvailable && (
+              <label className="flex items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value="applepay"
+                  checked={selectedPaymentMethod === "applepay"}
+                  onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                  className="h-4 w-4 text-orange-500 focus:ring-orange-500 border-gray-300"
+                />
+                <div className="ml-3 flex items-center">
+                  <div className="bg-black text-white px-3 py-1 rounded text-sm font-bold mr-3">
+                    Apple Pay
+                  </div>
+                  <span className="text-gray-900 font-medium">
+                    Pay with Apple Pay
+                  </span>
+                </div>
+              </label>
+            )}
+          </div>
+
           {processing && (
             <div className="text-center py-8">
               <Loader2 className="h-12 w-12 text-orange-500 animate-spin mx-auto mb-4" />
@@ -341,20 +441,50 @@ export default function PaymentPage() {
 
           {!processing && (
             <div className="space-y-4">
-              <p className="text-gray-600 text-sm mb-4">
-                Click below to proceed with your PayPal payment. You will be
-                redirected to PayPal to complete the transaction.
-              </p>
+              {selectedPaymentMethod === "paypal" && (
+                <div className="space-y-4">
+                  <p className="text-gray-600 text-sm mb-4">
+                    Click below to proceed with your PayPal payment. You will be
+                    redirected to PayPal to complete the transaction.
+                  </p>
+                  <button
+                    onClick={handleInitiatePayment}
+                    disabled={processing}
+                    className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center justify-center"
+                  >
+                    <CreditCard className="h-5 w-5 mr-2" />
+                    Pay with PayPal
+                  </button>
+                </div>
+              )}
 
-              <div className="flex flex-col sm:flex-row gap-4">
-                <button
-                  onClick={handleInitiatePayment}
-                  disabled={processing}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center justify-center"
-                >
-                  <CreditCard className="h-5 w-5 mr-2" />
-                  Pay with PayPal
-                </button>
+              {selectedPaymentMethod === "creditcard" && (
+                <Elements stripe={stripePromise}>
+                  <StripeCreditCard
+                    txId={txId}
+                    amount={Number.parseFloat(transaction?.amount || 0)}
+                    guestEmail={guestEmail}
+                    isAuthenticated={isAuthenticated}
+                    onSuccess={handleStripeSuccess}
+                    onError={handleStripeError}
+                  />
+                </Elements>
+              )}
+
+              {selectedPaymentMethod === "applepay" && applePayAvailable && (
+                <Elements stripe={stripePromise}>
+                  <StripeApplePay
+                    txId={txId}
+                    amount={Number.parseFloat(transaction?.amount || 0)}
+                    guestEmail={guestEmail}
+                    isAuthenticated={isAuthenticated}
+                    onSuccess={handleStripeSuccess}
+                    onError={handleStripeError}
+                  />
+                </Elements>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-4 mt-6">
                 <button
                   onClick={handleCancel}
                   disabled={processing}
@@ -367,25 +497,16 @@ export default function PaymentPage() {
               <div className="bg-gray-50 rounded-lg p-4 mt-6">
                 <div className="flex items-start">
                   <div className="flex-shrink-0">
-                    <svg
-                      className="h-5 w-5 text-green-500"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
+                    <Shield className="h-5 w-5 text-green-500" />
                   </div>
                   <div className="ml-3">
                     <h3 className="text-sm font-medium text-gray-900">
                       Secure Payment
                     </h3>
                     <p className="text-sm text-gray-600 mt-1">
-                      Your payment information is encrypted and secure. We never
-                      store your payment details.
+                      Your payment information is encrypted and secure. We
+                      support PayPal, credit cards, and Apple Pay for your
+                      convenience.
                     </p>
                   </div>
                 </div>
