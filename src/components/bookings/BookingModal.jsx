@@ -2,7 +2,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { bookingApi } from "../../api/BookingApi";
-import { paymentApi } from "../../api/PaymentApi";
 import { useAuth } from "../../contexts/AuthContext";
 import dayjs from "dayjs";
 import {
