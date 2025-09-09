@@ -81,6 +81,26 @@ export class PaymentApi extends ApiBase {
     }
   }
 
+  async initiateStripeTransaction(txId, includeAuth = true, guestEmail = "") {
+    try {
+      const params = guestEmail ? { guest_email: guestEmail.toLowerCase() } : {}
+      console.log("initiateStripeTransaction params:", { txId, params })
+      const response = await this.request(`/api/payments/transactions/${txId}/initiate-stripe/`, {
+        method: "POST",
+        includeAuth: includeAuth && !guestEmail,
+        params,
+      })
+      return response.data
+    } catch (error) {
+      console.error("initiateStripeTransaction error:", error, error.response?.data)
+      return {
+        success: false,
+        code: error.code || "STRIPE_INITIATE_ERROR",
+        message: error.response?.data?.error || error.message || "Failed to initiate Stripe payment",
+      }
+    }
+  }
+
   async getBooking(bookingId, includeAuth = true, guestEmail = "") {
     try {
       const params = guestEmail ? { guest_email: guestEmail.toLowerCase() } : {};
