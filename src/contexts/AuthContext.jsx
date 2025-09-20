@@ -46,6 +46,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password, rememberMe = false) => {
     try {
       const response = await authApi.login(email, password);
+      localStorage.removeItem("guestEmail"); // Clear guest email
       if (response.success) {
         if (rememberMe) {
           localStorage.setItem("remember_me", "true");
@@ -53,7 +54,12 @@ export const AuthProvider = ({ children }) => {
         } else {
           localStorage.removeItem("remember_me");
         }
-        await checkAuthStatus(); // Refresh user data
+        if (response.data.user) {
+          setUser(response.data.user);
+          setIsAuthenticated(true);
+        } else {
+          await checkAuthStatus(); // Fallback to refresh user data
+        }
         return { success: true, data: response.data };
       }
       return {
@@ -107,9 +113,17 @@ export const AuthProvider = ({ children }) => {
 
   const googleAuth = async (idToken) => {
     const result = await authApi.googleAuth(idToken);
+    localStorage.removeItem("guestEmail"); // Clear guest email
+
     if (result.success) {
-      const userData = await authApi.getCurrentUser();
-      setUser(userData);
+      if (result.data.user) {
+        setUser(result.data.user);
+        setIsAuthenticated(true);
+      } else {
+        const userData = await authApi.getCurrentUser();
+        setUser(userData);
+        setIsAuthenticated(true);
+      }
     }
     return result;
   };
@@ -120,6 +134,24 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
     localStorage.removeItem("remember_me");
     localStorage.removeItem("user_data");
+    localStorage.removeItem("guestEmail"); // Clear guest email
+  };
+
+  const isCustomer = () => user?.role === "customer";
+  const isDriver = () => user?.role === "driver";
+  const isAdmin = () => user?.role === "admin";
+
+  const getRedirectPath = (userRole) => {
+    switch (userRole) {
+      case "driver":
+        return "/driver-dashboard";
+      case "customer":
+        return "/";
+      case "admin":
+        return "/admin-dashboard";
+      default:
+        return "/";
+    }
   };
 
   const value = {
@@ -132,6 +164,10 @@ export const AuthProvider = ({ children }) => {
     googleAuth,
     logout,
     checkAuthStatus,
+    isCustomer,
+    isDriver,
+    isAdmin,
+    getRedirectPath,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
