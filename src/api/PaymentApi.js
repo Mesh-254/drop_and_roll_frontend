@@ -2,14 +2,17 @@
 import { ApiBase } from "./ApiBase";
 
 export class PaymentApi extends ApiBase {
+  
   async getTransaction(txId, includeAuth = true, guestEmail = "") {
     try {
-      const params = guestEmail ? { guest_email: guestEmail } : {};
+      const params = (!includeAuth && guestEmail) ? { guest_email: guestEmail.toLowerCase() } : {};
+      console.log("getTransaction request:", { txId, params, includeAuth });
       const response = await this.request(`/api/payments/transactions/${txId}/`, {
         method: "GET",
-        includeAuth: includeAuth && !guestEmail,
+        includeAuth: includeAuth,
         params,
       });
+      console.log("getTransaction response:", response.data);
       return { success: true, data: response.data };
     } catch (error) {
       console.error("getTransaction error:", error, error.response?.data);
