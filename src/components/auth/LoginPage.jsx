@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../../contexts/AuthContext";
+import { useAuth } from '../../contexts/AuthContext';
 import { GoogleLogin } from "@react-oauth/google";
 
 const LoginPage = () => {
@@ -15,73 +15,56 @@ const LoginPage = () => {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
-  const { login, googleAuth } = useAuth();
+  const { login, googleAuth, getRedirectPath } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = location.state?.from?.pathname || "/";
-
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!email) {
-      newErrors.email = "Email is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = "Please enter a valid email";
-    }
-
-    if (!password) {
-      newErrors.password = "Password is required";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const isValid = validateForm();
 
-    if (!validateForm()) return;
+    if (!isValid) {
+      return;
+    }
 
     setIsLoading(true);
     setErrors({});
 
     try {
-      const result = await login(email.toLowerCase(), password, rememberMe);
-
+      const result = await login(email, password, rememberMe);
       if (result.success) {
-        navigate(from, { replace: true });
+        const userRole = result.data.user?.role;
+        const redirectPath =
+          location.state?.from?.pathname || getRedirectPath(userRole);
+        navigate(redirectPath, { replace: true });
       } else {
-        switch (result.code) {
-          case "ACCOUNT_NOT_ACTIVATED":
-            setErrors({
-              general:
-                "Account is not activated. Redirecting to resend confirmation...",
-            });
-            setTimeout(() => {
-              navigate("/resend-confirmation", { state: { email } });
-            }, 2000);
-            break;
-          case "EMAIL_NOT_FOUND":
-            setErrors({ general: "No account found with this email." });
-            setTimeout(() => {
-              navigate("/register", { state: { email } });
-            }, 2000);
-            break;
-          case "INVALID_CREDENTIALS":
-            setErrors({ general: "The email and password do not match." });
-            break;
-          default:
-            setErrors({
-              general: result.message || "Login failed. Please try again.",
-            });
-        }
+        setErrors({
+          general: result.message || "Login failed.",
+        });
       }
     } catch (error) {
       setErrors({ general: "Login failed. Please try again." });
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const validateForm = () => {
+    let isValid = true;
+    const newErrors = {};
+
+    if (!email) {
+      newErrors.email = "Email is required.";
+      isValid = false;
+    }
+
+    if (!password) {
+      newErrors.password = "Password is required.";
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
   };
 
   const handleGoogleSuccess = async (credentialResponse) => {
@@ -91,7 +74,10 @@ const LoginPage = () => {
     try {
       const result = await googleAuth(credentialResponse.credential);
       if (result.success) {
-        navigate(from, { replace: true });
+        const userRole = result.data.user?.role;
+        const redirectPath =
+          location.state?.from?.pathname || getRedirectPath(userRole);
+        navigate(redirectPath, { replace: true });
       } else {
         setErrors({
           general: result.message || "Google authentication failed.",
@@ -104,7 +90,7 @@ const LoginPage = () => {
     }
   };
 
-  const handleGoogleError = () => {
+  const handleGoogleError = (error) => {
     setErrors({ general: "Google authentication failed. Please try again." });
     setIsLoading(false);
   };
