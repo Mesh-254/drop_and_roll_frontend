@@ -10,6 +10,7 @@ import Footer from "./components/common/Footer";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import FAQ from "./components/contact/faq";
 import "./App.css";
+import "./globals.css"
 // import LoginPage from "./components/auth/login-register";
 import ForgotPassword from "./components/auth/forgot-password";
 import ResetPassword from "./components/auth/reset-password";
@@ -26,6 +27,9 @@ import BookingHistory from "./components/bookings/BookingHistory";
 import PaymentPage from "./components/payments/PaymentPage";
 import PaymentSuccess from "./components/payments/PaymentSuccess";
 import PaymentCancel from "./components/payments/PaymentCancel";
+
+import DriverDashboard from "./components/driver/driver-dashboard";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 // Layout for pages with Header and Footer
 function MainLayout({ children }) {
@@ -57,14 +61,14 @@ function App() {
     <GoogleOAuthProvider clientId={googleClientId}>
       <div className="min-h-screen bg-black text-white">
         <Routes>
-          <Route
+          {/* <Route
             path="/"
             element={
               <MainLayout>
                 <HomePage />
               </MainLayout>
             }
-          />
+          /> */}
           <Route
             path="/faqs"
             element={
@@ -122,28 +126,35 @@ function App() {
             }
           />
           {/* Payment routes */}
-          <Route
-            path="/pay/:txId"
-            element={
-              <MainLayout>
-                <PaymentPage />
-              </MainLayout>
-            }
-          />
+          <Route path="/pay/:txId" element={<PaymentPage />} />
           <Route
             path="/pay/success"
             element={
               <MainLayout>
-                <PaymentSuccess />
+                {" "}
+                <PaymentSuccess />{" "}
               </MainLayout>
             }
           />
+          <Route path="/pay/cancel" element={<PaymentCancel />} />
+          {/* Protected routes for customers */}
           <Route
-            path="/pay/cancel"
+            path="/"
             element={
-              <MainLayout>
-                <PaymentCancel />
-              </MainLayout>
+              <ProtectedRoute allowedRoles={["customer"]}>
+                <MainLayout>
+                  <HomePage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          {/* Protected routes for drivers */}
+          <Route
+            path="/driver-dashboard"
+            element={
+              <ProtectedRoute allowedRoles={["driver"]}>
+                <DriverDashboard />
+              </ProtectedRoute>
             }
           />
         </Routes>
