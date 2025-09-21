@@ -206,6 +206,7 @@ class DriverAPI extends ApiBase {
       const response = await super.request("/api/driver/driver-docs/", {
         method: "POST",
         data: formData,
+        headers: { "Content-Type": undefined }, // overwrites the default headers(Content-Type: multipart/form-data)
       });
       console.log("docs response", response.data);
       return response.data;
