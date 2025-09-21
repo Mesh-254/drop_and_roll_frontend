@@ -18,6 +18,8 @@ import {
   ChevronRight,
   LogOut,
   Upload,
+  CheckCircle,
+  Eye,
 } from "lucide-react";
 import { PerformanceMetrics } from "./performance-metrics";
 import { EarningsChart } from "./earnings-chart";
@@ -221,6 +223,8 @@ export default function DriverDashboard() {
     setUploading(true);
     try {
       const response = await driverApi.uploadDocument({ file, type: docType });
+      console.log("DOCUMENT UPLOAD", response.data);
+
       toast.success(`${docType} uploaded successfully`);
       setDocuments((prev) =>
         prev.map((d) =>
