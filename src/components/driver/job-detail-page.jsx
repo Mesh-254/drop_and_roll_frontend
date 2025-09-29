@@ -16,6 +16,12 @@ import {
 } from "lucide-react";
 import { driverApi } from "../../api/driver-api";
 import { ProofOfDelivery } from "./proof-of-delivery";
+import MapComponent from "../map/MapComponent"; // Import MapComponent
+import { APIProvider } from "@vis.gl/react-google-maps";
+
+const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+const libraries = ["places", "maps", "geometry", "routes"];
 
 export function JobDetailPage({ jobId, onBack }) {
   const [job, setJob] = useState(null);
@@ -23,6 +29,7 @@ export function JobDetailPage({ jobId, onBack }) {
   const [showProofModal, setShowProofModal] = useState(false);
   const [currentLocation, setCurrentLocation] = useState(null);
   const [isNearDropoff, setIsNearDropoff] = useState(false);
+  const [mapError, setMapError] = useState(null);
   const [statuses, setStatuses] = useState([
     { current: "pending", next: "scheduled" },
     { current: "scheduled", next: "assigned" },
@@ -54,6 +61,9 @@ export function JobDetailPage({ jobId, onBack }) {
       }
       console.log("RECEIVED JOB DETAILS", jobDetail);
       setJob(jobDetail);
+      // Log address data for debugging
+      console.log("Pickup Address:", jobDetail.data.pickup_address);
+      console.log("Dropoff Address:", jobDetail.data.dropoff_address);
     } catch (error) {
       console.error("[DEBUG] Full error in loadJobDetails:", error);
       console.error("[DEBUG] Error stack:", error.stack);
@@ -208,6 +218,24 @@ export function JobDetailPage({ jobId, onBack }) {
     return "N/A";
   };
 
+  // Prepare pickup and dropoff address objects for MapComponent
+  const pickupAddress =
+    job?.data?.pickup_address?.latitude && job?.data?.pickup_address?.longitude
+      ? {
+          latitude: parseFloat(job.data.pickup_address.latitude),
+          longitude: parseFloat(job.data.pickup_address.longitude),
+        }
+      : null;
+
+  const dropoffAddress =
+    job?.data?.dropoff_address?.latitude &&
+    job?.data?.dropoff_address?.longitude
+      ? {
+          latitude: parseFloat(job.data.dropoff_address.latitude),
+          longitude: parseFloat(job.data.dropoff_address.longitude),
+        }
+      : null;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -327,6 +355,25 @@ export function JobDetailPage({ jobId, onBack }) {
                 <p className="text-muted-foreground">
                   {formatAddress(job.data.dropoff_address)}
                 </p>
+                {job.data.receiver_phone && (
+                  <button
+                    onClick={() =>
+                      (window.location.href = `tel:${job.data.receiver_phone.replace(
+                        /\D/g,
+                        ""
+                      )}`)
+                    }
+                    className="flex items-center gap-2 text-sm text-primary hover:underline"
+                  >
+                    <Phone className="h-4 w-4" />
+                    Receiver: {job.data.receiver_phone}
+                  </button>
+                )}
+                {job.data.receiver_email && (
+                  <p className="text-sm text-muted-foreground">
+                    Receiver Email: {job.data.receiver_email}
+                  </p>
+                )}
                 {job.data.scheduled_dropoff_at && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Calendar className="h-4 w-4" />
@@ -353,6 +400,11 @@ export function JobDetailPage({ jobId, onBack }) {
                   <AlertTriangle className="h-4 w-4" />
                   Fragile - Handle with care
                 </div>
+              )}
+              {job.data.quote?.service_type?.name && (
+                <p className="text-sm text-blue-500">
+                  Service: {job.data.quote.service_type.name}
+                </p>
               )}
             </div>
             <div className="space-y-3">
@@ -382,11 +434,11 @@ export function JobDetailPage({ jobId, onBack }) {
           </div>
         </div>
 
-        {/* Customer Info */}
+        {/* Sender Info */}
         <div className="bg-card rounded-xl p-6">
           <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
             <User className="h-5 w-5" />
-            Customer
+            Sender
           </h2>
           <div className="flex flex-col sm:flex-row gap-6">
             <div className="flex-1 space-y-2">
@@ -404,7 +456,7 @@ export function JobDetailPage({ jobId, onBack }) {
                   className="flex items-center gap-2 text-sm text-primary hover:underline"
                 >
                   <Phone className="h-4 w-4" />
-                  Call Customer
+                  Call Sender
                 </button>
               )}
             </div>
@@ -413,6 +465,40 @@ export function JobDetailPage({ jobId, onBack }) {
               <p className="text-sm text-foreground">
                 {new Date(job.data.updated_at).toLocaleString()}
               </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Receiver Info */}
+        <div className="bg-card rounded-xl p-6">
+          <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+            <User className="h-5 w-5" />
+            Receiver
+          </h2>
+          <div className="flex flex-col sm:flex-row gap-6">
+            <div className="flex-1 space-y-2">
+              {job.data.receiver_phone && (
+                <button
+                  onClick={() =>
+                    (window.location.href = `tel:${job.data.receiver_phone.replace(
+                      /\D/g,
+                      ""
+                    )}`)
+                  }
+                  className="flex items-center gap-2 text-sm text-primary hover:underline"
+                >
+                  <Phone className="h-4 w-4" />
+                  {job.data.receiver_phone}
+                </button>
+              )}
+              {job.data.receiver_email && (
+                <p className="text-sm text-muted-foreground">
+                  Email: {job.data.receiver_email}
+                </p>
+              )}
+              {!job.data.receiver_phone && !job.data.receiver_email && (
+                <p className="text-sm text-muted-foreground">No receiver details available</p>
+              )}
             </div>
           </div>
         </div>
@@ -453,15 +539,46 @@ export function JobDetailPage({ jobId, onBack }) {
             <Navigation className="h-5 w-5" />
             Navigation
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <button className="flex items-center justify-center gap-2 p-4 border border-input rounded-xl hover:bg-muted transition-colors">
-              <MapPin className="h-5 w-5 text-green-500" />
-              To Pickup
-            </button>
-            <button className="flex items-center justify-center gap-2 p-4 border border-input rounded-xl hover:bg-muted transition-colors">
-              <MapPin className="h-5 w-5 text-primary" />
-              To Delivery
-            </button>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-medium text-gray-900 dark:text-white">
+                Route Preview
+              </h4>
+              {job.data.quote.distance_km > 0 && (
+                <span className="text-sm font-medium text-orange-600 dark:text-orange-400">
+                  Distance: {job.data.quote.distance_km}km
+                </span>
+              )}
+            </div>
+
+            {/* Map Section with Debugging */}
+            {mapError ? (
+              <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg flex items-center justify-center">
+                <AlertTriangle className="h-6 w-6 text-red-500 mr-2" />
+                <p className="text-red-600 dark:text-red-300">{mapError}</p>
+              </div>
+            ) : !pickupAddress && !dropoffAddress ? (
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg flex items-center justify-center">
+                <AlertTriangle className="h-6 w-6 text-yellow-500 mr-2" />
+                <p className="text-yellow-600 dark:text-yellow-300">
+                  Map cannot be displayed: Missing pickup and dropoff
+                  coordinates
+                </p>
+              </div>
+            ) : (
+              <APIProvider apiKey={apiKey} libraries={libraries}>
+                <MapComponent
+                  pickupAddress={pickupAddress}
+                  dropoffAddress={dropoffAddress}
+                  isLoading={loading}
+                  error={mapError}
+                  className="w-full h-96 rounded-lg border border-gray-300 dark:border-gray-600"
+                  onError={(error) =>
+                    setMapError(error?.message || "Map failed to load")
+                  }
+                />
+              </APIProvider>
+            )}
           </div>
         </div>
       </div>
@@ -488,9 +605,13 @@ export function JobDetailPage({ jobId, onBack }) {
                 onUpdateBookingStatus(job.data.id, "delivered");
               }
             } catch (error) {
-              console.error("[JobDetailPage] Failed to submit proof of delivery:", error);
+              console.error(
+                "[JobDetailPage] Failed to submit proof of delivery:",
+                error
+              );
               const errorMessage =
-                error.response?.data?.detail || "Failed to submit proof of delivery";
+                error.response?.data?.detail ||
+                "Failed to submit proof of delivery";
               toast.error(errorMessage);
             }
           }}
