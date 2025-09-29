@@ -417,6 +417,20 @@ export function DeliveryStatusUpdates({
                     <p className="text-sm text-muted-foreground ml-8">
                       {formatAddress(job.dropoff_address)}
                     </p>
+                    {job.receiver_phone && (
+                      <p className="text-sm text-muted-foreground ml-8">
+                        Receiver Contact: {job.receiver_phone}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.location.href = `tel:${job.receiver_phone}`;
+                          }}
+                          className="ml-2 text-primary hover:underline"
+                        >
+                          <Phone className="h-3 w-3 inline" />
+                        </button>
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -432,6 +446,11 @@ export function DeliveryStatusUpdates({
                         title="Handle with care"
                       >
                         Fragile
+                      </span>
+                    )}
+                    {job.quote?.service_type?.name && (
+                      <span className="text-xs text-blue-500 font-medium ml-2">
+                        {job.quote.service_type.name}
                       </span>
                     )}
                   </div>
