@@ -61,14 +61,14 @@ function App() {
     <GoogleOAuthProvider clientId={googleClientId}>
       <div className="min-h-screen bg-black text-white">
         <Routes>
-          {/* <Route
+          <Route
             path="/"
             element={
               <MainLayout>
                 <HomePage />
               </MainLayout>
             }
-          /> */}
+          />
           <Route
             path="/faqs"
             element={
