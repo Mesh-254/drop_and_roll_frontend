@@ -1,437 +1,464 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { toast } from "react-hot-toast";
-import {
-  Camera,
-  Upload,
-  MapPin,
-  CheckCircle,
-  X,
-  FileImage,
-  Trash2,
-} from "lucide-react";
+import { Camera, Upload, MapPin, CheckCircle, X, FileImage, Trash2 } from "lucide-react";
 
-export function ProofOfDelivery({
-  job,
-  onClose,
-  onSubmit,
-  usingMockData = false,
-}) {
+// Lazy-load exifr to reduce initial load time
+const exifr = lazy(() => import("exifr"));
+
+export function ProofOfDelivery({ job, onClose, onSubmit }) {
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
-  const [signature, setSignature] = useState(null);
   const [notes, setNotes] = useState("");
   const [location, setLocation] = useState(null);
   const [loading, setLoading] = useState(false);
   const [captureMethod, setCaptureMethod] = useState("upload");
+  const [cameraError, setCameraError] = useState(null);
+  const [hasActiveStream, setHasActiveStream] = useState(false);
+  const [cameraStream, setCameraStream] = useState(null);
 
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const signatureCanvasRef = useRef(null);
-  const [isDrawing, setIsDrawing] = useState(false);
+
+  // Cleanup camera stream on unmount
+  useEffect(() => {
+    console.log("[ProofOfDelivery] Component mounted");
+    return () => {
+      console.log("[ProofOfDelivery] Component unmounting, cleaning up video stream");
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+        setCameraStream(null);
+        setHasActiveStream(false);
+      }
+    };
+  }, [cameraStream]);
+
+  // Pre-fetch location on mount for speed
+  useEffect(() => {
+    if (job && navigator.geolocation) {
+      console.log("[ProofOfDelivery] Pre-fetching location on mount");
+      getCurrentLocation().catch((err) => {
+        console.warn("[ProofOfDelivery] Pre-fetch failed:", err);
+        // Silent on pre-fetch to avoid spamming user
+      });
+    }
+  }, [job]);
+
+  // Assign camera stream when captureMethod is "camera"
+  useEffect(() => {
+    if (captureMethod !== "camera" || !cameraStream) return;
+    console.log("[ProofOfDelivery] Assigning stream to videoRef");
+    if (!videoRef.current) {
+      console.error("[ProofOfDelivery] videoRef is null");
+      setCameraError("Video element not ready");
+      toast.error("Camera setup failed. Use file upload.");
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+      setCaptureMethod("upload");
+      return;
+    }
+    videoRef.current.srcObject = cameraStream;
+    videoRef.current.onloadedmetadata = () => {
+      console.log("[ProofOfDelivery] Video metadata loaded:", {
+        videoWidth: videoRef.current.videoWidth,
+        videoHeight: videoRef.current.videoHeight,
+      });
+      if (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) {
+        console.error("[ProofOfDelivery] Invalid video dimensions");
+        toast.error("Camera feed has invalid dimensions");
+        cameraStream.getTracks().forEach((track) => track.stop());
+        setCameraStream(null);
+        setCaptureMethod("upload");
+        return;
+      }
+      videoRef.current.play().catch((err) => {
+        console.error("[ProofOfDelivery] Video play failed:", err);
+        toast.error("Failed to start video feed. Use upload.");
+        cameraStream.getTracks().forEach((track) => track.stop());
+        setCameraStream(null);
+        setCaptureMethod("upload");
+      });
+      setHasActiveStream(true);
+    };
+  }, [captureMethod, cameraStream]);
 
   const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-      setCaptureMethod("camera");
-    } catch (error) {
-      console.error("Camera access denied:", error);
-      toast.error("Camera access denied. Please use file upload instead.");
+    console.log("[ProofOfDelivery] Starting camera");
+    setCameraError(null);
+    setHasActiveStream(false);
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.error("[ProofOfDelivery] getUserMedia not supported");
+      toast.error("Camera not supported by this browser");
       setCaptureMethod("upload");
+      return;
     }
-  };
-
-  const capturePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
-      const canvas = canvasRef.current;
-      const video = videoRef.current;
-      const context = canvas.getContext("2d");
-
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      context.drawImage(video, 0, 0);
-
-      canvas.toBlob(
-        (blob) => {
-          const file = new File([blob], "delivery-photo.jpg", {
-            type: "image/jpeg",
-          });
-          setPhoto(file);
-          setPhotoPreview(URL.createObjectURL(blob));
-
-          const stream = video.srcObject;
-          if (stream) {
-            stream.getTracks().forEach((track) => track.stop());
-          }
-          setCaptureMethod("upload");
-        },
-        "image/jpeg",
-        0.8
-      );
-    }
-  };
-
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (file && file.type.startsWith("image/")) {
-      setPhoto(file);
-      setPhotoPreview(URL.createObjectURL(file));
-    } else {
-      toast.error("Please select a valid image file");
-    }
-  };
-
-  const startDrawing = (e) => {
-    setIsDrawing(true);
-    const canvas = signatureCanvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-
-    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-
-    const context = canvas.getContext("2d");
-    context.strokeStyle = "#FF6600";
-    context.lineWidth = 2;
-    context.lineCap = "round";
-    context.beginPath();
-    context.moveTo(x, y);
-  };
-
-  const draw = (e) => {
-    if (!isDrawing) return;
-
-    const canvas = signatureCanvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-
-    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-
-    const context = canvas.getContext("2d");
-    context.lineTo(x, y);
-    context.stroke();
-  };
-
-  const stopDrawing = () => {
-    if (isDrawing) {
-      setIsDrawing(false);
-      const canvas = signatureCanvasRef.current;
-      canvas.toBlob((blob) => {
-        const file = new File([blob], "signature.png", { type: "image/png" });
-        setSignature(file);
-      });
-    }
-  };
-
-  const clearSignature = () => {
-    const canvas = signatureCanvasRef.current;
-    const context = canvas.getContext("2d");
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    setSignature(null);
-  };
-
-  const getCurrentLocation = async () => {
+    let videoDevices = [];
     try {
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 60000,
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      videoDevices = devices.filter((device) => device.kind === "videoinput");
+      console.log("[ProofOfDelivery] Available video devices:", videoDevices);
+      if (videoDevices.length === 0) {
+        console.error("[ProofOfDelivery] No video devices found");
+        toast.error("No camera detected. Please use file upload.");
+        setCaptureMethod("upload");
+        return;
+      }
+    } catch (error) {
+      console.error("[ProofOfDelivery] Device enumeration failed:", error);
+      toast.error("Failed to enumerate devices");
+      setCaptureMethod("upload");
+      return;
+    }
+    let stream = null;
+    for (const device of videoDevices) {
+      try {
+        console.log(`[ProofOfDelivery] Attempting to use device: ${device.label || device.deviceId}`);
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: device.deviceId, facingMode: "environment" },
         });
-      });
+        const tracks = stream.getVideoTracks();
+        console.log("[ProofOfDelivery] Camera stream obtained:", tracks);
+        if (tracks.length === 0) {
+          console.error("[ProofOfDelivery] Stream has no video tracks");
+          continue;
+        }
+        setCameraStream(stream);
+        setCaptureMethod("camera");
+        return;
+      } catch (error) {
+        console.error(`[ProofOfDelivery] Camera access error for device ${device.label || device.deviceId}:`, error);
+        continue;
+      }
+    }
+    console.error("[ProofOfDelivery] No usable camera stream found");
+    setCameraError("No usable camera found");
+    toast.error("Unable to access camera. Please use file upload.");
+    setCaptureMethod("upload");
+  };
 
-      const locationData = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-        accuracy: position.coords.accuracy,
+  const capturePhoto = async () => {
+    console.log("[ProofOfDelivery] Capturing photo");
+    if (!videoRef.current || !canvasRef.current) {
+      console.error("[ProofOfDelivery] Missing video or canvas ref");
+      toast.error("Cannot capture: Video or canvas not initialized");
+      return;
+    }
+    if (!hasActiveStream) {
+      console.error("[ProofOfDelivery] No active video stream");
+      toast.error("No active camera feed. Please restart camera.");
+      return;
+    }
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    console.log("[ProofOfDelivery] Canvas set to:", { width: canvas.width, height: canvas.height });
+    const context = canvas.getContext("2d");
+    if (!context) {
+      console.error("[ProofOfDelivery] Failed to get canvas 2D context");
+      toast.error("Canvas context error");
+      return;
+    }
+    context.drawImage(video, 0, 0);
+    console.log("[ProofOfDelivery] Image drawn to canvas");
+    canvas.toBlob(
+      async (blob) => {
+        if (!blob) {
+          console.error("[ProofOfDelivery] Blob creation failed");
+          toast.error("Failed to create image");
+          return;
+        }
+        console.log("[ProofOfDelivery] Blob created:", { size: blob.size, type: blob.type });
+        const file = new File([blob], "delivery-photo.jpg", { type: "image/jpeg" });
+        setPhoto(file);
+        setPhotoPreview(URL.createObjectURL(blob));
+        console.log("[ProofOfDelivery] Photo set, preview URL:", photoPreview);
+        const exifLocation = await extractExifLocation(file);
+        if (exifLocation) {
+          console.log("[ProofOfDelivery] EXIF location extracted:", exifLocation);
+          setLocation(exifLocation);
+          toast.success("Location auto-detected from photo metadata");
+        } else {
+          console.log("[ProofOfDelivery] No EXIF location found, attempting geolocation");
+          await getCurrentLocation();
+        }
+        if (cameraStream) {
+          cameraStream.getTracks().forEach((track) => track.stop());
+          console.log("[ProofOfDelivery] Camera stream stopped");
+          setCameraStream(null);
+          setHasActiveStream(false);
+        }
+        setCaptureMethod("upload");
+      },
+      "image/jpeg",
+      0.8
+    );
+  };
+
+  const handleFileUpload = async (event) => {
+    console.log("[ProofOfDelivery] Handling file upload");
+    const file = event.target.files[0];
+    if (!file || !file.type.startsWith("image/")) {
+      console.error("[ProofOfDelivery] Invalid file:", file);
+      toast.error("Please select a valid image file");
+      return;
+    }
+    setPhoto(file);
+    setPhotoPreview(URL.createObjectURL(file));
+    console.log("[ProofOfDelivery] File uploaded, preview URL:", photoPreview);
+    const exifLocation = await extractExifLocation(file);
+    if (exifLocation) {
+      console.log("[ProofOfDelivery] EXIF location extracted:", exifLocation);
+      setLocation(exifLocation);
+      toast.success("Location auto-detected from photo metadata");
+    } else {
+      console.log("[ProofOfDelivery] No EXIF location found, attempting geolocation");
+      await getCurrentLocation();
+    }
+  };
+
+  const retakePhoto = () => {
+    console.log("[ProofOfDelivery] Retaking photo");
+    setPhoto(null);
+    setPhotoPreview(null);
+    setLocation(null);
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+      setHasActiveStream(false);
+    }
+    setCaptureMethod("upload");
+  };
+
+  const extractExifLocation = async (file) => {
+    console.log("[ProofOfDelivery] Extracting EXIF from file:", file.name);
+    try {
+      const exif = await exifr.parse(file, { gps: true });
+      if (!exif || !exif.latitude || !exif.longitude) {
+        console.log("[ProofOfDelivery] No GPS data in EXIF");
+        return null;
+      }
+      return {
+        lat: exif.latitude,
+        lng: exif.longitude,
+        accuracy: exif.gpsAltitudeAccuracy || 10, // Default accuracy if not provided
         timestamp: new Date().toISOString(),
       };
-
-      setLocation(locationData);
-      toast.success("Location captured successfully");
     } catch (error) {
-      console.error("Failed to get location:", error);
-      toast.error(
-        "Failed to capture location. Please ensure location services are enabled."
-      );
+      console.error("[ProofOfDelivery] EXIF extraction failed:", error);
+      return null;
+    }
+  };
+
+  const getCurrentLocation = async (retries = 3, timeout = 10000) => {
+    console.log("[ProofOfDelivery] Attempting to get current location, retries left:", retries);
+    if (!navigator.geolocation) {
+      console.error("[ProofOfDelivery] Geolocation not supported");
+      toast.error("Geolocation not supported by this browser");
+      return;
+    }
+    setLoading(true);
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          reject,
+          {
+            enableHighAccuracy: true,
+            timeout,
+            maximumAge: 0, // Force fresh location
+          }
+        );
+      });
+      const { latitude: lat, longitude: lng, accuracy } = position.coords;
+      console.log("[ProofOfDelivery] Geolocation success:", { lat, lng, accuracy });
+      setLocation({ lat, lng, accuracy, timestamp: new Date().toISOString() });
+      toast.success(`Location captured (${accuracy.toFixed(0)}m accuracy)`, { id: "location-toast" });
+    } catch (error) {
+      console.error("[ProofOfDelivery] Geolocation failed:", error);
+      if (retries > 0) {
+        console.log("[ProofOfDelivery] Retrying location capture, attempts left:", retries - 1);
+        setTimeout(() => getCurrentLocation(retries - 1, timeout + 2000), 1000);
+        return;
+      }
+      toast.error("Failed to capture location. Ensure location services are enabled.", { id: "location-toast" });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSubmit = async () => {
-    if (!photo && !signature) {
-      toast.error(
-        "Please provide either a photo or signature as proof of delivery"
-      );
+    console.log("[ProofOfDelivery] Submitting proof of delivery");
+    if (!photo) {
+      console.error("[ProofOfDelivery] No photo provided");
+      toast.error("Photo is required for proof of delivery");
       return;
     }
-
+    if (!location) {
+      console.error("[ProofOfDelivery] No location provided");
+      toast.error("Location is required. Please capture location or ensure photo contains GPS metadata.");
+      return;
+    }
+    setLoading(true);
     try {
-      setLoading(true);
-
-      if (!location && !usingMockData) {
-        await getCurrentLocation();
-      }
-
       const proofData = {
         photo,
-        signature,
         notes: notes.trim(),
-        location: location || {
-          lat: 40.7128,
-          lng: -74.006,
-          timestamp: new Date().toISOString(),
-        },
-        job_id: job.id,
-        timestamp: new Date().toISOString(),
+        location,
+        booking: job.id,
       };
-
+      console.log("[ProofOfDelivery] Sending proofData:", {
+        hasPhoto: !!proofData.photo,
+        notes: proofData.notes,
+        location: proofData.location,
+        booking: proofData.booking,
+      });
       await onSubmit(proofData);
+      console.log("[ProofOfDelivery] Submission successful");
     } catch (error) {
-      console.error("Failed to submit proof:", error);
-      toast.error("Failed to submit proof of delivery");
+      console.error("[ProofOfDelivery] Submission failed:", error);
+      toast.error(error.message || "Failed to submit proof of delivery");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="max-w-2xl w-full max-h-[90vh] overflow-y-auto bg-gray-900 border border-gray-800 text-white rounded-lg">
-        <div className="p-6 border-b border-gray-800">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-500" />
-              <h3 className="font-montserrat font-semibold">
-                Proof of Delivery - Job #{job.id.slice(-8)}
-                {usingMockData && (
-                  <span className="text-sm text-yellow-500 ml-2">
-                    (Demo Mode)
-                  </span>
-                )}
-              </h3>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-white transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+      <div className="bg-gray-900 w-full max-w-md mx-4 rounded-xl shadow-2xl">
+        <div className="flex justify-between items-center p-4 border-b border-gray-800">
+          <h2 className="text-xl font-bold text-white">Proof of Delivery</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">
+            <X className="h-6 w-6" />
+          </button>
         </div>
-
-        <div className="p-6 space-y-6">
-          {/* Job Summary */}
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 bg-orange-500/20 rounded-full flex items-center justify-center">
-                <MapPin className="h-4 w-4 text-orange-400" />
-              </div>
-              <div>
-                <p className="font-medium text-white">Delivery Address</p>
-                <p className="text-sm text-gray-400">{job.delivery_address}</p>
-                {job.customer_name && (
-                  <p className="text-sm text-gray-400 mt-1">
-                    Customer: {job.customer_name}
-                  </p>
+        <Suspense fallback={<div>Loading...</div>}>
+          <div className="p-4 space-y-6 max-h-[90vh] overflow-y-auto">
+            <div className="space-y-4">
+              <label className="text-base font-medium text-white">Delivery Photo (Required)</label>
+              <div className="border border-dashed border-gray-700 rounded-lg p-6 text-center">
+                {cameraError && (
+                  <p className="text-red-500 text-sm mb-4">{cameraError}</p>
                 )}
-              </div>
-            </div>
-          </div>
-
-          {/* Photo Capture */}
-          <div className="space-y-4">
-            <label className="text-base font-medium text-white">
-              Delivery Photo
-            </label>
-
-            {captureMethod === "camera" ? (
-              <div className="space-y-4">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full rounded-lg bg-black"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={capturePhoto}
-                    className="flex-1 flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg font-medium transition-colors"
-                  >
-                    <Camera className="h-4 w-4" />
-                    Capture Photo
-                  </button>
-                  <button
-                    onClick={() => setCaptureMethod("upload")}
-                    className="border border-gray-600 text-gray-300 hover:bg-gray-800 py-2 px-4 rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
                 {photoPreview ? (
-                  <div className="relative">
-                    <img
-                      src={photoPreview || "/placeholder.svg"}
-                      alt="Delivery proof"
-                      className="w-full h-48 object-cover rounded-lg border border-gray-700"
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <img
+                        src={photoPreview}
+                        alt="Proof"
+                        className="max-h-48 mx-auto rounded-lg object-contain"
+                      />
+                      <button
+                        onClick={retakePhoto}
+                        className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <button
+                      onClick={retakePhoto}
+                      className="bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg text-sm"
+                      disabled={loading}
+                    >
+                      Retake Photo
+                    </button>
+                  </div>
+                ) : captureMethod === "camera" ? (
+                  <div className="space-y-4">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      className="w-full min-h-[200px] max-h-48 rounded-lg object-contain bg-black"
                     />
                     <button
-                      className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full transition-colors"
-                      onClick={() => {
-                        setPhoto(null);
-                        setPhotoPreview(null);
-                      }}
+                      onClick={capturePhoto}
+                      className="bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg disabled:opacity-50"
+                      disabled={loading || !hasActiveStream}
                     >
-                      <X className="h-4 w-4" />
+                      Capture Photo
                     </button>
                   </div>
                 ) : (
-                  <div className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center">
-                    <FileImage className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-400 mb-4">
-                      Take a photo or upload an image as proof of delivery
-                    </p>
+                  <div className="space-y-4">
+                    <FileImage className="h-12 w-12 mx-auto text-gray-500" />
+                    <p className="text-sm text-gray-400">Capture or upload a clear photo of the delivery</p>
                     <div className="flex gap-2 justify-center">
                       <button
                         onClick={startCamera}
-                        className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg font-medium transition-colors"
+                        className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg"
+                        disabled={loading}
                       >
-                        <Camera className="h-4 w-4" />
-                        Use Camera
+                        <Camera className="h-4 w-4" /> Camera
                       </button>
                       <button
                         onClick={() => fileInputRef.current?.click()}
-                        className="flex items-center gap-2 border border-gray-600 text-gray-300 hover:bg-gray-800 py-2 px-4 rounded-lg transition-colors"
+                        className="flex items-center gap-2 border border-gray-600 text-gray-300 py-2 px-4 rounded-lg hover:bg-gray-800"
+                        disabled={loading}
                       >
-                        <Upload className="h-4 w-4" />
-                        Upload File
+                        <Upload className="h-4 w-4" /> Upload
                       </button>
                     </div>
                   </div>
                 )}
               </div>
-            )}
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-          </div>
-
-          {/* Signature Capture */}
-          <div className="space-y-4">
-            <label className="text-base font-medium text-white">
-              Customer Signature (Optional)
-            </label>
-            <div className="border border-gray-700 rounded-lg p-4 bg-gray-800">
-              <canvas
-                ref={signatureCanvasRef}
-                width={400}
-                height={200}
-                className="w-full border border-gray-600 rounded cursor-crosshair bg-white"
-                onMouseDown={startDrawing}
-                onMouseMove={draw}
-                onMouseUp={stopDrawing}
-                onMouseLeave={stopDrawing}
-                onTouchStart={startDrawing}
-                onTouchMove={draw}
-                onTouchEnd={stopDrawing}
-                style={{ touchAction: "none" }}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="hidden"
               />
-              <div className="flex justify-between items-center mt-2">
-                <p className="text-sm text-gray-400">
-                  Draw customer signature above
-                </p>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="notes" className="text-base font-medium text-white">Delivery Notes (Optional)</label>
+              <textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg p-3 focus:outline-none focus:border-orange-500"
+                disabled={loading}
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-base font-medium text-white">Delivery Location (Required)</label>
                 <button
-                  onClick={clearSignature}
-                  className="flex items-center gap-1 border border-gray-600 text-gray-300 bg-transparent hover:bg-gray-700 py-1 px-2 rounded text-sm transition-colors"
+                  onClick={() => getCurrentLocation()}
+                  disabled={loading}
+                  className="flex items-center gap-2 border border-gray-600 text-gray-300 py-2 px-3 rounded-lg hover:bg-gray-800 disabled:opacity-50"
                 >
-                  <Trash2 className="h-3 w-3" />
-                  Clear
+                  <MapPin className="h-4 w-4" />
+                  {location ? `Update (${location.accuracy?.toFixed(0)}m)` : "Capture Location"}
                 </button>
               </div>
+              {location && (
+                <p className="text-sm text-green-400">
+                  ✓ Lat: {location.lat.toFixed(6)}, Lng: {location.lng.toFixed(6)} (Accuracy: {location.accuracy?.toFixed(0)}m)
+                </p>
+              )}
             </div>
-          </div>
-
-          {/* Delivery Notes */}
-          <div className="space-y-2">
-            <label htmlFor="notes" className="text-base font-medium text-white">
-              Delivery Notes (Optional)
-            </label>
-            <textarea
-              id="notes"
-              placeholder="Add any additional notes about the delivery..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg p-3 resize-none focus:outline-none focus:border-orange-500"
-            />
-          </div>
-
-          {/* Location Capture */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-base font-medium text-white">
-                Delivery Location
-              </label>
+            <div className="flex gap-2 pt-4 border-t border-gray-800">
               <button
-                onClick={getCurrentLocation}
-                disabled={loading || usingMockData}
-                className="flex items-center gap-2 border border-gray-600 text-gray-300 bg-transparent hover:bg-gray-700 py-2 px-3 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleSubmit}
+                disabled={loading || !photo || !location}
+                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg disabled:opacity-50"
               >
-                <MapPin className="h-4 w-4" />
-                {location
-                  ? "Update Location"
-                  : usingMockData
-                  ? "Demo Location"
-                  : "Capture Location"}
+                {loading ? "Submitting..." : "Submit Proof"}
+              </button>
+              <button
+                onClick={onClose}
+                disabled={loading}
+                className="border border-gray-600 text-gray-300 py-2 px-4 rounded-lg hover:bg-gray-800"
+              >
+                Cancel
               </button>
             </div>
-            {(location || usingMockData) && (
-              <p className="text-sm text-green-400">
-                ✓ Location {usingMockData ? "simulated" : "captured"} (
-                {location?.lat?.toFixed(6) || "40.712800"},{" "}
-                {location?.lng?.toFixed(6) || "-74.006000"})
-              </p>
-            )}
           </div>
-
-          {/* Submit Buttons */}
-          <div className="flex gap-2 pt-4 border-t border-gray-800">
-            <button
-              onClick={handleSubmit}
-              disabled={loading || (!photo && !signature)}
-              className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? "Submitting..." : "Submit Proof of Delivery"}
-            </button>
-            <button
-              onClick={onClose}
-              disabled={loading}
-              className="border border-gray-600 text-gray-300 bg-transparent hover:bg-gray-800 py-2 px-4 rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-
+        </Suspense>
         <canvas ref={canvasRef} className="hidden" />
       </div>
     </div>
