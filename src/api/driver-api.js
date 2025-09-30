@@ -98,28 +98,64 @@ class DriverAPI extends ApiBase {
     });
     return response.data;
   }
+  async getProofOfDelivery(bookingId) {
+    if (!bookingId || typeof bookingId !== "string") {
+      console.error("[DriverAPI] Invalid bookingId provided:", bookingId);
+      return {
+        success: false,
+        code: "INVALID_INPUT",
+        message: "Booking ID must be a non-empty string",
+      };
+    }
 
-  async submitProofOfDelivery(jobId, proofData) {
-    console.log(`[DriverAPI] Calling submitProofOfDelivery() - Submitting proof for job ${jobId} with data:`, {
+    try {
+      console.log(`[DriverAPI] Fetching POD for booking: ${bookingId}`);
+      const response = await super.request(`/api/tracking/pod/by-booking/?booking=${bookingId}`, {
+        method: "GET",
+      });
+      console.log("[DriverAPI] POD response:", response.data);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error("[DriverAPI] Error fetching POD:", error);
+      return {
+        success: false,
+        code: error.code || "FETCH_ERROR",
+        message: error.response?.data?.detail || "Failed to fetch proof of delivery",
+        status: error.response?.status,
+      };
+    }
+  }
+
+  
+  async submitProofOfDelivery(bookingId, proofData) {
+    console.log(`[DriverAPI] Submitting proof for booking ${bookingId} with data:`, {
       hasPhoto: !!proofData.photo,
-      hasSignature: !!proofData.signature,
       hasNotes: !!proofData.notes,
       hasLocation: !!proofData.location,
     });
     const formData = new FormData();
     if (proofData.photo) formData.append("photo", proofData.photo);
-    if (proofData.signature) formData.append("signature", proofData.signature);
     if (proofData.notes) formData.append("notes", proofData.notes);
-    if (proofData.location) {
-      formData.append("delivery_location", JSON.stringify(proofData.location));
-    }
+    if (proofData.location) formData.append("location", JSON.stringify(proofData.location));
 
-    const response = await super.request(`/api/bookings/jobs/${jobId}/proof-of-delivery/`, {
-      method: "POST",
-      data: formData,
-      // Axios automatically sets Content-Type for FormData, no need for headers
-    });
-    return response.data;
+    try {
+      const response = await super.request(`/api/tracking/pod/?booking=${bookingId}`, {
+        method: "POST",
+        data: formData,
+        headers: { "Content-Type": undefined },
+      });
+      // Fetch updated job details to ensure status is "delivered"
+      const updatedJob = await this.getJob(bookingId);
+      return { success: true, data: response.data, updatedJob };
+    } catch (error) {
+      console.error(`[DriverAPI] Failed to submit proof for booking ${bookingId}:`, error);
+      return {
+        success: false,
+        code: error.code || "REQUEST_ERROR",
+        message: error.response?.data?.detail || "Failed to submit proof of delivery",
+        status: error.response?.status,
+      };
+    }
   }
 
   async getPayouts() {
