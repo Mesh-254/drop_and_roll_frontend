@@ -1,6 +1,7 @@
 import { ApiBase } from "./ApiBase"
 
 class AuthApi extends ApiBase {
+  // In AuthApi.js, update login method:
   async login(email, password) {
     try {
       const response = await this.request("/api/users/auth/login/", {
@@ -13,12 +14,22 @@ class AuthApi extends ApiBase {
         const userData = await this.getCurrentUser()
         return { success: true, data: { ...response.data, user: userData } }
       }
-      return { success: true, data: response.data }
+      // If no access but response is successful (e.g., 200 with error), treat as failure
+      return { success: false, code: response.data.code || "LOGIN_ERROR", message: response.data.error || "Login failed" }
     } catch (error) {
+      // Extract backend error like in register
+      const backendError = error.response?.data || {};
+      let code = backendError.code || "LOGIN_ERROR";
+      let message = backendError.error || backendError.detail || error.message || "Login failed";
+      if (message.toLowerCase().includes('not activated')) {
+        code = 'ACCOUNT_NOT_ACTIVATED';
+      } else if (message.toLowerCase().includes('no account found')) {
+        code = 'EMAIL_NOT_FOUND';
+      }
       return {
         success: false,
-        code: error.code || "LOGIN_ERROR",
-        message: error.message || "Login failed",
+        code,
+        message,
       }
     }
   }
@@ -32,11 +43,19 @@ class AuthApi extends ApiBase {
       })
       return { success: true, data: response.data }
     } catch (error) {
+      const backendError = error.response?.data || {};
+      let code = backendError.code || "REGISTER_ERROR";
+      let message = backendError.error || backendError.detail || error.message || "Registration failed";
+      if (message.toLowerCase().includes('not activated')) {
+        code = 'ACCOUNT_NOT_ACTIVATED';
+      } else if (message.toLowerCase().includes('already exists')) {
+        code = 'ACCOUNT_ALREADY_EXISTS';
+      }
       return {
         success: false,
-        code: error.code || "REGISTER_ERROR",
-        message: error.message || "Registration failed",
-      }
+        code,
+        message,
+      };
     }
   }
 
