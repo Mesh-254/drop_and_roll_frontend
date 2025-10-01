@@ -36,6 +36,9 @@ const RegisterPage = () => {
     if (location.state?.email) {
       setFormData((prev) => ({ ...prev, email: location.state.email }));
     }
+    if (location.state?.fromError) {
+      setErrors({ general: location.state.fromError });
+    }
   }, [location.state]);
 
   const handleChange = (e) => {
@@ -87,6 +90,7 @@ const RegisterPage = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // In RegisterPage.jsx:
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -107,33 +111,43 @@ const RegisterPage = () => {
           state: { email: formData.email.toLowerCase() },
         });
       } else {
+        let redirectMessage =
+          result.message || "Registration failed. Please try again.";
+        let shouldRedirect = false;
+        let redirectPath = null;
+        let redirectTimeout = 5000; // 5 seconds
+
         switch (result.code) {
           case "ACCOUNT_ALREADY_EXISTS":
-            setErrors({
-              general: "Account already exists. Redirecting to sign in...",
-            });
-            setTimeout(() => {
-              navigate("/login", {
-                state: { email: formData.email.toLowerCase() },
-              });
-            }, 2000);
+            redirectMessage = `${
+              result.message || "Account already exists."
+            } Redirecting to sign in...`;
+            shouldRedirect = true;
+            redirectPath = "/login";
             break;
           case "ACCOUNT_NOT_ACTIVATED":
-            setErrors({
-              general:
-                "Account exists but is not activated. Redirecting to resend confirmation...",
-            });
-            setTimeout(() => {
-              navigate("/resend-confirmation", {
-                state: { email: formData.email.toLowerCase() },
-              });
-            }, 2000);
+            redirectMessage = `${
+              result.message || "Account exists but is not activated."
+            } Redirecting to resend confirmation...`;
+            shouldRedirect = true;
+            redirectPath = "/resend-confirmation";
             break;
           default:
-            setErrors({
-              general:
-                result.message || "Registration failed. Please try again.",
-            });
+            // Like login: just show the message, no redirect
+            break;
+        }
+
+        setErrors({ general: redirectMessage });
+
+        if (shouldRedirect && redirectPath) {
+          navigate(redirectPath, {
+            state: {
+              email: formData.email.toLowerCase(),
+              fromError: redirectMessage,
+            },
+          });
+        } else {
+          setErrors({ general: redirectMessage });
         }
       }
     } catch (error) {
