@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from "../../contexts/AuthContext";
 import { GoogleLogin } from "@react-oauth/google";
 
 const LoginPage = () => {
@@ -19,6 +19,16 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  useEffect(() => {
+    if (location.state?.email) {
+      setEmail(location.state.email);
+    }
+    if (location.state?.fromError) {
+      setErrors({ general: location.state.fromError });
+    }
+  }, [location.state]);
+
+  // In LoginPage.jsx:
   const handleSubmit = async (e) => {
     e.preventDefault();
     const isValid = validateForm();
@@ -32,23 +42,61 @@ const LoginPage = () => {
 
     try {
       const result = await login(email, password, rememberMe);
+      console.log("Login Result Code:", result.code); // Debug: Check if code matches switch
+
       if (result.success) {
         const userRole = result.data.user?.role;
         const redirectPath =
           location.state?.from?.pathname || getRedirectPath(userRole);
         navigate(redirectPath, { replace: true });
       } else {
-        setErrors({
-          general: result.message || "Login failed.",
-        });
+        let redirectMessage = result.message || "Login failed.";
+        let shouldRedirect = false;
+        let redirectPath = null;
+        const redirectTimeout = 4000; // 4 seconds for reading
+
+        switch (result.code) {
+          case "EMAIL_NOT_FOUND":
+            redirectMessage = `${
+              result.message || "No account found with this email."
+            } Redirecting to register...`;
+            shouldRedirect = true;
+            redirectPath = "/register";
+            break;
+          case "ACCOUNT_NOT_ACTIVATED":
+            redirectMessage = `${
+              result.message || "Account is not activated."
+            } Redirecting to resend confirmation...`;
+            shouldRedirect = true;
+            redirectPath = "/resend-confirmation";
+            break;
+          default:
+            redirectMessage =
+              result.message || "Login failed. Please check your credentials.";
+            break;
+        }
+
+        setErrors({ general: redirectMessage });
+
+        if (shouldRedirect && redirectPath) {
+          console.log(
+            `Scheduling redirect to ${redirectPath} in ${redirectTimeout}ms`
+          );
+          setTimeout(() => {
+            console.log(`Redirecting to ${redirectPath}`);
+            navigate(redirectPath, {
+              state: { email: email.toLowerCase() }, // Prefill email on target page
+            });
+          }, redirectTimeout);
+        }
       }
     } catch (error) {
+      console.error("Login Error:", error); // Debug
       setErrors({ general: "Login failed. Please try again." });
     } finally {
       setIsLoading(false);
     }
   };
-
   const validateForm = () => {
     let isValid = true;
     const newErrors = {};
