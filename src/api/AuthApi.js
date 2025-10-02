@@ -64,15 +64,30 @@ class AuthApi extends ApiBase {
       const response = await this.request(`/api/users/auth/confirm/?uid=${uid}&token=${token}`, {
         method: "GET",
         includeAuth: false,
-      })
-      return { success: true, data: response.data }
+      });
+      const { code, detail, error } = response.data;
+
+      // New: Check for error codes even on 200
+      if (code === 'ACCOUNT_ALREADY_ACTIVATED' || code === 'INVALID_CONFIRMATION_LINK') {
+        return {
+          success: false,
+          code: code,
+          message: error || detail || "Confirmation failed",
+        };
+      }
+
+      return {
+        success: true,
+        data: response.data,
+        code: code || "CONFIRMATION_SUCCESS"
+      };
     } catch (error) {
-      console.log("Confirm Email Error Details:", error.data)
+      const backendError = error.response?.data || {};
       return {
         success: false,
-        code: error.code || "UNKNOWN_ERROR",
-        message: error.message || "Email confirmation failed",
-      }
+        code: backendError.code || "AUTH_ERROR",
+        message: backendError.error || backendError.detail || error.message || "Google authentication failed",
+      };
     }
   }
 
@@ -157,6 +172,52 @@ class AuthApi extends ApiBase {
       return response.data
     } catch (error) {
       throw new Error(error.message || "Password change failed")
+    }
+  }
+
+  async forgotPassword(email) {
+    try {
+      const response = await this.request("/api/users/auth/forgot-password/", {
+        method: "POST",
+        data: { email: email.toLowerCase() },
+        includeAuth: false,
+      });
+      return {
+        success: true,
+        data: response.data,
+        code: response.data.code || "RESET_EMAIL_SENT",
+        message: response.data.detail || "Reset email sent",
+      };
+    } catch (error) {
+      const backendError = error.response?.data || {};
+      return {
+        success: false,
+        code: backendError.code || "RESET_ERROR",
+        message: backendError.error || backendError.detail || "Failed to send reset email",
+      };
+    }
+  }
+
+  async resetPassword(uid, token, newPassword) {
+    try {
+      const response = await this.request("/api/users/auth/reset-password/", {
+        method: "POST",
+        data: { uid, token, new_password: newPassword },
+        includeAuth: false,
+      });
+      return {
+        success: true,
+        data: response.data,
+        code: response.data.code || "PASSWORD_RESET_SUCCESS",
+        message: response.data.detail || "Password reset successful",
+      };
+    } catch (error) {
+      const backendError = error.response?.data || {};
+      return {
+        success: false,
+        code: backendError.code || "RESET_ERROR",
+        message: backendError.error || backendError.detail || "Failed to reset password",
+      };
     }
   }
 
