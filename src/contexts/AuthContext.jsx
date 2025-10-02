@@ -35,7 +35,24 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error("Auth check failed:", error);
-      authApi.logout(); // Clear invalid tokens
+      // Fixed: Only logout on auth-specific failures (e.g., 401 after refresh attempt)
+      // This prevents logout on transient errors like network issues
+      const isAuthError =
+        error.status === 401 ||
+        error.code === "INVALID_TOKEN" ||
+        error.code === "SESSION_EXPIRED" || // Add backend-specific codes as needed
+        error.message?.includes("Session expired") ||
+        error.message?.includes("Token invalid");
+
+      if (isAuthError) {
+        console.log("Detected invalid session, logging out");
+        authApi.logout();
+      } else {
+        console.log(
+          "Transient error during auth check, keeping tokens for retry"
+        );
+        // Don't logout—tokens may still be valid; retry on next action
+      }
       setUser(null);
       setIsAuthenticated(false);
     } finally {
@@ -71,7 +88,7 @@ export const AuthProvider = ({ children }) => {
       return {
         success: false,
         code: "NETWORK_ERROR",
-        message: "Network error occurred. Please try again.",
+        message: error.message || "Login failed. Please try again.",
       };
     }
   };
@@ -80,20 +97,19 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authApi.register(userData);
       if (response.success) {
+        // Don't auto-login after register—user must confirm email
         return { success: true, data: response.data };
-      } else {
-        return {
-          success: false,
-          code: response.code,
-          message: response.message,
-        };
       }
+      return {
+        success: false,
+        code: response.code,
+        message: response.message,
+      };
     } catch (error) {
       return {
         success: false,
-        code: error.data?.code || "NETWORK_ERROR",
-        message:
-          error.data?.error || "Network error occurred. Please try again.",
+        code: error.data?.code || "REGISTER_ERROR",
+        message: error.data?.error || "Registration failed. Please try again.",
       };
     }
   };
