@@ -10,7 +10,7 @@ import Footer from "./components/common/Footer";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import FAQ from "./components/contact/faq";
 import "./App.css";
-import "./globals.css"
+import "./globals.css";
 // import LoginPage from "./components/auth/login-register";
 import ForgotPassword from "./components/auth/forgot-password";
 import ResetPassword from "./components/auth/reset-password";
@@ -20,6 +20,9 @@ import RegisterPage from "./components/auth/RegisterPage";
 import EmailConfirmationPage from "./components/auth/EmailConfirmationPage";
 import AccountConfirmedPage from "./components/auth/AccountConfirmedPage";
 import ResendConfirmationPage from "./components/auth/ResendConfirmationPage";
+import CheckEmail from "./components/auth/check-email";
+
+
 import QuotePage from "./components/quote/QuotePage";
 import BookingPage from "./components/bookings/BookingPage";
 import BookingHistory from "./components/bookings/BookingHistory";
@@ -77,12 +80,12 @@ function App() {
               </MainLayout>
             }
           />
-          {/* <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<LoginPage />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
- 
-        
-        <Route path="/reset-password/:token" element={<ResetPassword />} /> */}
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
+          <Route path="/check-email" element={<CheckEmail />} />
+
+          {/* login and register  */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route
