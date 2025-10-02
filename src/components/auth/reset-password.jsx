@@ -2,11 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-
-// eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
-
-import { Lock, Eye, EyeOff, Loader2, CheckCircle, XCircle } from "lucide-react";
+import {
+  Lock,
+  Eye,
+  EyeOff,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+  ArrowLeft,
+} from "lucide-react";
+import { authApi } from "../../api/AuthApi";
 
 export default function ResetPassword() {
   const [formData, setFormData] = useState({
@@ -17,76 +23,74 @@ export default function ResetPassword() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [status, setStatus] = useState(""); // 'success', 'error', 'invalid'
+  const [status, setStatus] = useState(""); // 'idle', 'success', 'error', 'invalid'
   const [countdown, setCountdown] = useState(3);
-
   const navigate = useNavigate();
-  const { token } = useParams();
+  const { uid, token } = useParams();
 
-  // Auto-focus password input
+  useEffect(() => {
+    if (!uid || !token) {
+      setStatus("invalid");
+      setErrors({ submit: "Invalid reset link. Please request a new one." });
+    }
+  }, [uid, token]);
+
   useEffect(() => {
     const passwordInput = document.getElementById("password");
     if (passwordInput) passwordInput.focus();
   }, []);
 
-  // Countdown for redirect
   useEffect(() => {
     if (status === "success" && countdown > 0) {
-      const timer = setTimeout(() => {
-        setCountdown((prev) => prev - 1);
-      }, 1000);
+      const timer = setTimeout(() => setCountdown((prev) => prev - 1), 1000);
       return () => clearTimeout(timer);
     } else if (status === "success" && countdown === 0) {
-      navigate("/home");
+      navigate("/login");
     }
   }, [status, countdown, navigate]);
 
-  // Password validation
   const validatePassword = (password) => {
     if (!password) return "Password is required";
     if (password.length < 8) return "Password must be at least 8 characters";
+    if (!/[A-Z]/.test(password))
+      return "Password must include an uppercase letter";
+    if (!/[a-z]/.test(password))
+      return "Password must include a lowercase letter";
+    if (!/[0-9]/.test(password)) return "Password must include a number";
     return "";
   };
 
-  // Confirm password validation
   const validateConfirmPassword = (confirmPassword, password) => {
     if (!confirmPassword) return "Please confirm your password";
     if (confirmPassword !== password) return "Passwords do not match";
     return "";
   };
 
-  // Handle input changes with real-time validation
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-
     let error = "";
     if (field === "password") {
       error = validatePassword(value);
-      // Also revalidate confirm password if it exists
       if (formData.confirmPassword) {
         const confirmError = validateConfirmPassword(
           formData.confirmPassword,
-          value,
+          value
         );
         setErrors((prev) => ({ ...prev, confirmPassword: confirmError }));
       }
     } else if (field === "confirmPassword") {
       error = validateConfirmPassword(value, formData.password);
     }
-
     setErrors((prev) => ({ ...prev, [field]: error }));
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     const passwordError = validatePassword(formData.password);
     const confirmPasswordError = validateConfirmPassword(
       formData.confirmPassword,
-      formData.password,
+      formData.password
     );
-
     if (passwordError || confirmPasswordError) {
       setErrors({
         password: passwordError,
@@ -94,30 +98,30 @@ export default function ResetPassword() {
       });
       return;
     }
-
+    if (!uid || !token) {
+      setStatus("invalid");
+      return;
+    }
     setIsLoading(true);
-
+    setErrors({});
+    setStatus("idle");
     try {
-      console.log("[v0] Resetting password with token:", token);
-      console.log("[v0] New password:", formData.password);
-
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Mock token validation
-      if (token === "valid-token") {
+      const result = await authApi.resetPassword(uid, token, formData.password);
+      if (result.success) {
         setStatus("success");
         setCountdown(3);
-        // Clear session storage
         sessionStorage.removeItem("resetEmail");
-      } else if (token !== "valid-token") {
-        setStatus("invalid");
       } else {
         setStatus("error");
+        let msg = result.message || "Failed to reset password.";
+        if (result.code === "INVALID_RESET_LINK")
+          msg = "Invalid or expired reset link. Please request a new one.";
+        setErrors({ submit: msg });
       }
     } catch (error) {
-      console.error("[v0] Error resetting password:", error);
+      console.error("Error resetting password:", error);
       setStatus("error");
+      setErrors({ submit: "An unexpected error occurred. Please try again." });
     } finally {
       setIsLoading(false);
     }
@@ -129,98 +133,67 @@ export default function ResetPassword() {
     !errors.password &&
     !errors.confirmPassword;
 
-  // Success state
+  if (status === "invalid") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 text-center max-w-md w-full"
+        >
+          <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+            Invalid Reset Link
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            {errors.submit}
+          </p>
+          <button
+            onClick={() => navigate("/forgot-password")}
+            className="w-full py-3 px-4 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+          >
+            Request New Link
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
   if (status === "success") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5 }}
-          className="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 text-center max-w-md w-full"
         >
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{
-              duration: 0.5,
-              delay: 0.2,
-              type: "spring",
-              stiffness: 200,
-            }}
-            className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6"
-          >
-            <CheckCircle className="w-10 h-10 text-green-600 dark:text-green-400" />
-          </motion.div>
-
+          <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+          </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-            Password Changed Successfully!
+            Password Reset Successful!
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Your password has been updated. Redirecting to home page in{" "}
-            {countdown} seconds...
+            You can now sign in with your new password.
           </p>
-
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => navigate("/home")}
-            className="w-full py-3 px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors"
+          <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-6">
+            <p className="text-blue-700 dark:text-blue-300 text-sm">
+              Redirecting to login in {countdown} seconds...
+            </p>
+          </div>
+          <button
+            onClick={() => navigate("/login")}
+            className="w-full py-3 px-4 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
           >
-            Go to Home Now
-          </motion.button>
+            Go to Login
+          </button>
         </motion.div>
       </div>
     );
   }
 
-  // Error states
-  if (status === "invalid" || status === "error") {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5 }}
-          className="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 text-center"
-        >
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{
-              duration: 0.5,
-              delay: 0.2,
-              type: "spring",
-              stiffness: 200,
-            }}
-            className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-6"
-          >
-            <XCircle className="w-10 h-10 text-red-600 dark:text-red-400" />
-          </motion.div>
-
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-            {status === "invalid" ? "Invalid Link" : "Something Went Wrong"}
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
-            {status === "invalid"
-              ? "Invalid or expired link. Please try again."
-              : "Something went wrong. Please try again."}
-          </p>
-
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => navigate("/forgot-password")}
-            className="w-full py-3 px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors"
-          >
-            Resend Link
-          </motion.button>
-        </motion.div>
-      </div>
-    );
-  }
-
-  // Main form
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
       <motion.div
@@ -229,13 +202,20 @@ export default function ResetPassword() {
         transition={{ duration: 0.5 }}
         className="w-full max-w-md"
       >
+        <motion.button
+          whileHover={{ x: -2 }}
+          onClick={() => navigate("/check-email")}
+          className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 mb-8 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </motion.button>
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.1 }}
           className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8"
         >
-          {/* Header */}
           <div className="text-center mb-8">
             <motion.div
               initial={{ scale: 0 }}
@@ -246,16 +226,25 @@ export default function ResetPassword() {
               <Lock className="w-8 h-8 text-orange-600 dark:text-orange-400" />
             </motion.div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              Set New Password
+              Reset Your Password
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Enter your new password below
+              Enter your new password below.
             </p>
           </div>
-
-          {/* Form */}
+          {status === "error" && errors.submit && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2"
+            >
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-red-600 dark:text-red-400 text-sm">
+                {errors.submit}
+              </p>
+            </motion.div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* New Password */}
             <div>
               <label
                 htmlFor="password"
@@ -304,8 +293,6 @@ export default function ResetPassword() {
                 </motion.p>
               )}
             </div>
-
-            {/* Confirm Password */}
             <div>
               <label
                 htmlFor="confirmPassword"
@@ -354,15 +341,13 @@ export default function ResetPassword() {
                 </motion.p>
               )}
             </div>
-
-            {/* Submit Button */}
             <motion.button
               whileHover={{ scale: isFormValid && !isLoading ? 1.02 : 1 }}
               whileTap={{ scale: isFormValid && !isLoading ? 0.98 : 1 }}
               type="submit"
-              disabled={!isFormValid || isLoading}
+              disabled={!isFormValid || isLoading || status === "invalid"}
               className={`w-full py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 ${
-                isFormValid && !isLoading
+                isFormValid && !isLoading && status !== "invalid"
                   ? "bg-orange-600 hover:bg-orange-700 text-white shadow-lg hover:shadow-xl"
                   : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
               }`}
@@ -377,6 +362,17 @@ export default function ResetPassword() {
               )}
             </motion.button>
           </form>
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Remember your password?{" "}
+              <button
+                onClick={() => navigate("/login")}
+                className="text-orange-600 hover:text-orange-700 font-medium transition-colors"
+              >
+                Sign in
+              </button>
+            </p>
+          </div>
         </motion.div>
       </motion.div>
     </div>

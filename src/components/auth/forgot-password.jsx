@@ -2,24 +2,28 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-// eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
-import { Mail, Loader2, ArrowLeft } from "lucide-react";
+import {
+  Mail,
+  Loader2,
+  ArrowLeft,
+  CheckCircle,
+  AlertCircle,
+} from "lucide-react";
+import { authApi } from "../../api/AuthApi"; // Adjust path
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [errors, setErrors] = useState({});
+  const [status, setStatus] = useState(""); // 'idle', 'success', 'error'
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Auto-focus email input
   useEffect(() => {
     const emailInput = document.getElementById("email");
     if (emailInput) emailInput.focus();
   }, []);
 
-  // Real-time email validation
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email) return "Email is required";
@@ -27,42 +31,38 @@ export default function ForgotPassword() {
     return "";
   };
 
-  // Handle email change with real-time validation
   const handleEmailChange = (e) => {
     const value = e.target.value;
     setEmail(value);
-
     const error = validateEmail(value);
     setErrors((prev) => ({ ...prev, email: error }));
+    if (status !== "idle") setStatus("idle");
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     const emailError = validateEmail(email);
     if (emailError) {
       setErrors({ email: emailError });
       return;
     }
-
     setIsLoading(true);
-
-    // Mock API call
+    setErrors({});
+    setStatus("idle");
     try {
-      console.log("[v0] Sending password reset email to:", email);
-
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Store email for next page
-      sessionStorage.setItem("resetEmail", email);
-
-      // Redirect to check email page
-      navigate("/check-email");
+      const result = await authApi.forgotPassword(email);
+      if (result.success) {
+        setStatus("success");
+        sessionStorage.setItem("resetEmail", email);
+        setTimeout(() => navigate("/check-email"), 3000);
+      } else {
+        setStatus("error");
+        setErrors({ submit: result.message });
+      }
     } catch (error) {
-      console.error("[v0] Error sending reset email:", error);
-      setErrors({ submit: "Failed to send reset email. Please try again." });
+      console.error("Error sending reset email:", error);
+      setStatus("error");
+      setErrors({ submit: "An unexpected error occurred. Please try again." });
     } finally {
       setIsLoading(false);
     }
@@ -78,7 +78,6 @@ export default function ForgotPassword() {
         transition={{ duration: 0.5 }}
         className="w-full max-w-md"
       >
-        {/* Back to Login */}
         <motion.button
           whileHover={{ x: -2 }}
           onClick={() => navigate("/login")}
@@ -87,15 +86,12 @@ export default function ForgotPassword() {
           <ArrowLeft className="w-4 h-4" />
           Back to Login
         </motion.button>
-
-        {/* Main Card */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.1 }}
           className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8"
         >
-          {/* Header */}
           <div className="text-center mb-8">
             <motion.div
               initial={{ scale: 0 }}
@@ -113,10 +109,31 @@ export default function ForgotPassword() {
               password.
             </p>
           </div>
-
-          {/* Form */}
+          {status === "success" && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6 p-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg flex items-start gap-3"
+            >
+              <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+              <p className="text-green-600 dark:text-green-400 text-sm">
+                Reset link sent to {email}! Check your inbox (and spam folder).
+              </p>
+            </motion.div>
+          )}
+          {status === "error" && errors.submit && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2"
+            >
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-red-600 dark:text-red-400 text-sm">
+                {errors.submit}
+              </p>
+            </motion.div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Input */}
             <div>
               <label
                 htmlFor="email"
@@ -140,35 +157,18 @@ export default function ForgotPassword() {
                       : "border-gray-300 dark:border-gray-600"
                   }`}
                   disabled={isLoading}
-                  aria-describedby={errors.email ? "email-error" : undefined}
                 />
               </div>
               {errors.email && (
                 <motion.p
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  id="email-error"
                   className="mt-2 text-sm text-red-600 dark:text-red-400"
                 >
                   {errors.email}
                 </motion.p>
               )}
             </div>
-
-            {/* Submit Error */}
-            {errors.submit && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg"
-              >
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {errors.submit}
-                </p>
-              </motion.div>
-            )}
-
-            {/* Submit Button */}
             <motion.button
               whileHover={{ scale: isFormValid && !isLoading ? 1.02 : 1 }}
               whileTap={{ scale: isFormValid && !isLoading ? 0.98 : 1 }}
@@ -190,6 +190,17 @@ export default function ForgotPassword() {
               )}
             </motion.button>
           </form>
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Remember your password?{" "}
+              <button
+                onClick={() => navigate("/login")}
+                className="text-orange-600 hover:text-orange-700 font-medium transition-colors"
+              >
+                Sign in
+              </button>
+            </p>
+          </div>
         </motion.div>
       </motion.div>
     </div>
