@@ -10,7 +10,7 @@ import { useAuth } from "../../contexts/AuthContext";
 
 export default function Header() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showTrackModal, setShowTrackModal] = useState(false);
@@ -104,8 +104,8 @@ export default function Header() {
                       isActive && !item.onClick
                         ? "text-orange-500 font-bold"
                         : isScrolled
-                          ? "text-white/90 hover:text-orange-500"
-                          : "text-white/90 hover:text-orange-500"
+                        ? "text-white/90 hover:text-orange-500"
+                        : "text-white/90 hover:text-orange-500"
                     }`
                   }
                 >
@@ -214,6 +214,18 @@ export default function Header() {
                       >
                         Booking History
                       </button>
+
+                      <button
+                        onClick={() => {
+                          logout(); // Assuming logout from useAuth context
+                          setIsMobileMenuOpen(false);
+                          navigate("/"); // Redirect to home after logout
+                        }}
+                        className="w-full text-left text-red-400 hover:text-red-300 hover:bg-red-500/10 font-medium px-4 py-2 rounded-lg transition-all duration-300"
+                      >
+                        Logout
+                      </button>
+                      
                     </div>
                   ) : (
                     <>
