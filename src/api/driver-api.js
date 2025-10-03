@@ -126,7 +126,7 @@ class DriverAPI extends ApiBase {
     }
   }
 
-  
+
   async submitProofOfDelivery(bookingId, proofData) {
     console.log(`[DriverAPI] Submitting proof for booking ${bookingId} with data:`, {
       hasPhoto: !!proofData.photo,
@@ -325,6 +325,42 @@ class DriverAPI extends ApiBase {
       );
       console.log("[DriverAPI] Geolocation watch ID:", watchId);
     });
+  }
+
+  // Add to DriverAPI class to prevent delivered booking update
+  async bulkUpdateStatus(updates, newStatus) {
+    return super.request('/api/booking/bookings/bulk-update-status/', {
+      method: 'POST',
+      data: { updates: updates.map(id => ({ booking_id: id, new_status: newStatus })) }
+    }).then(res => res.data).catch(err => { throw err; });
+  }
+
+  // UPDATED: checkImmutable (now calls the new backend endpoint)
+  async checkImmutable(jobId) {
+    try {
+      const response = await super.request(`/api/booking/bookings/${jobId}/check-immutable/`);
+      return {
+        success: true,
+        immutable: response.data.immutable,
+        reason: response.data.reason
+      };
+    } catch (error) {
+      console.error("[DriverAPI] checkImmutable error:", error);
+      return { success: false, immutable: false, reason: null };
+    }
+  }
+
+  async batchCheckImmutable(jobIds) {
+    try {
+      const response = await super.request('/api/booking/bookings/bulk-check-immutable/', {
+        method: 'POST',
+        data: { ids: jobIds }
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error("[DriverAPI] Batch check error:", error);
+      throw error;
+    }
   }
 
 
