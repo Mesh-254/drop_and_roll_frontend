@@ -51,7 +51,7 @@ export default function PaymentCancel() {
               <div className="flex justify-between items-center py-2 border-b border-gray-100">
                 <span className="text-gray-600">Amount:</span>
                 <span className="text-2xl font-bold text-gray-900">
-                  KSh {Number.parseFloat(transaction.amount).toFixed(2)}
+                  GBP {Number.parseFloat(transaction.amount).toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between items-center py-2">
