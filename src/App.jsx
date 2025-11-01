@@ -1,5 +1,6 @@
 // App.jsx
 import { Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import Header from "./components/common/Header";
 import Hero from "./components/landingPage/Hero";
@@ -7,7 +8,7 @@ import Services from "./components/landingPage/Services";
 import About from "./components/about/About";
 import ContactForm from "./components/contact/ContactForm";
 import Footer from "./components/common/Footer";
-import AdminDashboard from "./components/admin/AdminDashboard";
+// import AdminDashboard from "./components/admin/AdminDashboard";
 import FAQ from "./components/contact/faq";
 import "./App.css";
 import "./globals.css";
@@ -22,7 +23,6 @@ import AccountConfirmedPage from "./components/auth/AccountConfirmedPage";
 import ResendConfirmationPage from "./components/auth/ResendConfirmationPage";
 import CheckEmail from "./components/auth/check-email";
 
-
 import QuotePage from "./components/quote/QuotePage";
 import BookingPage from "./components/bookings/BookingPage";
 import BookingHistory from "./components/bookings/BookingHistory";
@@ -33,6 +33,8 @@ import PaymentCancel from "./components/payments/PaymentCancel";
 
 import DriverDashboard from "./components/driver/driver-dashboard";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+
+const backendUrl = import.meta.env.VITE_NEXT_PUBLIC_BACKEND_URL;
 
 // Layout for pages with Header and Footer
 function MainLayout({ children }) {
@@ -56,10 +58,29 @@ function HomePage() {
     </>
   );
 }
+// function to handle admin redirect (before the return)
+function AdminRedirect() {
+  
+  useEffect(() => {
+    console.log("🔄 AdminRedirect →", `${backendUrl}/admin/`);
+    window.location.replace(`${backendUrl}/admin/`);
+  }, []);
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-8">
+      <div className="text-center max-w-md mx-auto">
+        <h1 className="text-2xl font-bold mb-4">👨‍💼 Admin Dashboard</h1>
+        <p className="text-gray-400 mb-8">Redirecting to your dashboard...</p>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   // Ensure VITE_APP_GOOGLE_CLIENT_ID is set in your .env file
   const googleClientId = import.meta.env.VITE_PUBLIC_GOOGLE_CLIENT_ID;
+
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
       <div className="min-h-screen bg-black text-white">
@@ -82,7 +103,10 @@ function App() {
           />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
+          <Route
+            path="/reset-password/:uid/:token"
+            element={<ResetPassword />}
+          />
           <Route path="/check-email" element={<CheckEmail />} />
 
           {/* login and register  */}
@@ -97,8 +121,16 @@ function App() {
             path="/resend-confirmation"
             element={<ResendConfirmationPage />}
           />
-          <Route path="/admin" element={<AdminDashboard />} />{" "}
-          {/* No header/footer for admin */}
+          {/* ✅ ADMIN: PROTECTED + AUTO-REDIRECT */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminRedirect />
+              </ProtectedRoute>
+            }
+          />
+
           <Route path="/quote" element={<QuotePage />} />
           <Route path="/booking" element={<BookingPage />} />
           <Route

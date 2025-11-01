@@ -2,8 +2,7 @@ import axios from "axios";
 
 export class ApiBase {
   constructor() {
-    this.baseURL =
-      import.meta.env.NEXT_PUBLIC_BACKEND_URL;
+    this.baseURL = import.meta.env.VITE_NEXT_PUBLIC_BACKEND_URL;
     this.token =
       typeof window !== "undefined"
         ? localStorage.getItem("access_token")
