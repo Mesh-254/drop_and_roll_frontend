@@ -163,8 +163,6 @@ export const AuthProvider = ({ children }) => {
         return "/driver-dashboard";
       case "customer":
         return "/";
-      case "admin":
-        return "/admin-dashboard";
       default:
         return "/";
     }
