@@ -46,6 +46,15 @@ const LoginPage = () => {
 
       if (result.success) {
         const userRole = result.data.user?.role;
+
+        // ✅ Handle admin IMMEDIATELY (external redirect)
+        if (userRole === "admin") {
+          const backendUrl = import.meta.env.VITE_NEXT_PUBLIC_BACKEND_URL;
+          window.location.href = `${backendUrl}/admin/`; // Full page → Django Admin
+          return; // Stop execution
+        }
+
+        // other users
         const redirectPath =
           location.state?.from?.pathname || getRedirectPath(userRole);
         navigate(redirectPath, { replace: true });
@@ -123,8 +132,18 @@ const LoginPage = () => {
       const result = await googleAuth(credentialResponse.credential);
       if (result.success) {
         const userRole = result.data.user?.role;
+
+        // ✅ Handle admin IMMEDIATELY (external redirect)
+        if (userRole === "admin") {
+          const backendUrl = import.meta.env.VITE_NEXT_PUBLIC_BACKEND_URL;
+          window.location.href = `${backendUrl}/admin/`; // Full page → Django Admin
+          return; // Stop execution
+        }
+
+        // Non-admin: Use normal React navigation
         const redirectPath =
           location.state?.from?.pathname || getRedirectPath(userRole);
+
         navigate(redirectPath, { replace: true });
       } else {
         setErrors({
