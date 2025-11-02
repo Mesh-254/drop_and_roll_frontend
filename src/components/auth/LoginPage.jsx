@@ -19,6 +19,8 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const backendUrl = import.meta.env.VITE_NEXT_PUBLIC_BACKEND_URL;
+
   useEffect(() => {
     if (location.state?.email) {
       setEmail(location.state.email);
@@ -49,9 +51,36 @@ const LoginPage = () => {
 
         // ✅ Handle admin IMMEDIATELY (external redirect)
         if (userRole === "admin") {
-          const backendUrl = import.meta.env.VITE_NEXT_PUBLIC_BACKEND_URL;
-          window.location.href = `${backendUrl}/admin/`; // Full page → Django Admin
-          return; // Stop execution
+          const accessToken = localStorage.getItem("access_token"); // or your storage key
+
+          if (!accessToken) {
+            alert("No access token found. Please log in again.");
+            return;
+          }
+
+          // Make authenticated request to set Django session
+          fetch(`${backendUrl}/api/users/auth/admin/`, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            credentials: "include", // Required for sessionid cookie
+          })
+            .then((response) => {
+              if (response.ok || response.redirected) {
+                // Django will redirect to /admin/ and set sessionid
+                window.location.href = `${backendUrl}/admin/`;
+              } else {
+                throw new Error("Failed to authenticate with Django admin");
+              }
+            })
+            .catch((err) => {
+              console.error("Admin bridge failed:", err);
+              alert("Failed to access admin panel. Please try again.");
+            });
+
+          return; // Prevent further navigation
         }
 
         // other users
@@ -133,11 +162,38 @@ const LoginPage = () => {
       if (result.success) {
         const userRole = result.data.user?.role;
 
-        // ✅ Handle admin IMMEDIATELY (external redirect)
+        // ✅ Handle admin login IMMEDIATELY (external redirect)
         if (userRole === "admin") {
-          const backendUrl = import.meta.env.VITE_NEXT_PUBLIC_BACKEND_URL;
-          window.location.href = `${backendUrl}/admin/`; // Full page → Django Admin
-          return; // Stop execution
+          const accessToken = localStorage.getItem("access_token"); // or your storage key
+
+          if (!accessToken) {
+            alert("No access token found. Please log in again.");
+            return;
+          }
+
+          // Make authenticated request to set Django session
+          fetch(`${backendUrl}/api/users/auth/admin/`, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            credentials: "include", // Required for sessionid cookie
+          })
+            .then((response) => {
+              if (response.ok || response.redirected) {
+                // Django will redirect to /admin/ and set sessionid
+                window.location.href = `${backendUrl}/admin/`;
+              } else {
+                throw new Error("Failed to authenticate with Django admin");
+              }
+            })
+            .catch((err) => {
+              console.error("Admin bridge failed:", err);
+              alert("Failed to access admin panel. Please try again.");
+            });
+
+          return; // Prevent further navigation
         }
 
         // Non-admin: Use normal React navigation
