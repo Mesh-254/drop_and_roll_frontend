@@ -19,7 +19,7 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const backendUrl = import.meta.env.VITE_NEXT_PUBLIC_BACKEND_URL;
+  const backendUrl = 'http://127.0.0.1:8000';
 
   useEffect(() => {
     if (location.state?.email) {
