@@ -49,15 +49,22 @@ export default function Header() {
     navigate("/register");
   };
 
+  const handleSmoothScroll = (elementId) => {
+    const element = document.getElementById(elementId)
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" })
+    }
+  }
+
   const navItems = [
     { name: "Home", href: "/" },
-    { name: "Services", href: "#services" },
+    { name: "Services", onClick: () => handleSmoothScroll("services"), href: "#" },
     {
       name: "Tracking",
       onClick: handleTracking,
     },
     ...(isAuthenticated ? [{ name: "History", href: "/history" }] : []),
-    { name: "Support", href: "#support" },
+    { name: "Support", onClick: () => handleSmoothScroll("contact"), href: "#" },
     { name: "FAQ", href: "/faqs" },
   ];
 
