@@ -3,68 +3,693 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { loadStripe } from "@stripe/stripe-js";
-import { Elements } from "@stripe/react-stripe-js";
+import {
+  Elements,
+  CardElement,
+  PaymentRequestButtonElement,
+  useStripe,
+  useElements,
+  PaymentElement,
+} from "@stripe/react-stripe-js";
 import { paymentApi } from "../../api/PaymentApi";
 import { useAuth } from "../../contexts/AuthContext";
-import StripeCreditCard from "./StripeCreditCard";
-import StripeApplePay from "./StripeApplePay";
 import {
   Loader2,
   CreditCard,
   AlertCircle,
   ArrowLeft,
   Shield,
+  CheckCircle,
 } from "lucide-react";
 
 // Initialize Stripe
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
-export default function PaymentPage() {
+// Payment Method Radio Button Component
+function PaymentMethodOption({
+  id,
+  selected,
+  onSelect,
+  icon,
+  label,
+  description,
+  color,
+}) {
+  return (
+    <label
+      className={`relative flex items-center p-6 rounded-2xl border-2 cursor-pointer transition-all duration-200 ${
+        selected
+          ? `border-${color}-500 bg-${color}-50 shadow-lg scale-[1.02]`
+          : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-md"
+      }`}
+      onClick={() => onSelect(id)}
+    >
+      <input
+        type="radio"
+        name="payment-method"
+        value={id}
+        checked={selected}
+        onChange={() => onSelect(id)}
+        className="sr-only"
+      />
+      <div className="flex items-center flex-1">
+        <div
+          className={`flex items-center justify-center w-12 h-12 rounded-full ${
+            color === "orange"
+              ? "bg-orange-500"
+              : color === "blue"
+              ? "bg-blue-500"
+              : color === "gray"
+              ? "bg-gray-900"
+              : color === "green"
+              ? "bg-green-500"
+              : "bg-yellow-500"
+          } text-white mr-4`}
+        >
+          {icon}
+        </div>
+        <div className="flex-1">
+          <div className="font-bold text-gray-900 text-lg">{label}</div>
+          <div className="text-sm text-gray-600">{description}</div>
+        </div>
+        {selected && <CheckCircle className="h-6 w-6 text-orange-500 ml-4" />}
+      </div>
+    </label>
+  );
+}
+
+// Stripe Credit Card Component
+function StripeCreditCard({
+  txId,
+  amount,
+  guestEmail,
+  isAuthenticated,
+  onSuccess,
+  onError,
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleSubmit = async () => {
+    if (!stripe || !elements) {
+      setError("Payment system not ready. Please try again.");
+      return;
+    }
+
+    setProcessing(true);
+    setError(null);
+
+    try {
+      const result = await paymentApi.initiateStripeTransaction(
+        txId,
+        isAuthenticated,
+        guestEmail,
+        "card"
+      );
+      if (!result.success) {
+        throw new Error(result.message || "Failed to initialize payment");
+      }
+
+      const { client_secret } = result;
+
+      const { error: confirmError, paymentIntent } =
+        await stripe.confirmCardPayment(client_secret, {
+          payment_method: {
+            card: elements.getElement(CardElement),
+            billing_details: { email: guestEmail || undefined },
+          },
+        });
+
+      if (confirmError) {
+        throw confirmError;
+      }
+
+      if (paymentIntent.status === "succeeded") {
+        onSuccess();
+      } else {
+        throw new Error("Payment did not succeed. Please try again.");
+      }
+    } catch (err) {
+      setError(err.message || "An unexpected error occurred.");
+      onError(err.message || "An unexpected error occurred.");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <CardElement
+        options={{
+          style: {
+            base: {
+              fontSize: "16px",
+              color: "#1F2937",
+              "::placeholder": { color: "#6B7280" },
+            },
+            invalid: { color: "#EF4444" },
+          },
+        }}
+        className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white"
+      />
+      {error && (
+        <div className="flex items-center text-red-500 text-sm">
+          <AlertCircle size={16} className="mr-2" />
+          {error}
+        </div>
+      )}
+      <button
+        onClick={handleSubmit}
+        disabled={processing}
+        className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center justify-center"
+        aria-label="Pay with Credit Card"
+      >
+        {processing ? (
+          <>
+            <Loader2 size={20} className="mr-2 animate-spin" />
+            Processing...
+          </>
+        ) : (
+          "Pay with Credit Card"
+        )}
+      </button>
+    </div>
+  );
+}
+
+// Stripe Apple Pay Component
+function StripeApplePay({
+  txId,
+  amount,
+  guestEmail,
+  isAuthenticated,
+  onSuccess,
+  onError,
+}) {
+  const stripe = useStripe();
+  const [paymentRequest, setPaymentRequest] = useState(null);
+  const [error, setError] = useState(null);
+  const [canMakePayment, setCanMakePayment] = useState(false);
+
+  useEffect(() => {
+    if (!stripe) return;
+
+    const pr = stripe.paymentRequest({
+      country: "GB",
+      currency: "gbp",
+      total: { label: "Total", amount: Math.round(amount * 100) },
+      requestPayerName: true,
+      requestPayerEmail: true,
+    });
+
+    pr.canMakePayment().then((result) => {
+      if (result?.applePay) {
+        setPaymentRequest(pr);
+        setCanMakePayment(true);
+      }
+    });
+
+    pr.on("paymentmethod", async (ev) => {
+      try {
+        const result = await paymentApi.initiateStripeTransaction(
+          txId,
+          isAuthenticated,
+          guestEmail,
+          "apple_pay"
+        );
+        if (!result.success) {
+          throw new Error(result.message || "Failed to initialize payment");
+        }
+
+        const { client_secret } = result;
+
+        const { error: confirmError, paymentIntent } =
+          await stripe.confirmCardPayment(client_secret, {
+            payment_method: ev.paymentMethod.id,
+          });
+
+        if (confirmError) {
+          ev.complete("fail");
+          throw confirmError;
+        }
+
+        ev.complete("success");
+        if (paymentIntent.status === "succeeded") {
+          onSuccess();
+        } else {
+          throw new Error("Payment did not succeed. Please try again.");
+        }
+      } catch (err) {
+        ev.complete("fail");
+        setError(err.message || "An unexpected error occurred.");
+        onError(err.message || "An unexpected error occurred.");
+      }
+    });
+  }, [stripe, txId, amount, guestEmail, isAuthenticated, onSuccess, onError]);
+
+  if (!canMakePayment) {
+    return (
+      <p className="text-gray-600 text-sm">
+        Apple Pay not available on this device.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {error && (
+        <div className="flex items-center text-red-500 text-sm">
+          <AlertCircle size={16} className="mr-2" />
+          {error}
+        </div>
+      )}
+      {paymentRequest && (
+        <PaymentRequestButtonElement options={{ paymentRequest }} />
+      )}
+    </div>
+  );
+}
+
+// Stripe Google Pay Component
+function StripeGooglePay({
+  txId,
+  amount,
+  guestEmail,
+  isAuthenticated,
+  onSuccess,
+  onError,
+}) {
+  const stripe = useStripe();
+  const [paymentRequest, setPaymentRequest] = useState(null);
+  const [error, setError] = useState(null);
+  const [canMakePayment, setCanMakePayment] = useState(false);
+
+  useEffect(() => {
+    if (!stripe) return;
+
+    const pr = stripe.paymentRequest({
+      country: "GB",
+      currency: "gbp",
+      total: { label: "Total", amount: Math.round(amount * 100) },
+      requestPayerName: true,
+      requestPayerEmail: true,
+    });
+
+    pr.canMakePayment().then((result) => {
+      if (result?.googlePay) {
+        setPaymentRequest(pr);
+        setCanMakePayment(true);
+      }
+    });
+
+    pr.on("paymentmethod", async (ev) => {
+      try {
+        const result = await paymentApi.initiateStripeTransaction(
+          txId,
+          isAuthenticated,
+          guestEmail,
+          "google_pay"
+        );
+        if (!result.success) {
+          throw new Error(result.message || "Failed to initialize payment");
+        }
+
+        const { client_secret } = result;
+
+        const { error: confirmError, paymentIntent } =
+          await stripe.confirmCardPayment(client_secret, {
+            payment_method: ev.paymentMethod.id,
+          });
+
+        if (confirmError) {
+          ev.complete("fail");
+          throw confirmError;
+        }
+
+        ev.complete("success");
+        if (paymentIntent.status === "succeeded") {
+          onSuccess();
+        } else {
+          throw new Error("Payment did not succeed. Please try again.");
+        }
+      } catch (err) {
+        ev.complete("fail");
+        setError(err.message || "An unexpected error occurred.");
+        onError(err.message || "An unexpected error occurred.");
+      }
+    });
+  }, [stripe, txId, amount, guestEmail, isAuthenticated, onSuccess, onError]);
+
+  if (!canMakePayment) {
+    return (
+      <p className="text-gray-600 text-sm">
+        Google Pay not available on this device.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {error && (
+        <div className="flex items-center text-red-500 text-sm">
+          <AlertCircle size={16} className="mr-2" />
+          {error}
+        </div>
+      )}
+      {paymentRequest && (
+        <PaymentRequestButtonElement options={{ paymentRequest }} />
+      )}
+    </div>
+  );
+}
+
+// StripeCashApp Component (outer wrapper)
+function StripeCashApp({
+  txId,
+  amount,
+  guestEmail,
+  isAuthenticated,
+  onSuccess,
+  onError,
+}) {
+  const [clientSecret, setClientSecret] = useState("");
+  const [error, setError] = useState(null);
+  const [processing, setProcessing] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const redirectStatus = params.get("redirect_status");
+    const cs = params.get("payment_intent_client_secret");
+
+    if (redirectStatus && cs) {
+      setClientSecret(cs);
+    } else {
+      const fetchClientSecret = async () => {
+        try {
+          const result = await paymentApi.initiateStripeTransaction(
+            txId,
+            isAuthenticated,
+            guestEmail,
+            "cashapp"
+          );
+          if (result.success) {
+            setClientSecret(result.client_secret);
+          } else {
+            throw new Error(result.message || "Failed to initialize payment");
+          }
+        } catch (err) {
+          setError(err.message || "An unexpected error occurred.");
+          onError(err.message || "An unexpected error occurred.");
+        }
+      };
+      fetchClientSecret();
+    }
+  }, [txId, isAuthenticated, guestEmail, onError, location]);
+
+  if (!clientSecret) {
+    return <Loader2 className="h-6 w-6 animate-spin mx-auto" />;
+  }
+
+  return (
+    <Elements stripe={stripePromise} options={{ clientSecret }}>
+      <CashAppForm
+        onSuccess={onSuccess}
+        onError={onError}
+        processing={processing}
+        setProcessing={setProcessing}
+        error={error}
+        setError={setError}
+        clientSecret={clientSecret}
+      />
+    </Elements>
+  );
+}
+
+// Inner Cash App Form
+function CashAppForm({
+  onSuccess,
+  onError,
+  processing,
+  setProcessing,
+  error,
+  setError,
+  clientSecret,
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+
+  const handleSubmit = async () => {
+    if (!stripe || !elements) {
+      setError("Payment system not ready. Please try again.");
+      return;
+    }
+
+    setProcessing(true);
+    setError(null);
+
+    try {
+      const result = await stripe.confirmPayment({
+        elements,
+        clientSecret,
+        confirmParams: {
+          return_url: window.location.href,
+        },
+        redirect: "if_required",
+      });
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      if (result.paymentIntent?.status === "succeeded") {
+        onSuccess();
+      }
+    } catch (err) {
+      setError(err.message || "An unexpected error occurred.");
+      onError(err.message || "An unexpected error occurred.");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <PaymentElement />
+      {error && (
+        <div className="flex items-center text-red-500 text-sm">
+          <AlertCircle size={16} className="mr-2" />
+          {error}
+        </div>
+      )}
+      <button
+        onClick={handleSubmit}
+        disabled={processing}
+        className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center justify-center"
+        aria-label="Pay with Cash App"
+      >
+        {processing ? (
+          <>
+            <Loader2 size={20} className="mr-2 animate-spin" />
+            Processing...
+          </>
+        ) : (
+          "Pay with Cash App"
+        )}
+      </button>
+    </div>
+  );
+}
+
+// StripeAmazonPay Component (outer wrapper)
+function StripeAmazonPay({
+  txId,
+  amount,
+  guestEmail,
+  isAuthenticated,
+  onSuccess,
+  onError,
+}) {
+  const [clientSecret, setClientSecret] = useState("");
+  const [error, setError] = useState(null);
+  const [processing, setProcessing] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const redirectStatus = params.get("redirect_status");
+    const cs = params.get("payment_intent_client_secret");
+
+    if (redirectStatus && cs) {
+      setClientSecret(cs);
+    } else {
+      const fetchClientSecret = async () => {
+        try {
+          const result = await paymentApi.initiateStripeTransaction(
+            txId,
+            isAuthenticated,
+            guestEmail,
+            "amazon_pay"
+          );
+          if (result.success) {
+            setClientSecret(result.client_secret);
+          } else {
+            throw new Error(result.message || "Failed to initialize payment");
+          }
+        } catch (err) {
+          setError(err.message || "An unexpected error occurred.");
+          onError(err.message || "An unexpected error occurred.");
+        }
+      };
+      fetchClientSecret();
+    }
+  }, [txId, isAuthenticated, guestEmail, onError, location]);
+
+  if (!clientSecret) {
+    return <Loader2 className="h-6 w-6 animate-spin mx-auto" />;
+  }
+
+  return (
+    <Elements stripe={stripePromise} options={{ clientSecret }}>
+      <AmazonPayForm
+        onSuccess={onSuccess}
+        onError={onError}
+        processing={processing}
+        setProcessing={setProcessing}
+        error={error}
+        setError={setError}
+        clientSecret={clientSecret}
+      />
+    </Elements>
+  );
+}
+
+// Inner Amazon Pay Form
+function AmazonPayForm({
+  onSuccess,
+  onError,
+  processing,
+  setProcessing,
+  error,
+  setError,
+  clientSecret,
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+
+  const handleSubmit = async () => {
+    if (!stripe || !elements) {
+      setError("Payment system not ready. Please try again.");
+      return;
+    }
+
+    setProcessing(true);
+    setError(null);
+
+    try {
+      const result = await stripe.confirmPayment({
+        elements,
+        clientSecret,
+        confirmParams: {
+          return_url: window.location.href,
+        },
+        redirect: "if_required",
+      });
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      if (result.paymentIntent?.status === "succeeded") {
+        onSuccess();
+      }
+    } catch (err) {
+      setError(err.message || "An unexpected error occurred.");
+      onError(err.message || "An unexpected error occurred.");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <PaymentElement />
+      {error && (
+        <div className="flex items-center text-red-500 text-sm">
+          <AlertCircle size={16} className="mr-2" />
+          {error}
+        </div>
+      )}
+      <button
+        onClick={handleSubmit}
+        disabled={processing}
+        className="w-full bg-yellow-500 hover:bg-yellow-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center justify-center"
+        aria-label="Pay with Amazon Pay"
+      >
+        {processing ? (
+          <>
+            <Loader2 size={20} className="mr-2 animate-spin" />
+            Processing...
+          </>
+        ) : (
+          "Pay with Amazon Pay"
+        )}
+      </button>
+    </div>
+  );
+}
+
+// Main Payment Page Content
+function PaymentPageContent() {
   const { txId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [transaction, setTransaction] = useState(null);
+  const [amount, setAmount] = useState(0);
+  const [guestEmail, setGuestEmail] = useState("");
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("card");
   const [processing, setProcessing] = useState(false);
-  const [transaction, setTransaction] = useState(
-    location.state?.transaction || null
-  );
-  const [guestEmail, setGuestEmail] = useState(
-    location.state?.guestEmail?.toLowerCase() || ""
-  );
-
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("paypal");
   const [applePayAvailable, setApplePayAvailable] = useState(false);
+  const [googlePayAvailable, setGooglePayAvailable] = useState(false);
+  const [hasCaptured, setHasCaptured] = useState(false);
 
   const queryParams = new URLSearchParams(location.search);
   const paypalToken = queryParams.get("token");
-  const isCancelled = queryParams.has("cancelled");
-  const [hasCaptured, setHasCaptured] = useState(false);
+  const payerId = queryParams.get("PayerID");
+  const isCancelled = queryParams.get("cancelled");
 
   useEffect(() => {
-    const checkApplePayAvailability = async () => {
-      if (window.ApplePaySession && window.ApplePaySession.canMakePayments()) {
-        setApplePayAvailable(true);
-      }
+    const checkWallets = async () => {
+      const stripe = await stripePromise;
+      const pr = stripe.paymentRequest({
+        country: "GB",
+        currency: "gbp",
+        total: { label: "Test", amount: 1000 },
+        requestPayerEmail: true,
+      });
+      const result = await pr.canMakePayment();
+      setApplePayAvailable(!!result?.applePay);
+      setGooglePayAvailable(!!result?.googlePay);
     };
-    checkApplePayAvailability();
+    checkWallets();
   }, []);
 
   useEffect(() => {
-    const loadTransactionData = async () => {
+    const loadTransaction = async () => {
+      setLoading(true);
       try {
-        let effectiveGuestEmail = guestEmail.toLowerCase();
-        if (
-          !isAuthenticated &&
-          !effectiveGuestEmail &&
-          transaction?.guest_email
-        ) {
-          effectiveGuestEmail = transaction.guest_email;
+        const stateGuestEmail = location.state?.guestEmail;
+        let effectiveGuestEmail = guestEmail;
+        if (!isAuthenticated && stateGuestEmail) {
+          effectiveGuestEmail = stateGuestEmail.toLowerCase();
           setGuestEmail(effectiveGuestEmail);
         }
 
-        // New: Retrieve guestEmail from localStorage if not in state (for PayPal redirect)
         if (!isAuthenticated && !effectiveGuestEmail) {
           const storedGuestEmail = localStorage.getItem("guestEmail");
           if (storedGuestEmail) {
@@ -74,8 +699,7 @@ export default function PaymentPage() {
         }
 
         if (!isAuthenticated && !effectiveGuestEmail) {
-          setError("Guest email not available");
-          setLoading(false);
+          setError("Guest email required for non-authenticated users");
           return;
         }
 
@@ -84,130 +708,51 @@ export default function PaymentPage() {
           isAuthenticated,
           effectiveGuestEmail
         );
-
         if (result.success) {
           setTransaction(result.data);
+          setAmount(Number.parseFloat(result.data.amount || 0));
           if (!isAuthenticated && result.data.guest_email && !guestEmail) {
-            setGuestEmail(result.data.guest_email);
-          }
-          if (result.data.status === "success") {
-            navigate("/pay/success", {
-              state: {
-                transaction: result.data,
-                guestEmail: effectiveGuestEmail,
-              },
-            });
-          } else if (result.data.status === "cancelled") {
-            navigate("/pay/cancel", {
-              state: {
-                transaction: result.data,
-                guestEmail: effectiveGuestEmail,
-              },
-            });
-          } else if (Number.parseFloat(result.data.amount || 0) === 0) {
-            navigate("/pay/success", {
-              state: {
-                transaction: result.data,
-                guestEmail: effectiveGuestEmail,
-              },
-            });
+            setGuestEmail(result.data.guest_email.toLowerCase());
           }
         } else {
-          console.error("getTransaction failed:", result);
-          setError(result.message || "Failed to load transaction details");
+          setError(result.message || "Failed to load transaction");
         }
       } catch (err) {
-        console.error("loadTransaction error:", err, err.response?.data);
-        setError(
-          "Failed to load transaction details: " +
-            (err.response?.data?.detail || err.message)
-        );
+        setError(err.message || "Failed to load transaction");
       } finally {
         setLoading(false);
       }
     };
-
-    loadTransactionData();
-  }, [txId, isAuthenticated, guestEmail, navigate]);
+    loadTransaction();
+  }, [txId, isAuthenticated, location.state, guestEmail]);
 
   useEffect(() => {
-    if (!loading && transaction?.status === "pending" && paypalToken) {
+    if (paypalToken && payerId && transaction && !hasCaptured) {
       handleCapture();
-    } else if (!loading && isCancelled) {
+    } else if (isCancelled && transaction) {
       handleCancel();
     }
-  }, [loading, transaction, paypalToken, isCancelled]);
-
-  // Optional: Polling for webhook delay
-  useEffect(() => {
-    if (!loading && transaction?.status === "pending" && !paypalToken) {
-      const pollInterval = setInterval(async () => {
-        try {
-          const result = await paymentApi.getTransaction(
-            txId,
-            isAuthenticated,
-            guestEmail
-          );
-          if (result.success && result.data.status !== "pending") {
-            setTransaction(result.data);
-            clearInterval(pollInterval);
-            if (result.data.status === "success") {
-              navigate("/pay/success", {
-                state: { transaction: result.data, guestEmail },
-              });
-            } else if (result.data.status === "cancelled") {
-              navigate("/pay/cancel", {
-                state: { transaction: result.data, guestEmail },
-              });
-            }
-          }
-        } catch (err) {
-          console.error("Poll error:", err);
-        }
-      }, 5000);
-      return () => clearInterval(pollInterval);
-    }
-  }, [loading, transaction, txId, isAuthenticated, guestEmail, navigate]);
+  }, [paypalToken, payerId, isCancelled, transaction, hasCaptured]);
 
   const handleInitiatePayment = async () => {
     setProcessing(true);
     setError(null);
     try {
-      // New: Store guestEmail in localStorage before redirect (for guest users)
       if (!isAuthenticated && guestEmail) {
-        localStorage.setItem("guestEmail", guestEmail);
+        localStorage.setItem("guestEmail", guestEmail.toLowerCase());
       }
 
-      const initiateResult = await paymentApi.initiateTransaction(
+      const result = await paymentApi.initiateTransaction(
         txId,
         isAuthenticated,
         guestEmail
       );
-      console.log("Initiate result:", initiateResult);
-      if (
-        initiateResult.success &&
-        initiateResult.links &&
-        Array.isArray(initiateResult.links)
-      ) {
-        const approvalUrl = initiateResult.links.find(
-          (link) => link.rel === "approve"
-        )?.href;
-        if (approvalUrl) {
-          console.log("Redirecting to PayPal approval URL:", approvalUrl);
-          window.location.href = approvalUrl;
-        } else {
-          console.error("No approval URL in PayPal response:", initiateResult);
-          throw new Error("No approval URL found in PayPal response");
-        }
+      if (result.approval_url) {
+        window.location.href = result.approval_url;
       } else {
-        console.error("Invalid initiate result:", initiateResult);
-        setError(
-          initiateResult.error ||
-            "Failed to initiate payment: Invalid response from server"
-        );
+        setError(result.message || "Failed to initiate payment");
       }
     } catch (err) {
-      console.error("Initiate payment error:", err);
       setError(err.message || "Failed to initiate payment");
     } finally {
       setProcessing(false);
@@ -215,7 +760,7 @@ export default function PaymentPage() {
   };
 
   const handleCapture = async () => {
-    if (hasCaptured) return; // Prevent multiple captures
+    if (hasCaptured) return;
     setHasCaptured(true);
     setProcessing(true);
     setError(null);
@@ -225,39 +770,42 @@ export default function PaymentPage() {
         isAuthenticated,
         guestEmail
       );
-      if (result.success === false) {
-        console.error("Capture failed:", result);
-        setError(result.message || "Failed to capture payment");
-      } else {
-        setTransaction(result.data);
-        console.log("Capture successful, navigating to success");
+      if (result.success) {
         navigate("/pay/success", {
           state: { transaction: result.data, guestEmail },
         });
+      } else {
+        setError(result.message || "Failed to capture payment");
       }
     } catch (err) {
-      console.error("Capture error:", err);
-      setError(err.message || "Failed to complete payment capture");
+      setError(err.message || "Failed to capture payment");
     } finally {
       setProcessing(false);
+      if (!isAuthenticated) {
+        localStorage.removeItem("guestEmail");
+      }
     }
   };
 
   const handleCancel = async () => {
+    setProcessing(true);
     try {
       const result = await paymentApi.cancelTransaction(
         txId,
         isAuthenticated,
         guestEmail
       );
-      console.log("Cancel result:", result);
-      navigate("/pay/cancel", { state: { transaction } });
+      if (result.success) {
+        navigate("/pay/cancel", {
+          state: { transaction: result.data, guestEmail },
+        });
+      } else {
+        setError(result.message);
+      }
     } catch (err) {
-      console.error("Cancel error:", err);
-      setError("Failed to cancel transaction: " + err.message);
-      navigate("/pay/cancel", { state: { transaction } });
+      setError("Failed to cancel payment");
     } finally {
-      // New: Clear guestEmail from localStorage after cancel
+      setProcessing(false);
       if (!isAuthenticated) {
         localStorage.removeItem("guestEmail");
       }
@@ -265,24 +813,24 @@ export default function PaymentPage() {
   };
 
   const handleStripeSuccess = () => {
-    navigate("/pay/success", {
-      state: { transaction, guestEmail },
-    });
+    if (!isAuthenticated) {
+      localStorage.removeItem("guestEmail");
+    }
+    navigate("/pay/success", { state: { transaction, guestEmail } });
   };
 
-  const handleStripeError = (errorMessage) => {
-    setError(errorMessage);
+  const handleStripeError = (message) => {
+    setError(message);
+  };
+
+  const handleSelectMethod = (method) => {
+    setSelectedPaymentMethod(method);
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 text-orange-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 font-medium">
-            Loading payment details...
-          </p>
-        </div>
+        <Loader2 className="h-12 w-12 text-orange-500 animate-spin" />
       </div>
     );
   }
@@ -292,15 +840,37 @@ export default function PaymentPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
           <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
             Payment Error
-          </h1>
+          </h2>
           <p className="text-gray-600 mb-6">{error}</p>
           <button
             onClick={() => navigate("/history")}
-            className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+            className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg transition-colors w-full"
           >
-            Return to Bookings
+            Back to Bookings
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!transaction) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <AlertCircle className="h-16 w-16 text-orange-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            No Transaction Found
+          </h2>
+          <p className="text-gray-600 mb-6">
+            Please start a new booking or check your history.
+          </p>
+          <button
+            onClick={() => navigate("/history")}
+            className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg transition-colors w-full"
+          >
+            View Bookings
           </button>
         </div>
       </div>
@@ -308,213 +878,223 @@ export default function PaymentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-2xl mx-auto px-4">
-        <div className="mb-8">
+    <div className="min-h-screen bg-gray-50 py-12 px-4">
+      <div className="max-w-3xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center text-gray-600 hover:text-gray-800 mb-4 transition-colors"
+            className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft className="h-5 w-5 mr-2" />
             Back
           </button>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Complete Payment
-          </h1>
-          <p className="text-gray-600">Choose your preferred payment method</p>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-            <CreditCard className="h-6 w-6 text-orange-500 mr-2" />
-            Payment Details
-          </h2>
-
-          <div className="space-y-3">
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
-              <span className="text-gray-600">Transaction ID:</span>
-              <span className="font-mono text-sm text-gray-900">
-                {transaction?.reference}
-              </span>
-            </div>
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
-              <span className="text-gray-600">Amount:</span>
-              <span className="text-2xl font-bold text-gray-900">
-                KSh {Number.parseFloat(transaction?.amount || 0).toFixed(2)}{" "}
-                (~USD{" "}
-                {(
-                  Number.parseFloat(transaction?.amount || 0) * 0.00775
-                ).toFixed(2)}
-                )
-              </span>
-            </div>
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
-              <span className="text-gray-600">Status:</span>
-              <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium capitalize">
-                {transaction?.status}
-              </span>
-            </div>
-            {transaction?.booking && (
-              <div className="flex justify-between items-center py-2">
-                <span className="text-gray-600">Booking ID:</span>
-                <span className="font-mono text-sm text-gray-900">
-                  {transaction.booking}
-                </span>
-              </div>
-            )}
+          <div className="text-sm text-gray-500">
+            Transaction #{transaction.reference}
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
+        {/* Transaction Summary Card */}
+        <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-6">
+            Complete Your Payment
+          </h1>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <div className="text-sm text-gray-600 mb-2">Amount Due</div>
+              <div className="text-4xl font-bold text-gray-900">
+                £{amount.toFixed(2)}
+              </div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-600 mb-2">Status</div>
+              <div className="inline-flex items-center px-4 py-2 bg-orange-100 text-orange-700 rounded-full font-medium">
+                {transaction.status.charAt(0).toUpperCase() +
+                  transaction.status.slice(1)}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Payment Methods Card */}
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">
             Choose Payment Method
           </h2>
-
-          <div className="space-y-4 mb-6">
-            {/* PayPal Option */}
-            <label className="flex items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-              <input
-                type="radio"
-                name="paymentMethod"
-                value="paypal"
-                checked={selectedPaymentMethod === "paypal"}
-                onChange={(e) => setSelectedPaymentMethod(e.target.value)}
-                className="h-4 w-4 text-orange-500 focus:ring-orange-500 border-gray-300"
-              />
-              <div className="ml-3 flex items-center">
-                <div className="bg-blue-600 text-white px-3 py-1 rounded text-sm font-bold mr-3">
-                  PayPal
-                </div>
-                <span className="text-gray-900 font-medium">
-                  Pay with PayPal
-                </span>
-              </div>
-            </label>
-
-            {/* Credit Card Option */}
-            <label className="flex items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-              <input
-                type="radio"
-                name="paymentMethod"
-                value="creditcard"
-                checked={selectedPaymentMethod === "creditcard"}
-                onChange={(e) => setSelectedPaymentMethod(e.target.value)}
-                className="h-4 w-4 text-orange-500 focus:ring-orange-500 border-gray-300"
-              />
-              <div className="ml-3 flex items-center">
-                <CreditCard className="h-6 w-6 text-gray-600 mr-3" />
-                <span className="text-gray-900 font-medium">
-                  Credit or Debit Card
-                </span>
-              </div>
-            </label>
-
-            {/* Apple Pay Option - Only show if available */}
+          <div className="space-y-4 mb-8">
+            <PaymentMethodOption
+              id="paypal"
+              selected={selectedPaymentMethod === "paypal"}
+              onSelect={handleSelectMethod}
+              icon={<CreditCard className="h-6 w-6" />}
+              label="PayPal"
+              description="Pay securely with your PayPal account"
+              color="blue"
+            />
+            <PaymentMethodOption
+              id="card"
+              selected={selectedPaymentMethod === "card"}
+              onSelect={handleSelectMethod}
+              icon={<CreditCard className="h-6 w-6" />}
+              label="Credit/Debit Card"
+              description="Visa, MasterCard, Amex accepted"
+              color="orange"
+            />
             {applePayAvailable && (
-              <label className="flex items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                <input
-                  type="radio"
-                  name="paymentMethod"
-                  value="applepay"
-                  checked={selectedPaymentMethod === "applepay"}
-                  onChange={(e) => setSelectedPaymentMethod(e.target.value)}
-                  className="h-4 w-4 text-orange-500 focus:ring-orange-500 border-gray-300"
-                />
-                <div className="ml-3 flex items-center">
-                  <div className="bg-black text-white px-3 py-1 rounded text-sm font-bold mr-3">
-                    Apple Pay
-                  </div>
-                  <span className="text-gray-900 font-medium">
-                    Pay with Apple Pay
-                  </span>
-                </div>
-              </label>
+              <PaymentMethodOption
+                id="apple"
+                selected={selectedPaymentMethod === "apple"}
+                onSelect={handleSelectMethod}
+                icon={<CheckCircle className="h-6 w-6" />}
+                label="Apple Pay"
+                description="Quick payment with Apple Wallet"
+                color="gray"
+              />
+            )}
+            {googlePayAvailable && (
+              <PaymentMethodOption
+                id="google"
+                selected={selectedPaymentMethod === "google"}
+                onSelect={handleSelectMethod}
+                icon={<CheckCircle className="h-6 w-6" />}
+                label="Google Pay"
+                description="Pay with your Google account"
+                color="blue"
+              />
+            )}
+            <PaymentMethodOption
+              id="cashapp"
+              selected={selectedPaymentMethod === "cashapp"}
+              onSelect={handleSelectMethod}
+              icon={<CheckCircle className="h-6 w-6" />}
+              label="Cash App"
+              description="Simple mobile payments"
+              color="green"
+            />
+            <PaymentMethodOption
+              id="amazon"
+              selected={selectedPaymentMethod === "amazon"}
+              onSelect={handleSelectMethod}
+              icon={<CheckCircle className="h-6 w-6" />}
+              label="Amazon Pay"
+              description="Use your Amazon account"
+              color="yellow"
+            />
+          </div>
+
+          {/* Payment Form */}
+          <div className="bg-gray-50 rounded-2xl p-6 mb-6">
+            {selectedPaymentMethod === "paypal" && (
+              <button
+                onClick={handleInitiatePayment}
+                disabled={processing}
+                className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 rounded-lg transition-colors flex items-center justify-center text-lg"
+              >
+                <CreditCard className="h-6 w-6 mr-3" />
+                Continue to PayPal
+              </button>
+            )}
+
+            {selectedPaymentMethod === "card" && (
+              <StripeCreditCard
+                txId={txId}
+                amount={amount}
+                guestEmail={guestEmail}
+                isAuthenticated={isAuthenticated}
+                onSuccess={handleStripeSuccess}
+                onError={handleStripeError}
+              />
+            )}
+
+            {selectedPaymentMethod === "apple" && applePayAvailable && (
+              <StripeApplePay
+                txId={txId}
+                amount={amount}
+                guestEmail={guestEmail}
+                isAuthenticated={isAuthenticated}
+                onSuccess={handleStripeSuccess}
+                onError={handleStripeError}
+              />
+            )}
+
+            {selectedPaymentMethod === "google" && googlePayAvailable && (
+              <StripeGooglePay
+                txId={txId}
+                amount={amount}
+                guestEmail={guestEmail}
+                isAuthenticated={isAuthenticated}
+                onSuccess={handleStripeSuccess}
+                onError={handleStripeError}
+              />
+            )}
+
+            {selectedPaymentMethod === "cashapp" && (
+              <StripeCashApp
+                txId={txId}
+                amount={amount}
+                guestEmail={guestEmail}
+                isAuthenticated={isAuthenticated}
+                onSuccess={handleStripeSuccess}
+                onError={handleStripeError}
+              />
+            )}
+
+            {selectedPaymentMethod === "amazon" && (
+              <StripeAmazonPay
+                txId={txId}
+                amount={amount}
+                guestEmail={guestEmail}
+                isAuthenticated={isAuthenticated}
+                onSuccess={handleStripeSuccess}
+                onError={handleStripeError}
+              />
             )}
           </div>
 
-          {processing && (
-            <div className="text-center py-8">
-              <Loader2 className="h-12 w-12 text-orange-500 animate-spin mx-auto mb-4" />
-              <p className="text-gray-600 font-medium">Processing payment...</p>
-            </div>
-          )}
+          {/* Cancel Button */}
+          <button
+            onClick={handleCancel}
+            disabled={processing}
+            className="w-full bg-white hover:bg-gray-50 text-gray-700 font-bold py-4 rounded-lg border border-gray-300 transition-colors text-lg"
+          >
+            Cancel Payment
+          </button>
+        </div>
 
-          {!processing && (
-            <div className="space-y-4">
-              {selectedPaymentMethod === "paypal" && (
-                <div className="space-y-4">
-                  <p className="text-gray-600 text-sm mb-4">
-                    Click below to proceed with your PayPal payment. You will be
-                    redirected to PayPal to complete the transaction.
-                  </p>
-                  <button
-                    onClick={handleInitiatePayment}
-                    disabled={processing}
-                    className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center justify-center"
-                  >
-                    <CreditCard className="h-5 w-5 mr-2" />
-                    Pay with PayPal
-                  </button>
-                </div>
-              )}
-
-              {selectedPaymentMethod === "creditcard" && (
-                <Elements stripe={stripePromise}>
-                  <StripeCreditCard
-                    txId={txId}
-                    amount={Number.parseFloat(transaction?.amount || 0)}
-                    guestEmail={guestEmail}
-                    isAuthenticated={isAuthenticated}
-                    onSuccess={handleStripeSuccess}
-                    onError={handleStripeError}
-                  />
-                </Elements>
-              )}
-
-              {selectedPaymentMethod === "applepay" && applePayAvailable && (
-                <Elements stripe={stripePromise}>
-                  <StripeApplePay
-                    txId={txId}
-                    amount={Number.parseFloat(transaction?.amount || 0)}
-                    guestEmail={guestEmail}
-                    isAuthenticated={isAuthenticated}
-                    onSuccess={handleStripeSuccess}
-                    onError={handleStripeError}
-                  />
-                </Elements>
-              )}
-
-              <div className="flex flex-col sm:flex-row gap-4 mt-6">
-                <button
-                  onClick={handleCancel}
-                  disabled={processing}
-                  className="flex-1 bg-white hover:bg-gray-50 text-gray-700 font-bold py-3 px-6 rounded-lg border border-gray-300 transition-colors"
-                >
-                  Cancel Payment
-                </button>
-              </div>
-
-              <div className="bg-gray-50 rounded-lg p-4 mt-6">
-                <div className="flex items-start">
-                  <div className="flex-shrink-0">
-                    <Shield className="h-5 w-5 text-green-500" />
-                  </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-gray-900">
-                      Secure Payment
-                    </h3>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Your payment information is encrypted and secure. We
-                      support PayPal, credit cards, and Apple Pay for your
-                      convenience.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+        {/* Security Footer */}
+        <div className="bg-gray-100 rounded-2xl p-6">
+          <div className="flex items-center justify-center text-gray-700">
+            <Shield className="h-5 w-5 text-green-500 mr-2" />
+            <span className="font-medium">
+              Secure Payment • Your data is encrypted and protected
+            </span>
+          </div>
         </div>
       </div>
+
+      {/* Processing Overlay */}
+      {processing && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 text-center">
+            <Loader2 className="h-12 w-12 text-orange-500 animate-spin mx-auto mb-4" />
+            <p className="text-gray-900 font-bold text-xl">
+              Processing your payment...
+            </p>
+            <p className="text-gray-600 mt-2">
+              Please do not close this window
+            </p>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+// Main Export with Elements Provider
+export default function PaymentPage() {
+  return (
+    <Elements stripe={stripePromise}>
+      <PaymentPageContent />
+    </Elements>
   );
 }
