@@ -110,8 +110,7 @@ export default function DriverDashboard() {
 
       // Handle jobs response: Extract results array from paginated response
       const jobsData =
-        jbsResp.results || (Array.isArray(jbsResp) ? jbsResp : []);
-      console.log("[DriverDashboard] Jobs data:", jobsData);
+        jbsResp.ordered_bookings || (Array.isArray(jbsResp) ? jbsResp : []);
       setJobs(jobsData); // Set to array of jobs
 
       // Handle earnings response
@@ -281,7 +280,7 @@ export default function DriverDashboard() {
   };
 
   const formatCurrency = (amount) => {
-    return `KES ${amount.toLocaleString()}`;
+    return `GB ${amount.toLocaleString()}`;
   };
 
   const getStatusColor = (status) => {
