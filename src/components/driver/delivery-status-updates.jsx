@@ -45,7 +45,7 @@ export function DeliveryStatusUpdates({ jobs: initialJobs = [], onJobClick, onSt
         const statusParam = statusFilter !== "all" ? statusFilter : ""
         const response = await driverApi.getAssignedJobs(page, pageSize, statusParam)
 
-        const newJobs = response.results || []
+        const newJobs = response.ordered_bookings || []
         const count = response.count || 0
 
         if (append) {
