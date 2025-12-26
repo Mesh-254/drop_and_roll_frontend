@@ -30,9 +30,10 @@ class DriverAPI extends ApiBase {
   // Job Management
   async getAssignedJobs(page = 1, pageSize = 10, status = "") {
     try {
-      let url = `/api/driver/assigned-bookings/?page=${page}&page_size=${pageSize}`;
+      let url = `/api/driver/driver-routes/current-route/?page=${page}&page_size=${pageSize}`;
       if (status) url += `&status=${status}`;
       const response = await super.request(url);
+      console.log("[DriverAPI] Assigned jobs response:", response.data);
       return response.data;
     } catch (error) {
       console.error("[DriverAPI] Error fetching assigned jobs:", error);
@@ -42,7 +43,7 @@ class DriverAPI extends ApiBase {
   // load job statuses
   // async getJobStatuses(){
   //   const response = await super.request(`/api/booking/booking-statuses/`);
-  //   return response.data;
+  //   return response.data;driverApi
   // }
 
 
