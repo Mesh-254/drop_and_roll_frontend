@@ -413,14 +413,14 @@ export function JobDetailPage({ jobId, onBack }) {
               )}
             </div>
           </div>
-          <span
+          {/* <span
             className="text-lg font-bold text-primary"
             aria-label={`Fee: KES ${
               job.data.final_price?.toLocaleString() || "0"
             }`}
           >
             KES {job.data.final_price?.toLocaleString() || "0"}
-          </span>
+          </span> */}
         </div>
       </div>
 
