@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { toast } from "react-hot-toast"
@@ -31,7 +31,7 @@ export function DeliveryStatusUpdates({ jobs: initialJobs = [], onJobClick, onSt
   const [totalCount, setTotalCount] = useState(0)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [hasMoreJobs, setHasMoreJobs] = useState(true)
-  const [immutableChecks, setImmutableChecks] = useState({}); // Cached: { jobId: { immutable: bool, reason?: string } }
+  const [immutableChecks, setImmutableChecks] = useState({}) // Cached: { jobId: { immutable: bool, reason?: string } }
   const [isCheckingImmutable, setIsCheckingImmutable] = useState(false)
   const observerTarget = useRef(null)
 
@@ -79,37 +79,43 @@ export function DeliveryStatusUpdates({ jobs: initialJobs = [], onJobClick, onSt
 
   // UPDATED: Batch check all selected (called only on bulk click)
   const checkAllSelectedImmutable = useCallback(async () => {
-    if (selectedJobs.length === 0 || isCheckingImmutable) return;
-    setIsCheckingImmutable(true);
+    if (selectedJobs.length === 0 || isCheckingImmutable) return
+    setIsCheckingImmutable(true)
     try {
       // Assume batch endpoint; fallback to parallel if not
-      const response = await driverApi.batchCheckImmutable(selectedJobs); // NEW: Implement in driver-api.js
-      setImmutableChecks((prev) => ({ ...prev, ...response.data })); // {jobId: {immutable, reason}}
+      const response = await driverApi.batchCheckImmutable(selectedJobs) // NEW: Implement in driver-api.js
+      setImmutableChecks((prev) => ({ ...prev, ...response.data })) // {jobId: {immutable, reason}}
     } catch (error) {
-      console.error("[DeliveryStatusUpdates] Batch immutable check error:", error);
-      toast.error("Failed to check job statuses");
+      console.error("[DeliveryStatusUpdates] Batch immutable check error:", error)
+      toast.error("Failed to check job statuses")
       // Fallback: Parallel single checks (but limit to avoid spam)
       await Promise.allSettled(
-        selectedJobs.slice(0, 5).map(id => driverApi.checkImmutable(id).then(res => {
-          if (res.success) setImmutableChecks(prev => ({ ...prev, [id]: { immutable: res.immutable, reason: res.reason } }));
-        }))
-      );
+        selectedJobs.slice(0, 5).map((id) =>
+          driverApi.checkImmutable(id).then((res) => {
+            if (res.success)
+              setImmutableChecks((prev) => ({ ...prev, [id]: { immutable: res.immutable, reason: res.reason } }))
+          }),
+        ),
+      )
     } finally {
-      setIsCheckingImmutable(false);
+      setIsCheckingImmutable(false)
     }
-  }, [selectedJobs, isCheckingImmutable]);
+  }, [selectedJobs, isCheckingImmutable])
 
   // UPDATED: Single check (for single updates)
-  const checkSingleImmutable = useCallback(async (jobId) => {
-    const cached = immutableChecks[jobId];
-    if (cached !== undefined) return cached;
-    const result = await driverApi.checkImmutable(jobId);
-    if (result.success) {
-      setImmutableChecks(prev => ({ ...prev, [jobId]: { immutable: result.immutable, reason: result.reason } }));
-      return { immutable: result.immutable, reason: result.reason };
-    }
-    return { immutable: false };
-  }, [immutableChecks]);
+  const checkSingleImmutable = useCallback(
+    async (jobId) => {
+      const cached = immutableChecks[jobId]
+      if (cached !== undefined) return cached
+      const result = await driverApi.checkImmutable(jobId)
+      if (result.success) {
+        setImmutableChecks((prev) => ({ ...prev, [jobId]: { immutable: result.immutable, reason: result.reason } }))
+        return { immutable: result.immutable, reason: result.reason }
+      }
+      return { immutable: false }
+    },
+    [immutableChecks],
+  )
 
   useEffect(() => {
     setCurrentPage(1)
@@ -189,23 +195,26 @@ export function DeliveryStatusUpdates({ jobs: initialJobs = [], onJobClick, onSt
         formatAddress(job.pickup_address).toLowerCase().includes(searchTerm.toLowerCase()) ||
         formatAddress(job.dropoff_address).toLowerCase().includes(searchTerm.toLowerCase())
       return matchesSearch
-    });
+    })
   }, [jobs, searchTerm, formatAddress])
 
   // Updatable selected jobs (exclude immutable)
   const updatableJobs = useMemo(() => {
     return selectedJobs.filter((jobId) => {
-      const check = immutableChecks[jobId];
-      return !check?.immutable;
-    });
-  }, [selectedJobs, immutableChecks]);
+      const check = immutableChecks[jobId]
+      return !check?.immutable
+    })
+  }, [selectedJobs, immutableChecks])
 
-  const skippedCount = selectedJobs.length - updatableJobs.length;
+  const skippedCount = selectedJobs.length - updatableJobs.length
 
   const handleJobSelect = useCallback((jobId) => {
     setSelectedJobs((prev) => (prev.includes(jobId) ? prev.filter((id) => id !== jobId) : [...prev, jobId]))
     // Clear cache for changed ID to force re-check if needed
-    setImmutableChecks(prev => { const { [jobId]: _, ...rest } = prev; return rest; });
+    setImmutableChecks((prev) => {
+      const { [jobId]: _, ...rest } = prev
+      return rest
+    })
   }, [])
 
   const handleSelectAll = () => {
@@ -216,62 +225,82 @@ export function DeliveryStatusUpdates({ jobs: initialJobs = [], onJobClick, onSt
     }
   }
 
-  const handleBulkStatusUpdate = useCallback(async (newStatus) => {
-    await checkAllSelectedImmutable(); // Batch check here
-    if (updatableJobs.length === 0) {
-      toast.error("No jobs can be updated—all selected are delivered with POD submitted.");
-      return;
-    }
-
-    const confirmMsg = skippedCount > 0
-      ? `Update ${updatableJobs.length} jobs to ${newStatus.toUpperCase().replace("_", " ")}? Skipping ${skippedCount} delivered jobs (POD submitted).`
-      : `Update ${selectedJobs.length} jobs to ${newStatus.toUpperCase().replace("_", " ")}?`;
-
-    if (!window.confirm(confirmMsg)) return;
-
-    try {
-      if (skippedCount > 0) {
-        toast.warning(`Skipping ${skippedCount} delivered jobs with POD. Updating ${updatableJobs.length}.`);
+  const handleBulkStatusUpdate = useCallback(
+    async (newStatus) => {
+      await checkAllSelectedImmutable() // Batch check here
+      if (updatableJobs.length === 0) {
+        toast.error("No jobs can be updated—all selected are delivered with POD submitted.")
+        return
       }
-      const response = await driverApi.bulkUpdateStatus(updatableJobs, newStatus);
-      toast.success(`Updated ${updatableJobs.length} jobs to ${newStatus.toUpperCase().replace("_", " ")}`);
-      setSelectedJobs([]);
-      setBulkActionOpen(false);
-      setCurrentPage(1);
-      setJobs([]);
-      await fetchJobs(1, false);
-      if (onStatusUpdate) onStatusUpdate();
-    } catch (error) {
-      toast.error("Failed to update job statuses");
-      console.error("[DeliveryStatusUpdates] Bulk status update error:", error);
-    }
-  }, [checkAllSelectedImmutable, updatableJobs, skippedCount, selectedJobs.length, fetchJobs, onStatusUpdate]);
 
-  const handleSingleStatusUpdate = useCallback(async (jobId, newStatus) => {
-    const check = await checkSingleImmutable(jobId);
-    if (check.immutable) {
-      toast.error(check.reason || "Job is delivered with POD submitted—cannot update.");
-      return;
-    }
+      const confirmMsg =
+        skippedCount > 0
+          ? `Update ${updatableJobs.length} jobs to ${newStatus.toUpperCase().replace("_", " ")}? Skipping ${skippedCount} delivered jobs (POD submitted).`
+          : `Update ${selectedJobs.length} jobs to ${newStatus.toUpperCase().replace("_", " ")}?`
 
-    if (!window.confirm(`Mark this job as ${newStatus.toUpperCase().replace("_", " ")}?`)) return;
+      if (!window.confirm(confirmMsg)) return
 
-    try {
-      await driverApi.updateJobStatus(jobId, newStatus);
-      toast.success(`Job status updated to ${newStatus.toUpperCase().replace("_", " ")}`);
-      setJobs((prev) =>
-        prev.map((job) =>
-          job.id === jobId
-            ? { ...job, status: newStatus, updated_at: new Date().toISOString() }
-            : job
+      try {
+        if (skippedCount > 0) {
+          toast.warning(`Skipping ${skippedCount} delivered jobs with POD. Updating ${updatableJobs.length}.`)
+        }
+        const response = await driverApi.bulkUpdateStatus(updatableJobs, newStatus)
+        toast.success(`Updated ${updatableJobs.length} jobs to ${newStatus.toUpperCase().replace("_", " ")}`)
+        setSelectedJobs([])
+        setBulkActionOpen(false)
+        setCurrentPage(1)
+        setJobs([])
+        await fetchJobs(1, false)
+        if (onStatusUpdate) onStatusUpdate()
+      } catch (error) {
+        toast.error("Failed to update job statuses")
+        console.error("[DeliveryStatusUpdates] Bulk status update error:", error)
+      }
+    },
+    [checkAllSelectedImmutable, updatableJobs, skippedCount, selectedJobs.length, fetchJobs, onStatusUpdate],
+  )
+
+  const handleSingleStatusUpdate = useCallback(
+    async (jobId, newStatus) => {
+      const check = await checkSingleImmutable(jobId)
+      if (check.immutable) {
+        toast.error(check.reason || "Job is delivered with POD submitted—cannot update.")
+        return
+      }
+
+      if (!window.confirm(`Mark this job as ${newStatus.toUpperCase().replace("_", " ")}?`)) return
+
+      try {
+        await driverApi.updateJobStatus(jobId, newStatus)
+        toast.success(`Job status updated to ${newStatus.toUpperCase().replace("_", " ")}`)
+        setJobs((prev) =>
+          prev.map((job) =>
+            job.id === jobId ? { ...job, status: newStatus, updated_at: new Date().toISOString() } : job,
+          ),
         )
-      );
-      if (onStatusUpdate) onStatusUpdate();
-    } catch (error) {
-      toast.error("Failed to update job status");
-      console.error("[DeliveryStatusUpdates] Single status update error:", error);
+        if (onStatusUpdate) onStatusUpdate()
+      } catch (error) {
+        toast.error("Failed to update job status")
+        console.error("[DeliveryStatusUpdates] Single status update error:", error)
+      }
+    },
+    [checkSingleImmutable, onStatusUpdate],
+  )
+
+  const getNextStatus = (currentStatus) => {
+    switch (currentStatus) {
+      case "assigned":
+        return "picked_up"
+      case "picked_up":
+        return "at_hub"
+      case "at_hub":
+        return "in_transit"
+      case "in_transit":
+        return "delivered"
+      default:
+        return null
     }
-  }, [checkSingleImmutable, onStatusUpdate]);
+  }
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -279,6 +308,8 @@ export function DeliveryStatusUpdates({ jobs: initialJobs = [], onJobClick, onSt
         return "bg-blue-500/10 text-blue-600 border-blue-500/20"
       case "picked_up":
         return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
+      case "at_hub":
+        return "bg-purple-500/10 text-purple-600 border-purple-500/20"
       case "in_transit":
         return "bg-primary/10 text-primary border-primary/20"
       case "delivered":
@@ -288,27 +319,17 @@ export function DeliveryStatusUpdates({ jobs: initialJobs = [], onJobClick, onSt
     }
   }
 
-  const getNextStatus = (currentStatus) => {
-    switch (currentStatus) {
-      case "assigned":
-        return "picked_up"
-      case "picked_up":
-        return "in_transit"
-      case "in_transit":
-        return "delivered"
-      default:
-        return null
-    }
-  }
-
   const getStatusLabel = (status) => {
     return status?.replace("_", " ").toUpperCase() || "UNKNOWN"
   }
 
-  const handleMarkDeliveredClick = useCallback((e, job) => {
-    e.stopPropagation()
-    onJobClick(job)
-  }, [onJobClick])
+  const handleMarkDeliveredClick = useCallback(
+    (e, job) => {
+      e.stopPropagation()
+      onJobClick(job)
+    },
+    [onJobClick],
+  )
 
   return (
     <div className="space-y-6">
@@ -322,7 +343,7 @@ export function DeliveryStatusUpdates({ jobs: initialJobs = [], onJobClick, onSt
           <div className="relative">
             <button
               onClick={async () => {
-                await checkAllSelectedImmutable();
+                await checkAllSelectedImmutable()
                 setBulkActionOpen(!bulkActionOpen)
               }}
               disabled={isCheckingImmutable}
@@ -344,6 +365,12 @@ export function DeliveryStatusUpdates({ jobs: initialJobs = [], onJobClick, onSt
                   className="w-full text-left px-4 py-2 hover:bg-muted transition-colors text-foreground"
                 >
                   Mark as Picked Up
+                </button>
+                <button
+                  onClick={() => handleBulkStatusUpdate("at_hub")}
+                  className="w-full text-left px-4 py-2 hover:bg-muted transition-colors text-foreground"
+                >
+                  Mark as At Hub
                 </button>
                 <button
                   onClick={() => handleBulkStatusUpdate("in_transit")}
@@ -369,6 +396,7 @@ export function DeliveryStatusUpdates({ jobs: initialJobs = [], onJobClick, onSt
             <option value="all">All Statuses</option>
             <option value="assigned">Assigned</option>
             <option value="picked_up">Picked Up</option>
+            <option value="at_hub">At Hub</option>
             <option value="in_transit">In Transit</option>
             <option value="delivered">Delivered</option>
           </select>
@@ -402,10 +430,10 @@ export function DeliveryStatusUpdates({ jobs: initialJobs = [], onJobClick, onSt
       <div className="space-y-4">
         {filteredJobs.length > 0 ? (
           filteredJobs.map((job) => {
-            const check = immutableChecks[job.id];
-            const isImmutable = check?.immutable;
-            const nextStatus = getNextStatus(job.status);
-            const canUpdate = nextStatus && !isImmutable;
+            const check = immutableChecks[job.id]
+            const isImmutable = check?.immutable
+            const nextStatus = getNextStatus(job.status)
+            const canUpdate = nextStatus && !isImmutable
 
             return (
               <div
@@ -446,13 +474,17 @@ export function DeliveryStatusUpdates({ jobs: initialJobs = [], onJobClick, onSt
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(job.status)}`}>
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(job.status)}`}
+                      >
                         {getStatusLabel(job.status)}
                         {isImmutable && (
                           <Lock className="h-3 w-3 inline ml-1 text-destructive" title="Immutable - POD Submitted" />
                         )}
                       </span>
-                      <span className="text-sm font-medium text-foreground">KES {job.driver_fee?.toLocaleString()}</span>
+                      {/* <span className="text-sm font-medium text-foreground">
+                        KES {job.driver_fee?.toLocaleString()}
+                      </span> */}
                     </div>
                   </div>
 
@@ -563,7 +595,10 @@ export function DeliveryStatusUpdates({ jobs: initialJobs = [], onJobClick, onSt
                       <button
                         onClick={async (e) => {
                           e.stopPropagation()
-                          if (job.status === "in_transit") {
+                          if (
+                            job.status === "in_transit" ||
+                            (job.status === "picked_up" && job.route?.leg_type === "pickup")
+                          ) {
                             handleMarkDeliveredClick(e, job)
                           } else {
                             await handleSingleStatusUpdate(job.id, nextStatus)
@@ -574,7 +609,8 @@ export function DeliveryStatusUpdates({ jobs: initialJobs = [], onJobClick, onSt
                         title={isImmutable ? "Status locked - POD submitted" : undefined}
                       >
                         {job.status === "assigned" && "Mark Picked Up"}
-                        {job.status === "picked_up" && "Start Transit"}
+                        {job.status === "picked_up" && job.route?.leg_type === "pickup" && "Mark At Hub"}
+                        {job.status === "at_hub" && job.route?.leg_type !== "pickup" && "Start Transit"}
                         {job.status === "in_transit" && "Mark Delivered"}
                         {isImmutable && " (Locked)"}
                       </button>
@@ -596,7 +632,7 @@ export function DeliveryStatusUpdates({ jobs: initialJobs = [], onJobClick, onSt
                   </div>
                 </div>
               </div>
-            );
+            )
           })
         ) : (
           <p className="text-muted-foreground">No jobs found.</p>
