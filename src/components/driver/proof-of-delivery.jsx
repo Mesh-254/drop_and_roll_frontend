@@ -2,12 +2,20 @@
 
 import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { toast } from "react-hot-toast";
-import { Camera, Upload, MapPin, CheckCircle, X, FileImage, Trash2 } from "lucide-react";
+import {
+  Camera,
+  Upload,
+  MapPin,
+  CheckCircle,
+  X,
+  FileImage,
+  Trash2,
+} from "lucide-react";
 
 // Lazy-load exifr to reduce initial load time
-const exifr = lazy(() => import("exifr"));
+// const exifr = lazy(() => import("exifr"));
 
-export function ProofOfDelivery({ job, onClose, onSubmit }) {
+export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
   const [photo, setPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [notes, setNotes] = useState("");
@@ -26,7 +34,9 @@ export function ProofOfDelivery({ job, onClose, onSubmit }) {
   useEffect(() => {
     console.log("[ProofOfDelivery] Component mounted");
     return () => {
-      console.log("[ProofOfDelivery] Component unmounting, cleaning up video stream");
+      console.log(
+        "[ProofOfDelivery] Component unmounting, cleaning up video stream"
+      );
       if (cameraStream) {
         cameraStream.getTracks().forEach((track) => track.stop());
         setCameraStream(null);
@@ -37,14 +47,14 @@ export function ProofOfDelivery({ job, onClose, onSubmit }) {
 
   // Pre-fetch location on mount for speed
   useEffect(() => {
-    if (job && navigator.geolocation) {
+    if (jobId && navigator.geolocation) {
       console.log("[ProofOfDelivery] Pre-fetching location on mount");
       getCurrentLocation().catch((err) => {
         console.warn("[ProofOfDelivery] Pre-fetch failed:", err);
         // Silent on pre-fetch to avoid spamming user
       });
     }
-  }, [job]);
+  }, [jobId]);
 
   // Assign camera stream when captureMethod is "camera"
   useEffect(() => {
@@ -65,7 +75,10 @@ export function ProofOfDelivery({ job, onClose, onSubmit }) {
         videoWidth: videoRef.current.videoWidth,
         videoHeight: videoRef.current.videoHeight,
       });
-      if (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) {
+      if (
+        videoRef.current.videoWidth === 0 ||
+        videoRef.current.videoHeight === 0
+      ) {
         console.error("[ProofOfDelivery] Invalid video dimensions");
         toast.error("Camera feed has invalid dimensions");
         cameraStream.getTracks().forEach((track) => track.stop());
@@ -114,7 +127,11 @@ export function ProofOfDelivery({ job, onClose, onSubmit }) {
     let stream = null;
     for (const device of videoDevices) {
       try {
-        console.log(`[ProofOfDelivery] Attempting to use device: ${device.label || device.deviceId}`);
+        console.log(
+          `[ProofOfDelivery] Attempting to use device: ${
+            device.label || device.deviceId
+          }`
+        );
         stream = await navigator.mediaDevices.getUserMedia({
           video: { deviceId: device.deviceId, facingMode: "environment" },
         });
@@ -128,7 +145,12 @@ export function ProofOfDelivery({ job, onClose, onSubmit }) {
         setCaptureMethod("camera");
         return;
       } catch (error) {
-        console.error(`[ProofOfDelivery] Camera access error for device ${device.label || device.deviceId}:`, error);
+        console.error(
+          `[ProofOfDelivery] Camera access error for device ${
+            device.label || device.deviceId
+          }:`,
+          error
+        );
         continue;
       }
     }
@@ -154,7 +176,10 @@ export function ProofOfDelivery({ job, onClose, onSubmit }) {
     const video = videoRef.current;
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    console.log("[ProofOfDelivery] Canvas set to:", { width: canvas.width, height: canvas.height });
+    console.log("[ProofOfDelivery] Canvas set to:", {
+      width: canvas.width,
+      height: canvas.height,
+    });
     const context = canvas.getContext("2d");
     if (!context) {
       console.error("[ProofOfDelivery] Failed to get canvas 2D context");
@@ -170,18 +195,28 @@ export function ProofOfDelivery({ job, onClose, onSubmit }) {
           toast.error("Failed to create image");
           return;
         }
-        console.log("[ProofOfDelivery] Blob created:", { size: blob.size, type: blob.type });
-        const file = new File([blob], "delivery-photo.jpg", { type: "image/jpeg" });
+        console.log("[ProofOfDelivery] Blob created:", {
+          size: blob.size,
+          type: blob.type,
+        });
+        const file = new File([blob], "delivery-photo.jpg", {
+          type: "image/jpeg",
+        });
         setPhoto(file);
         setPhotoPreview(URL.createObjectURL(blob));
         console.log("[ProofOfDelivery] Photo set, preview URL:", photoPreview);
         const exifLocation = await extractExifLocation(file);
         if (exifLocation) {
-          console.log("[ProofOfDelivery] EXIF location extracted:", exifLocation);
+          console.log(
+            "[ProofOfDelivery] EXIF location extracted:",
+            exifLocation
+          );
           setLocation(exifLocation);
           toast.success("Location auto-detected from photo metadata");
         } else {
-          console.log("[ProofOfDelivery] No EXIF location found, attempting geolocation");
+          console.log(
+            "[ProofOfDelivery] No EXIF location found, attempting geolocation"
+          );
           await getCurrentLocation();
         }
         if (cameraStream) {
@@ -214,7 +249,9 @@ export function ProofOfDelivery({ job, onClose, onSubmit }) {
       setLocation(exifLocation);
       toast.success("Location auto-detected from photo metadata");
     } else {
-      console.log("[ProofOfDelivery] No EXIF location found, attempting geolocation");
+      console.log(
+        "[ProofOfDelivery] No EXIF location found, attempting geolocation"
+      );
       await getCurrentLocation();
     }
   };
@@ -235,15 +272,19 @@ export function ProofOfDelivery({ job, onClose, onSubmit }) {
   const extractExifLocation = async (file) => {
     console.log("[ProofOfDelivery] Extracting EXIF from file:", file.name);
     try {
-      const exif = await exifr.parse(file, { gps: true });
+      // Dynamically import exifr only when needed (code-splitting still works)
+      const exifrLib = await import("exifr");
+      const exif = await exifrLib.parse(file, { gps: true });
+
       if (!exif || !exif.latitude || !exif.longitude) {
         console.log("[ProofOfDelivery] No GPS data in EXIF");
         return null;
       }
+
       return {
         lat: exif.latitude,
         lng: exif.longitude,
-        accuracy: exif.gpsAltitudeAccuracy || 10, // Default accuracy if not provided
+        accuracy: exif.gpsAltitudeAccuracy || 10,
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
@@ -253,7 +294,10 @@ export function ProofOfDelivery({ job, onClose, onSubmit }) {
   };
 
   const getCurrentLocation = async (retries = 3, timeout = 10000) => {
-    console.log("[ProofOfDelivery] Attempting to get current location, retries left:", retries);
+    console.log(
+      "[ProofOfDelivery] Attempting to get current location, retries left:",
+      retries
+    );
     if (!navigator.geolocation) {
       console.error("[ProofOfDelivery] Geolocation not supported");
       toast.error("Geolocation not supported by this browser");
@@ -262,28 +306,36 @@ export function ProofOfDelivery({ job, onClose, onSubmit }) {
     setLoading(true);
     try {
       const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          resolve,
-          reject,
-          {
-            enableHighAccuracy: true,
-            timeout,
-            maximumAge: 0, // Force fresh location
-          }
-        );
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout,
+          maximumAge: 0, // Force fresh location
+        });
       });
       const { latitude: lat, longitude: lng, accuracy } = position.coords;
-      console.log("[ProofOfDelivery] Geolocation success:", { lat, lng, accuracy });
+      console.log("[ProofOfDelivery] Geolocation success:", {
+        lat,
+        lng,
+        accuracy,
+      });
       setLocation({ lat, lng, accuracy, timestamp: new Date().toISOString() });
-      toast.success(`Location captured (${accuracy.toFixed(0)}m accuracy)`, { id: "location-toast" });
+      toast.success(`Location captured (${accuracy.toFixed(0)}m accuracy)`, {
+        id: "location-toast",
+      });
     } catch (error) {
       console.error("[ProofOfDelivery] Geolocation failed:", error);
       if (retries > 0) {
-        console.log("[ProofOfDelivery] Retrying location capture, attempts left:", retries - 1);
+        console.log(
+          "[ProofOfDelivery] Retrying location capture, attempts left:",
+          retries - 1
+        );
         setTimeout(() => getCurrentLocation(retries - 1, timeout + 2000), 1000);
         return;
       }
-      toast.error("Failed to capture location. Ensure location services are enabled.", { id: "location-toast" });
+      toast.error(
+        "Failed to capture location. Ensure location services are enabled.",
+        { id: "location-toast" }
+      );
     } finally {
       setLoading(false);
     }
@@ -298,7 +350,9 @@ export function ProofOfDelivery({ job, onClose, onSubmit }) {
     }
     if (!location) {
       console.error("[ProofOfDelivery] No location provided");
-      toast.error("Location is required. Please capture location or ensure photo contains GPS metadata.");
+      toast.error(
+        "Location is required. Please capture location or ensure photo contains GPS metadata."
+      );
       return;
     }
     setLoading(true);
@@ -307,7 +361,7 @@ export function ProofOfDelivery({ job, onClose, onSubmit }) {
         photo,
         notes: notes.trim(),
         location,
-        booking: job.id,
+        booking: jobId,
       };
       console.log("[ProofOfDelivery] Sending proofData:", {
         hasPhoto: !!proofData.photo,
@@ -334,131 +388,141 @@ export function ProofOfDelivery({ job, onClose, onSubmit }) {
             <X className="h-6 w-6" />
           </button>
         </div>
-        <Suspense fallback={<div>Loading...</div>}>
-          <div className="p-4 space-y-6 max-h-[90vh] overflow-y-auto">
-            <div className="space-y-4">
-              <label className="text-base font-medium text-white">Delivery Photo (Required)</label>
-              <div className="border border-dashed border-gray-700 rounded-lg p-6 text-center">
-                {cameraError && (
-                  <p className="text-red-500 text-sm mb-4">{cameraError}</p>
-                )}
-                {photoPreview ? (
-                  <div className="space-y-2">
-                    <div className="relative">
-                      <img
-                        src={photoPreview}
-                        alt="Proof"
-                        className="max-h-48 mx-auto rounded-lg object-contain"
-                      />
-                      <button
-                        onClick={retakePhoto}
-                        className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <button
-                      onClick={retakePhoto}
-                      className="bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg text-sm"
-                      disabled={loading}
-                    >
-                      Retake Photo
-                    </button>
-                  </div>
-                ) : captureMethod === "camera" ? (
-                  <div className="space-y-4">
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsInline
-                      className="w-full min-h-[200px] max-h-48 rounded-lg object-contain bg-black"
+
+        <div className="p-4 space-y-6 max-h-[90vh] overflow-y-auto">
+          <div className="space-y-4">
+            <label className="text-base font-medium text-white">
+              Delivery Photo (Required)
+            </label>
+            <div className="border border-dashed border-gray-700 rounded-lg p-6 text-center">
+              {cameraError && (
+                <p className="text-red-500 text-sm mb-4">{cameraError}</p>
+              )}
+              {photoPreview ? (
+                <div className="space-y-2">
+                  <div className="relative">
+                    <img
+                      src={photoPreview}
+                      alt="Proof"
+                      className="max-h-48 mx-auto rounded-lg object-contain"
                     />
                     <button
-                      onClick={capturePhoto}
-                      className="bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg disabled:opacity-50"
-                      disabled={loading || !hasActiveStream}
+                      onClick={retakePhoto}
+                      className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
                     >
-                      Capture Photo
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    <FileImage className="h-12 w-12 mx-auto text-gray-500" />
-                    <p className="text-sm text-gray-400">Capture or upload a clear photo of the delivery</p>
-                    <div className="flex gap-2 justify-center">
-                      <button
-                        onClick={startCamera}
-                        className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg"
-                        disabled={loading}
-                      >
-                        <Camera className="h-4 w-4" /> Camera
-                      </button>
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex items-center gap-2 border border-gray-600 text-gray-300 py-2 px-4 rounded-lg hover:bg-gray-800"
-                        disabled={loading}
-                      >
-                        <Upload className="h-4 w-4" /> Upload
-                      </button>
-                    </div>
+                  <button
+                    onClick={retakePhoto}
+                    className="bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg text-sm"
+                    disabled={loading}
+                  >
+                    Retake Photo
+                  </button>
+                </div>
+              ) : captureMethod === "camera" ? (
+                <div className="space-y-4">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    className="w-full min-h-[200px] max-h-48 rounded-lg object-contain bg-black"
+                  />
+                  <button
+                    onClick={capturePhoto}
+                    className="bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg disabled:opacity-50"
+                    disabled={loading || !hasActiveStream}
+                  >
+                    Capture Photo
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <FileImage className="h-12 w-12 mx-auto text-gray-500" />
+                  <p className="text-sm text-gray-400">
+                    Capture or upload a clear photo of the delivery
+                  </p>
+                  <div className="flex gap-2 justify-center">
+                    <button
+                      onClick={startCamera}
+                      className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg"
+                      disabled={loading}
+                    >
+                      <Camera className="h-4 w-4" /> Camera
+                    </button>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-2 border border-gray-600 text-gray-300 py-2 px-4 rounded-lg hover:bg-gray-800"
+                      disabled={loading}
+                    >
+                      <Upload className="h-4 w-4" /> Upload
+                    </button>
                   </div>
-                )}
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="notes" className="text-base font-medium text-white">Delivery Notes (Optional)</label>
-              <textarea
-                id="notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-                className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg p-3 focus:outline-none focus:border-orange-500"
-                disabled={loading}
-              />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-base font-medium text-white">Delivery Location (Required)</label>
-                <button
-                  onClick={() => getCurrentLocation()}
-                  disabled={loading}
-                  className="flex items-center gap-2 border border-gray-600 text-gray-300 py-2 px-3 rounded-lg hover:bg-gray-800 disabled:opacity-50"
-                >
-                  <MapPin className="h-4 w-4" />
-                  {location ? `Update (${location.accuracy?.toFixed(0)}m)` : "Capture Location"}
-                </button>
-              </div>
-              {location && (
-                <p className="text-sm text-green-400">
-                  ✓ Lat: {location.lat.toFixed(6)}, Lng: {location.lng.toFixed(6)} (Accuracy: {location.accuracy?.toFixed(0)}m)
-                </p>
+                </div>
               )}
             </div>
-            <div className="flex gap-2 pt-4 border-t border-gray-800">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="notes" className="text-base font-medium text-white">
+              Delivery Notes (Optional)
+            </label>
+            <textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg p-3 focus:outline-none focus:border-orange-500"
+              disabled={loading}
+            />
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-base font-medium text-white">
+                Delivery Location (Required)
+              </label>
               <button
-                onClick={handleSubmit}
-                disabled={loading || !photo || !location}
-                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg disabled:opacity-50"
-              >
-                {loading ? "Submitting..." : "Submit Proof"}
-              </button>
-              <button
-                onClick={onClose}
+                onClick={() => getCurrentLocation()}
                 disabled={loading}
-                className="border border-gray-600 text-gray-300 py-2 px-4 rounded-lg hover:bg-gray-800"
+                className="flex items-center gap-2 border border-gray-600 text-gray-300 py-2 px-3 rounded-lg hover:bg-gray-800 disabled:opacity-50"
               >
-                Cancel
+                <MapPin className="h-4 w-4" />
+                {location
+                  ? `Update (${location.accuracy?.toFixed(0)}m)`
+                  : "Capture Location"}
               </button>
             </div>
+            {location && (
+              <p className="text-sm text-green-400">
+                ✓ Lat: {location.lat.toFixed(6)}, Lng: {location.lng.toFixed(6)}{" "}
+                (Accuracy: {location.accuracy?.toFixed(0)}m)
+              </p>
+            )}
           </div>
-        </Suspense>
+          <div className="flex gap-2 pt-4 border-t border-gray-800">
+            <button
+              onClick={handleSubmit}
+              disabled={loading || !photo || !location}
+              className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg disabled:opacity-50"
+            >
+              {loading ? "Submitting..." : "Submit Proof"}
+            </button>
+            <button
+              onClick={onClose}
+              disabled={loading}
+              className="border border-gray-600 text-gray-300 py-2 px-4 rounded-lg hover:bg-gray-800"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
         <canvas ref={canvasRef} className="hidden" />
       </div>
     </div>
