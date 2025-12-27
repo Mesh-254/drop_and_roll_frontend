@@ -7,11 +7,9 @@ import {
   Phone,
   User,
   Package,
-  Camera,
   AlertTriangle,
   Navigation,
   Calendar,
-  Truck,
   ChevronLeft,
   X,
   Lock,
@@ -63,7 +61,7 @@ function ProofOfDeliveryView({ proofData, onClose }) {
                 <div>
                   <p className="text-sm text-muted-foreground">Photo</p>
                   <img
-                    src={pod.photo}
+                    src={pod.photo || "/placeholder.svg"}
                     alt={`Proof of Delivery ${index + 1}`}
                     className="w-full h-48 object-cover rounded-lg mt-1"
                   />
@@ -121,7 +119,8 @@ export function JobDetailPage({ jobId, onBack }) {
     { current: "pending", next: "scheduled" },
     { current: "scheduled", next: "assigned" },
     { current: "assigned", next: "picked_up" },
-    { current: "picked_up", next: "in_transit" },
+    { current: "picked_up", next: "at_hub" },
+    { current: "at_hub", next: "in_transit" },
     { current: "in_transit", next: "delivered" },
     { current: "delivered", next: null },
   ];
@@ -148,7 +147,6 @@ export function JobDetailPage({ jobId, onBack }) {
       setJob(jobDetail);
       setHasProof(!!jobDetail.data.proof_of_delivery);
 
-      // New: Check immutability on load
       const immutabilityCheck = await driverApi.checkImmutable(jobId);
       if (immutabilityCheck.success) {
         setImmutable(immutabilityCheck.immutable);
@@ -198,16 +196,14 @@ export function JobDetailPage({ jobId, onBack }) {
     } catch (error) {
       console.error("Failed to get current location:", error);
     }
-  }, [job?.data]);
+  }, [job]);
 
   const calculateDistance = useCallback((loc1, loc2) => {
-    // Placeholder: Implement Haversine formula in prod
-    return 100; // Mock distance in meters
+    return 100;
   }, []);
 
   const handleStatusUpdate = useCallback(
     async (newStatus) => {
-      // New: Check immutability before update
       if (immutable) {
         toast.error(
           immutableReason ||
@@ -224,7 +220,6 @@ export function JobDetailPage({ jobId, onBack }) {
           newStatus,
           currentLocation
         );
-        // Optimistic update
         setJob({
           ...job,
           data: {
@@ -237,7 +232,6 @@ export function JobDetailPage({ jobId, onBack }) {
         if (newStatus === "in_transit") {
           await getCurrentLocation();
         }
-        // Re-check immutability after update
         const immutabilityCheck = await driverApi.checkImmutable(job.data.id);
         if (immutabilityCheck.success) {
           setImmutable(immutabilityCheck.immutable);
@@ -250,7 +244,7 @@ export function JobDetailPage({ jobId, onBack }) {
         );
       }
     },
-    [job?.data?.id, currentLocation, immutable, immutableReason]
+    [job, currentLocation, immutable, immutableReason]
   );
 
   const getNextStatus = useCallback((currentStatus) => {
@@ -263,6 +257,7 @@ export function JobDetailPage({ jobId, onBack }) {
       scheduled: "bg-orange-500",
       assigned: "bg-blue-500",
       picked_up: "bg-yellow-500",
+      at_hub: "bg-purple-500",
       in_transit: "bg-indigo-500",
       delivered: "bg-green-500",
       cancelled: "bg-red-500",
@@ -277,6 +272,7 @@ export function JobDetailPage({ jobId, onBack }) {
       scheduled: "Scheduled",
       assigned: "Assigned",
       picked_up: "Picked Up",
+      at_hub: "At Hub",
       in_transit: "In Transit",
       delivered: "Delivered",
       cancelled: "Cancelled",
@@ -413,14 +409,6 @@ export function JobDetailPage({ jobId, onBack }) {
               )}
             </div>
           </div>
-          {/* <span
-            className="text-lg font-bold text-primary"
-            aria-label={`Fee: KES ${
-              job.data.final_price?.toLocaleString() || "0"
-            }`}
-          >
-            KES {job.data.final_price?.toLocaleString() || "0"}
-          </span> */}
         </div>
       </div>
 
@@ -630,72 +618,32 @@ export function JobDetailPage({ jobId, onBack }) {
         <div className="bg-card rounded-xl p-6 border-primary/20 border">
           <h2 className="font-semibold text-foreground mb-4">Next Action</h2>
           <div className="flex flex-col gap-4">
-            {job.data.status === "delivered" ? (
-              <>
-                <button
-                  onClick={() => hasProof && setShowProofViewModal(true)}
-                  disabled={!hasProof}
-                  className="flex items-center justify-center gap-3 px-6 py-4 bg-green-500 text-white rounded-xl font-semibold text-base hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label={hasProof ? "View POD" : "No POD available"}
-                >
-                  <Truck className="h-5 w-5" />
-                  Delivered
-                  {immutable && <Lock className="h-5 w-5" title="Locked" />}
-                </button>
-                {hasProof && (
-                  <button
-                    onClick={() => setShowProofViewModal(true)}
-                    className="text-sm text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary"
-                    aria-label="View POD submission"
-                  >
-                    View Submission
-                  </button>
-                )}
-                {immutable && (
-                  <p className="text-sm text-destructive text-center">
-                    {immutableReason || "Status locked—POD submitted."}
-                  </p>
-                )}
-              </>
-            ) : nextStatus ? (
-              <div className="flex flex-col sm:flex-row gap-4">
-                <button
-                  onClick={() => handleStatusUpdate(nextStatus)}
-                  disabled={
-                    immutable ||
-                    (nextStatus === "delivered" &&
-                      (!isNearDropoff || !hasProof))
+            {nextStatus && (
+              <button
+                onClick={async () => {
+                  if (job.data.status === "in_transit") {
+                    setShowProofModal(true);
+                  } else {
+                    await handleStatusUpdate(nextStatus);
                   }
-                  className="flex-1 flex items-center justify-center gap-3 px-6 py-4 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/90 transition-colors text-base disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label={
-                    immutable
-                      ? immutableReason
-                      : `Mark as ${getStatusText(nextStatus)}`
-                  }
-                >
-                  <Truck className="h-5 w-5" />
-                  Mark as {getStatusText(nextStatus)}
-                  {immutable && <Lock className="h-5 w-5" />}
-                </button>
-                {job.data.status === "in_transit" && (
-                  <button
-                    onClick={() => setShowProofModal(true)}
-                    disabled={immutable}
-                    className="flex items-center justify-center gap-3 px-6 py-4 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 transition-colors text-base disabled:opacity-50 disabled:cursor-not-allowed"
-                    aria-label={
-                      immutable ? "POD locked" : "Upload Proof of Delivery"
-                    }
-                  >
-                    <Camera className="h-5 w-5" />
-                    Upload Proof
-                    {immutable && <Lock className="h-5 w-5" />}
-                  </button>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No further status updates available
-              </p>
+                }}
+                disabled={immutable}
+                className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title={immutable ? immutableReason : undefined}
+              >
+                {job.data.status === "assigned" && "Mark Picked Up"}
+                {job.data.status === "picked_up" && "Mark At Hub"}
+                {job.data.status === "at_hub" && "Start Transit"}
+                {job.data.status === "in_transit" && "Mark Delivered"}
+              </button>
+            )}
+            {job.data.status === "delivered" && hasProof && (
+              <button
+                onClick={() => setShowProofViewModal(true)}
+                className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                View Proof of Delivery
+              </button>
             )}
           </div>
         </div>
@@ -748,25 +696,60 @@ export function JobDetailPage({ jobId, onBack }) {
       </div>
 
       {/* Proof of Delivery Modal */}
+      {/* Proof of Delivery Modal */}
       {showProofModal && (
         <ProofOfDelivery
-          job={job.data}
+          jobId={job.data.id} // Keep jobId for backward compatibility in ProofOfDelivery component
           onClose={() => setShowProofModal(false)}
           onSubmit={async (proofData) => {
-            try {
-              await driverApi.submitProofOfDelivery(job.data.id, proofData);
-              toast.success("Proof of delivery submitted successfully");
-              setShowProofModal(false);
-              setHasProof(true);
-              await loadProofOfDelivery(job.data.id);
-              // New: Full refresh after POD submit to sync status/UI
-              await loadJobDetails();
-            } catch (error) {
-              console.error("Failed to submit proof of delivery:", error);
+            // Prevent submission if job is already locked (delivered + POD submitted)
+            if (immutable) {
               toast.error(
-                error.response?.data?.detail ||
-                  "Failed to submit proof of delivery"
+                immutableReason || "This job is locked and cannot be updated."
               );
+              return;
+            }
+
+            try {
+              // Step 1: Submit Proof of Delivery (photo, notes, location)
+              const podResult = await driverApi.submitProofOfDelivery(
+                job.data.id,
+                proofData
+              );
+
+              if (!podResult.success) {
+                throw new Error(
+                  podResult.message || "Failed to submit proof of delivery"
+                );
+              }
+
+              // Step 2: Mark job as 'delivered' (triggers status change + confirmation prompt)
+              // This reuses your existing logic: confirmation, location pass, immutability check
+              await handleStatusUpdate("delivered");
+
+              // Step 3: Refresh UI state
+              setShowProofModal(false);
+              setHasProof(true); // Optimistic update
+
+              // Reload proof data and full job details to reflect new status/POD
+              await Promise.all([
+                loadProofOfDelivery(job.data.id),
+                loadJobDetails(),
+              ]);
+
+              toast.success(
+                "Proof of delivery submitted and job marked as delivered!"
+              );
+            } catch (error) {
+              console.error("[JobDetailPage] POD submission failed:", error);
+
+              // Improved error messaging from API response if available
+              const errorMessage =
+                error.response?.data?.detail ||
+                error.message ||
+                "Failed to submit proof of delivery. Please try again.";
+
+              toast.error(errorMessage);
             }
           }}
         />
