@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+"use client";
+
+import { useState, useEffect, useRef } from "react";
 import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import {
@@ -15,11 +17,13 @@ import {
   Clock,
   Star,
   MapPin,
-  ChevronRight,
   LogOut,
   Upload,
   CheckCircle,
   Eye,
+  AlertCircle,
+  Activity,
+  Zap,
 } from "lucide-react";
 import { PerformanceMetrics } from "./performance-metrics";
 import { EarningsChart } from "./earnings-chart";
@@ -72,6 +76,19 @@ export default function DriverDashboard() {
     localStorage.setItem("activeTab", activeTab);
   }, [activeTab]);
 
+  const [isTracking, setIsTracking] = useState(false);
+  const [manualTrackingEnabled, setManualTrackingEnabled] = useState(false);
+  const [trackingStatus, setTrackingStatus] = useState("idle"); // idle, tracking, error
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [geolocationError, setGeolocationError] = useState(null);
+  const [toggleLoading, setToggleLoading] = useState(false);
+  const [backendTrackingStatus, setBackendTrackingStatus] = useState(false);
+  const routePollIntervalRef = useRef(null);
+  const routeCheckTimeRef = useRef(null);
+
+  const wsRef = useRef(null); // New: For per-driver WS
+  const pollIntervalRef = useRef(null); // For polling
+
   const navigate = useNavigate();
 
   // Check if driver is logged in
@@ -79,34 +96,355 @@ export default function DriverDashboard() {
 
   useEffect(() => {
     fetchData();
+    startRoutePoll();
+    // Cleanup on unmount
+    return () => {
+      stopRoutePoll();
+      driverApi.stopLocationTracking();
+    };
   }, []);
+
+  // New: Poll profile to detect tracking changes (every 60s)
+  useEffect(() => {
+    const fetchProfileAndCheckTracking = async () => {
+      try {
+        const profileData = await driverApi.getProfile();
+        if (profileData.success) {
+          setProfile(profileData.data);
+          const hasRecentLocation = await checkRecentLocation(); // New helper below
+          if (
+            profileData.data.is_tracking_enabled &&
+            hasRecentLocation &&
+            !driverApi.locationWatcher
+          ) {
+            driverApi.startLocationTracking();
+            toast.success(
+              "Tracking activated - assignments detected and you're online",
+            );
+          } else if (
+            !profileData.data.is_tracking_enabled &&
+            driverApi.locationWatcher
+          ) {
+            driverApi.stopLocationTracking();
+            toast.info("Tracking deactivated");
+          }
+        }
+      } catch (err) {
+        toast.error("Tracking check failed - retrying...");
+        setTimeout(fetchProfileAndCheckTracking, 10000); // Retry on error
+      }
+    };
+
+    const checkRecentLocation = async () => {
+      // Optional: Fetch last location timestamp from API to confirm "online"
+      // Or assume if geolocation permission granted
+      const permission = await navigator.permissions.query({
+        name: "geolocation",
+      });
+      return permission.state === "granted"; // Simple online check
+    };
+    
+    fetchProfileAndCheckTracking(); // Initial fetch
+
+    // Poll every 60s
+    pollIntervalRef.current = setInterval(fetchProfileAndCheckTracking, 60000);
+
+    // Handle visibility (background/foreground)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchProfileAndCheckTracking(); // Immediate check on focus
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(pollIntervalRef.current);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (wsRef.current) wsRef.current.close();
+    };
+  }, []);
+
+  // New: WS for real-time tracking toggle (per-driver group)
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    const token = localStorage.getItem("access_token");
+    wsRef.current = new WebSocket(
+      `ws://127.0.0.1:8000/ws/driver/${profile.id}/?token=${token}`,
+    );
+    wsRef.current.onopen = () =>
+      console.log("[DriverDashboard] Per-driver WS connected");
+    wsRef.current.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === "tracking.toggle") {
+        if (data.enabled) {
+          driverApi.startLocationTracking();
+          toast.success("Tracking enabled via server update");
+        } else {
+          driverApi.stopLocationTracking();
+          toast.info("Tracking disabled via server update");
+        }
+      }
+    };
+
+    wsRef.current.onclose = (event) => {
+      console.log("[DriverDashboard] Per-driver WS disconnected:", event);
+      if (event.code === 1006 || event.code !== 1000) {
+        setTimeout(() => {
+          // Reconnect
+          wsRef.current = new WebSocket(
+            `ws://127.0.0.1:8000/ws/driver/${profile.id}/?token=${localStorage.getItem("access_token")}`,
+          );
+          // Re-add listeners
+        }, 5000); // 5s delay
+      }
+    };
+
+    wsRef.current.onerror = (error) =>
+      console.error("[DriverDashboard] Per-driver WS error:", error);
+
+    return () => {
+      if (wsRef.current) wsRef.current.close();
+    };
+  }, [profile?.id]);
+
+  const startRoutePoll = () => {
+    // Poll for active route every 60 seconds
+    routePollIntervalRef.current = setInterval(async () => {
+      try {
+        // Only poll if we have profile with driver_id
+        if (!profile?.driver_profile) {
+          console.log("[DriverDashboard] Waiting for profile to load...");
+          return;
+        }
+
+        const result = await driverApi.getCurrentRoute(profile.driver_profile);
+        console.log("[DriverDashboard] Route poll result:", result);
+
+        if (result.success && result.data) {
+          const route = result.data;
+          const hasActiveRoute =
+            route.status && ["assigned", "in_progress"].includes(route.status);
+
+          console.log("[DriverDashboard] Active route check:", {
+            hasRoute: !!route,
+            status: route?.status,
+            isActive: hasActiveRoute,
+            isTracking,
+            manualEnabled: manualTrackingEnabled,
+          });
+
+          if (hasActiveRoute && !isTracking && !manualTrackingEnabled) {
+            console.log(
+              "[DriverDashboard] Auto-starting tracking due to active route",
+            );
+            startTracking();
+          } else if (!hasActiveRoute && isTracking && !manualTrackingEnabled) {
+            console.log(
+              "[DriverDashboard] Stopping tracking - no active route and manual not enabled",
+            );
+            stopTracking();
+          }
+        } else if (!isTracking && !manualTrackingEnabled) {
+          console.log(
+            "[DriverDashboard] No active route and not tracking - ensuring stopped",
+          );
+          stopTracking();
+        }
+      } catch (error) {
+        console.error("[DriverDashboard] Route poll error:", error);
+      }
+    }, 60000); // 60 seconds
+
+    routeCheckTimeRef.current = Date.now();
+  };
+
+  const stopRoutePoll = () => {
+    if (routePollIntervalRef.current) {
+      clearInterval(routePollIntervalRef.current);
+      routePollIntervalRef.current = null;
+    }
+  };
+
+  const startTracking = async () => {
+    if (isTracking) return;
+
+    try {
+      setTrackingStatus("tracking");
+      setGeolocationError(null);
+
+      if (!navigator.geolocation) {
+        throw new Error("Geolocation is not supported by your browser");
+      }
+
+      const geolocationOptions = { enableHighAccuracy: true, timeout: 60000 };
+
+      let position;
+      try {
+        position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            resolve,
+            reject,
+            geolocationOptions,
+          );
+        });
+      } catch (error) {
+        if (error.code === error.TIMEOUT) {
+          console.warn(
+            "[DriverDashboard] High accuracy timeout - trying low accuracy",
+          );
+          position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: false,
+              timeout: 30000,
+            });
+          });
+        } else {
+          throw error;
+        }
+      }
+
+      const location = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+      };
+      setCurrentLocation(location);
+
+      driverApi.startLocationTracking(30000);
+      setIsTracking(true);
+      toast.success("Location tracking started");
+    } catch (error) {
+      console.error("[DriverDashboard] Tracking start error:", error);
+      let errorMsg = "Unable to access your location";
+      if (error.code === error.PERMISSION_DENIED) {
+        errorMsg =
+          "Location permission denied. Please enable location access in settings.";
+      } else if (error.code === error.POSITION_UNAVAILABLE) {
+        errorMsg = "Location information is unavailable.";
+      } else if (error.code === error.TIMEOUT) {
+        errorMsg =
+          "Location request timed out. Please check your connection or try moving to a better signal area.";
+      }
+      setGeolocationError(errorMsg);
+      setTrackingStatus("error");
+      toast.error(errorMsg);
+    }
+  };
+
+  const stopTracking = async () => {
+    try {
+      driverApi.stopLocationTracking();
+      setIsTracking(false);
+      setTrackingStatus("idle");
+      toast.success("Location tracking stopped");
+    } catch (error) {
+      console.error("[DriverDashboard] Tracking stop error:", error);
+      toast.error("Failed to stop tracking");
+    }
+  };
+
+  // Toggle tracking via backend API
+  const handleToggleTracking = async () => {
+    if (toggleLoading) return;
+
+    setToggleLoading(true);
+    console.log("[DriverDashboard] Initiating toggle tracking...");
+
+    try {
+      const result = await driverApi.toggleTracking();
+      console.log("[DriverDashboard] Toggle tracking result:", result);
+
+      if (result.success) {
+        const newStatus = result.isEnabled;
+        setBackendTrackingStatus(newStatus);
+
+        if (newStatus) {
+          console.log("[DriverDashboard] Tracking enabled via backend");
+          await startTracking();
+          toast.success(result.message || "Tracking enabled successfully");
+        } else {
+          console.log("[DriverDashboard] Tracking disabled via backend");
+          await stopTracking();
+          toast.success(result.message || "Tracking disabled successfully");
+        }
+      } else {
+        console.error(
+          "[DriverDashboard] Toggle tracking failed:",
+          result.message,
+        );
+        toast.error(result.message || "Failed to toggle tracking");
+      }
+    } catch (error) {
+      console.error("[DriverDashboard] Toggle tracking error:", error);
+      toast.error("An error occurred while toggling tracking");
+    } finally {
+      setToggleLoading(false);
+    }
+  };
+
+  // Toggle tracking with manual override
+  const toggleManualTracking = async () => {
+    const newState = !manualTrackingEnabled;
+    setManualTrackingEnabled(newState);
+
+    if (newState) {
+      // Turn on manual tracking
+      await startTracking();
+      // Optionally update availability if backend supports
+      try {
+        await driverApi.updateAvailability({ available: false });
+      } catch (error) {
+        console.warn("[DriverDashboard] Availability update failed:", error);
+      }
+    } else {
+      // Turn off manual tracking, let route polling control it
+      await stopTracking();
+    }
+  };
 
   const fetchData = async () => {
     const token = localStorage.getItem("access_token");
     if (!token) {
       toast.error("Please log in to view the dashboard");
       navigate("/login");
-      setLoading(false);
       return;
     }
 
     setLoading(true);
     try {
-      const [profResp, jbsResp, earnsResp, ratsResp, metricsResp, docsResp] =
-        await Promise.all([
-          driverApi.getProfile(),
-          driverApi.getAssignedJobs(),
-          driverApi.getEarnings(),
-          driverApi.getRatings(),
-          driverApi.getMetrics(),
-          driverApi.getDocuments(),
-        ]);
+      const [
+        profResp,
+        jbsResp,
+        earnsResp,
+        ratsResp,
+        metricsResp,
+        docsResp,
+        trackingResp,
+      ] = await Promise.all([
+        driverApi.getProfile(),
+        driverApi.getAssignedJobs(1, 10, "all"),
+        driverApi.getEarnings(),
+        driverApi.getRatings(),
+        driverApi.getMetrics(),
+        driverApi.getDocuments(),
+        driverApi.getTrackingStatus(),
+      ]);
 
       // Handle profile response
       if (!profResp.success) {
         throw new Error(profResp.message || "Failed to fetch profile");
       }
       setProfile(profResp.data || null);
+
+      // Handle tracking status response
+      if (trackingResp.success) {
+        setBackendTrackingStatus(trackingResp.isEnabled);
+        console.log(
+          "[DriverDashboard] Initial tracking status:",
+          trackingResp.isEnabled,
+        );
+      }
 
       // Handle jobs response: Extract results array from paginated response
       const jobsData =
@@ -170,7 +508,7 @@ export default function DriverDashboard() {
             file: null,
             verified: false,
             notes: null,
-          }
+          },
       );
       setDocuments(allDocuments);
 
@@ -234,8 +572,8 @@ export default function DriverDashboard() {
                 uploaded_at: new Date(),
                 verified: response.verified || false,
               }
-            : d
-        )
+            : d,
+        ),
       );
     } catch (error) {
       console.error("[DriverDashboard] Document upload error:", error);
@@ -249,6 +587,7 @@ export default function DriverDashboard() {
   const navigation = [
     { name: "Overview", icon: Home, key: "overview" },
     { name: "Jobs", icon: Briefcase, key: "jobs" },
+    { name: "Map", icon: MapPin, key: "map" }, // Add map tab
     { name: "Earnings", icon: DollarSign, key: "earnings" },
     { name: "Documents", icon: FileText, key: "documents" },
     { name: "Profile", icon: User, key: "profile" },
@@ -296,6 +635,139 @@ export default function DriverDashboard() {
       default:
         return "bg-muted text-muted-foreground border-border";
     }
+  };
+
+  const renderMapTab = () => {
+    if (typeof window === "undefined" || !window.google) {
+      return (
+        <div className="bg-card border border-border rounded-lg p-6 h-96 flex items-center justify-center">
+          <p className="text-muted-foreground">
+            Google Maps not loaded. Check your API key in index.html
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6 max-w-none">
+        {/* Tracking Status Card */}
+        <div className="bg-card border border-border rounded-lg p-4 lg:p-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+            <h3 className="text-lg font-semibold text-foreground">
+              Live Tracking
+            </h3>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button
+                onClick={handleToggleTracking}
+                disabled={toggleLoading}
+                className={`flex-1 sm:flex-none px-4 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                  toggleLoading
+                    ? "bg-gray-400 text-white cursor-not-allowed opacity-60"
+                    : backendTrackingStatus
+                      ? "bg-red-500 text-white hover:bg-red-600 active:scale-95"
+                      : "bg-green-500 text-white hover:bg-green-600 active:scale-95"
+                }`}
+              >
+                {toggleLoading ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                    <span>Updating...</span>
+                  </>
+                ) : (
+                  <>
+                    <Activity className="w-4 h-4" />
+                    <span>
+                      {backendTrackingStatus
+                        ? "Stop Tracking"
+                        : "Start Tracking"}
+                    </span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={toggleManualTracking}
+                disabled={toggleLoading}
+                className={`flex-1 sm:flex-none px-4 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                  toggleLoading
+                    ? "bg-gray-400 text-white cursor-not-allowed opacity-60"
+                    : manualTrackingEnabled
+                      ? "bg-orange-500 text-white hover:bg-orange-600 active:scale-95"
+                      : "bg-slate-600 text-white hover:bg-slate-700 active:scale-95"
+                }`}
+              >
+                <Zap className="w-4 h-4" />
+                <span>
+                  {manualTrackingEnabled ? "Manual ON" : "Manual OFF"}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-3 bg-muted rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">App Status</p>
+              <p
+                className={`font-semibold capitalize text-sm ${
+                  trackingStatus === "tracking"
+                    ? "text-green-600"
+                    : trackingStatus === "error"
+                      ? "text-red-600"
+                      : "text-yellow-600"
+                }`}
+              >
+                {trackingStatus}
+              </p>
+            </div>
+            <div className="p-3 bg-muted rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">
+                Backend Status
+              </p>
+              <p
+                className={`font-semibold text-sm ${backendTrackingStatus ? "text-green-600" : "text-slate-600"}`}
+              >
+                {backendTrackingStatus ? "ACTIVE" : "INACTIVE"}
+              </p>
+            </div>
+            <div className="p-3 bg-muted rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">
+                Manual Override
+              </p>
+              <p className="font-semibold text-foreground text-sm">
+                {manualTrackingEnabled ? "ON" : "OFF"}
+              </p>
+            </div>
+            <div className="p-3 bg-muted rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">
+                Current Location
+              </p>
+              <p className="text-xs font-mono text-foreground">
+                {currentLocation
+                  ? `${currentLocation.lat.toFixed(4)}, ${currentLocation.lng.toFixed(4)}`
+                  : "—"}
+              </p>
+            </div>
+          </div>
+
+          {geolocationError && (
+            <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex gap-2">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-600">{geolocationError}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Map Container */}
+        <div className="bg-card border border-border rounded-lg overflow-hidden shadow-sm">
+          <div
+            id="driver-map"
+            className="w-full h-96 lg:h-[600px]"
+            style={{ backgroundColor: "#f0f0f0" }}
+          >
+            {/* Map will be rendered here by initMap function */}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
@@ -417,6 +889,7 @@ export default function DriverDashboard() {
                 <h1 className="text-lg lg:text-xl font-bold text-foreground truncate mobile-header">
                   {activeTab === "overview" && "Dashboard Overview"}
                   {activeTab === "jobs" && "My Jobs"}
+                  {activeTab === "map" && "Live Map"}
                   {activeTab === "earnings" && "Earnings"}
                   {activeTab === "documents" && "Documents"}
                   {activeTab === "profile" && "Profile"}
@@ -529,75 +1002,16 @@ export default function DriverDashboard() {
                 <EarningsChart earnings={earnings} detailed={false} />
                 <PerformanceMetrics
                   rating={metrics.averageRating}
-                  completedJobs={metrics.totalDeliveries}
-                  totalJobs={metrics.totalJobs}
-                  ratings={ratings}
+                  completionRate={metrics.completionRate}
+                  totalDeliveries={metrics.totalDeliveries}
                 />
               </div>
 
-              <div className="bg-card border border-border rounded-lg shadow-sm">
-                <div className="p-4 lg:p-6 border-b border-border">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-foreground">
-                      Recent Jobs
-                    </h3>
-                    <button
-                      onClick={() => setActiveTab("jobs")}
-                      className="text-primary hover:text-primary/80 text-sm font-medium flex items-center gap-1 transition-colors"
-                    >
-                      View all
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-                <div className="p-4 lg:p-6">
-                  <div className="space-y-3">
-                    {Array.isArray(jobs) && jobs.length > 0 ? (
-                      jobs.slice(0, 4).map((job) => (
-                        <div
-                          key={job.id}
-                          className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 cursor-pointer transition-all duration-200 mobile-card"
-                          onClick={() => handleJobClick(job)}
-                        >
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                              <MapPin className="h-5 w-5 text-primary" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-medium text-foreground truncate">
-                                {job.customer.name || job.guest_email || "N/A"}
-                              </p>
-                              <p className="text-sm text-muted-foreground truncate">
-                                {job.pickup_address.city || "N/A"} →{" "}
-                                {job.dropoff_address.city || "N/A"}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-right flex-shrink-0 ml-3">
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(
-                                job.status
-                              )}`}
-                            >
-                              {job.status?.replace("_", " ").toUpperCase() ||
-                                "UNKNOWN"}
-                            </span>
-                            <p className="text-sm font-medium text-foreground mt-1">
-                              {formatCurrency(job.driver_fee || 0)}
-                            </p>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-muted-foreground text-center">
-                        No recent jobs available
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <DeliveryStatusUpdates jobs={jobs.slice(0, 5)} />
             </div>
           )}
+
+          {activeTab === "map" && renderMapTab()}
 
           {activeTab === "jobs" && (
             <div className="max-w-none">
@@ -752,7 +1166,7 @@ export default function DriverDashboard() {
                             .map((name) =>
                               name
                                 ? name.charAt(0).toUpperCase() + name.slice(1)
-                                : ""
+                                : "",
                             )
                             .join(" ")
                         : "N/A"}
