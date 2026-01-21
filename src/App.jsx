@@ -9,6 +9,7 @@ import About from "./components/about/About";
 import ContactForm from "./components/contact/ContactForm";
 import Footer from "./components/common/Footer";
 // import AdminDashboard from "./components/admin/AdminDashboard";
+import AdminLiveTrackingDashboard from "./components/admin/admin-live-tracking-dashboard";
 import FAQ from "./components/contact/faq";
 import "./App.css";
 import "./globals.css";
@@ -60,7 +61,6 @@ function HomePage() {
 }
 // function to handle admin redirect (before the return)
 function AdminRedirect() {
-  
   useEffect(() => {
     console.log("🔄 AdminRedirect →", `${backendUrl}/admin/`);
     window.location.replace(`${backendUrl}/admin/`);
@@ -127,6 +127,15 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["admin"]}>
                 <AdminRedirect />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin-live-tracking"
+            element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminLiveTrackingDashboard />
               </ProtectedRoute>
             }
           />
