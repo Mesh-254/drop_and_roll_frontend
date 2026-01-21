@@ -46,7 +46,6 @@ class DriverAPI extends ApiBase {
   //   return response.data;driverApi
   // }
 
-
   async getJob(jobId) {
     /**
      * Fetches details for a specific job by its ID.
@@ -63,7 +62,9 @@ class DriverAPI extends ApiBase {
     }
 
     try {
-      console.log(`[DriverAPI] Fetching job details for ID: ${jobId} from /api/bookings/bookings/${jobId}/`);
+      console.log(
+        `[DriverAPI] Fetching job details for ID: ${jobId} from /api/bookings/bookings/${jobId}/`,
+      );
       const response = await super.request(`/api/booking/bookings/${jobId}/`, {
         method: "GET",
       });
@@ -73,30 +74,39 @@ class DriverAPI extends ApiBase {
       return {
         success: false,
         code: error.code || "FETCH_ERROR",
-        message: error.message || `Failed to fetch job details for ID: ${jobId}`,
+        message:
+          error.message || `Failed to fetch job details for ID: ${jobId}`,
         status: error.status,
       };
     }
   }
 
   async updateJobStatus(jobId, status, location = null) {
-
-    const response = await super.request(`/api/booking/bookings/${jobId}/set-status/`, {
-      method: "POST",
-      data: {
-        status,
-        driver_location: location,
+    const response = await super.request(
+      `/api/booking/bookings/${jobId}/set-status/`,
+      {
+        method: "POST",
+        data: {
+          status,
+          driver_location: location,
+        },
       },
-    });
+    );
     return response.data;
   }
 
   async reportJobIssue(jobId, issueData) {
-    console.log(`[DriverAPI] Calling reportJobIssue() - Reporting issue for job ${jobId} with data:`, issueData);
-    const response = await super.request(`/api/bookings/jobs/${jobId}/report-issue/`, {
-      method: "POST",
-      data: issueData,
-    });
+    console.log(
+      `[DriverAPI] Calling reportJobIssue() - Reporting issue for job ${jobId} with data:`,
+      issueData,
+    );
+    const response = await super.request(
+      `/api/bookings/jobs/${jobId}/report-issue/`,
+      {
+        method: "POST",
+        data: issueData,
+      },
+    );
     return response.data;
   }
   async getProofOfDelivery(bookingId) {
@@ -111,9 +121,12 @@ class DriverAPI extends ApiBase {
 
     try {
       console.log(`[DriverAPI] Fetching POD for booking: ${bookingId}`);
-      const response = await super.request(`/api/tracking/pod/by-booking/?booking=${bookingId}`, {
-        method: "GET",
-      });
+      const response = await super.request(
+        `/api/tracking/pod/by-booking/?booking=${bookingId}`,
+        {
+          method: "GET",
+        },
+      );
       console.log("[DriverAPI] POD response:", response.data);
       return { success: true, data: response.data };
     } catch (error) {
@@ -121,39 +134,50 @@ class DriverAPI extends ApiBase {
       return {
         success: false,
         code: error.code || "FETCH_ERROR",
-        message: error.response?.data?.detail || "Failed to fetch proof of delivery",
+        message:
+          error.response?.data?.detail || "Failed to fetch proof of delivery",
         status: error.response?.status,
       };
     }
   }
 
-
   async submitProofOfDelivery(bookingId, proofData) {
-    console.log(`[DriverAPI] Submitting proof for booking ${bookingId} with data:`, {
-      hasPhoto: !!proofData.photo,
-      hasNotes: !!proofData.notes,
-      hasLocation: !!proofData.location,
-    });
+    console.log(
+      `[DriverAPI] Submitting proof for booking ${bookingId} with data:`,
+      {
+        hasPhoto: !!proofData.photo,
+        hasNotes: !!proofData.notes,
+        hasLocation: !!proofData.location,
+      },
+    );
     const formData = new FormData();
     if (proofData.photo) formData.append("photo", proofData.photo);
     if (proofData.notes) formData.append("notes", proofData.notes);
-    if (proofData.location) formData.append("location", JSON.stringify(proofData.location));
+    if (proofData.location)
+      formData.append("location", JSON.stringify(proofData.location));
 
     try {
-      const response = await super.request(`/api/tracking/pod/?booking=${bookingId}`, {
-        method: "POST",
-        data: formData,
-        headers: { "Content-Type": undefined },
-      });
+      const response = await super.request(
+        `/api/tracking/pod/?booking=${bookingId}`,
+        {
+          method: "POST",
+          data: formData,
+          headers: { "Content-Type": undefined },
+        },
+      );
       // Fetch updated job details to ensure status is "delivered"
       const updatedJob = await this.getJob(bookingId);
       return { success: true, data: response.data, updatedJob };
     } catch (error) {
-      console.error(`[DriverAPI] Failed to submit proof for booking ${bookingId}:`, error);
+      console.error(
+        `[DriverAPI] Failed to submit proof for booking ${bookingId}:`,
+        error,
+      );
       return {
         success: false,
         code: error.code || "REQUEST_ERROR",
-        message: error.response?.data?.detail || "Failed to submit proof of delivery",
+        message:
+          error.response?.data?.detail || "Failed to submit proof of delivery",
         status: error.response?.status,
       };
     }
@@ -166,9 +190,14 @@ class DriverAPI extends ApiBase {
   }
 
   async getEarnings() {
-    console.log("[DriverAPI] Calling getEarnings() - Computing earnings from payouts");
+    console.log(
+      "[DriverAPI] Calling getEarnings() - Computing earnings from payouts",
+    );
     const payouts = await this.getPayouts();
-    console.log("[DriverAPI] Raw payouts data for earnings calculation:", payouts);
+    console.log(
+      "[DriverAPI] Raw payouts data for earnings calculation:",
+      payouts,
+    );
     const today = new Date().toDateString();
     const thisWeek = this.getWeekStart();
     const thisMonth = new Date().getMonth();
@@ -197,23 +226,38 @@ class DriverAPI extends ApiBase {
 
   // Availability Management
   async getAvailability() {
-    console.log("[DriverAPI] Calling getAvailability() - Fetching driver availability");
+    console.log(
+      "[DriverAPI] Calling getAvailability() - Fetching driver availability",
+    );
     const response = await super.request("/api/driver/availability/");
     return response.data;
   }
 
-  async updateAvailability(availabilityData) {
-    console.log("[DriverAPI] Calling updateAvailability() - Updating availability with data:", availabilityData);
-    const response = await super.request("/api/driver/availability/", {
-      method: "POST",
-      data: availabilityData,
-    });
-    return response.data;
+  async updateAvailability(data) {
+    console.log("[DriverAPI] Updating availability with data:", data);
+    try {
+      const response = await this.request("/api/driver/availability/me/", {
+        method: "PATCH",
+        data: data,
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error("[DriverAPI] Availability update failed:", error);
+      return {
+        success: false,
+        code: error.code || "UPDATE_ERROR",
+        message: error.message || "Failed to update availability",
+        status: error.response?.status,
+        details: error.response?.data, // Capture backend error details
+      };
+    }
   }
 
   // Documents Management
   async getDocuments() {
-    console.log("[DriverAPI] Calling getDocuments() - Fetching driver documents");
+    console.log(
+      "[DriverAPI] Calling getDocuments() - Fetching driver documents",
+    );
     const response = await super.request("/api/driver/driver-docs/");
     return response.data;
   }
@@ -256,14 +300,20 @@ class DriverAPI extends ApiBase {
       return {
         success: false,
         code: error.code || "REQUEST_ERROR",
-        message: error.response?.data?.detail || error.response?.data?.file?.[0] || error.message || "Failed to upload document",
+        message:
+          error.response?.data?.detail ||
+          error.response?.data?.file?.[0] ||
+          error.message ||
+          "Failed to upload document",
         status: error.response?.status,
         data: error.response?.data,
       };
     }
   }
   async deleteDocument(docId) {
-    console.log(`[DriverAPI] Calling deleteDocument() - Deleting document ID: ${docId}`);
+    console.log(
+      `[DriverAPI] Calling deleteDocument() - Deleting document ID: ${docId}`,
+    );
     const response = await super.request(`/api/driver/driver-docs/${docId}/`, {
       method: "DELETE",
     });
@@ -294,7 +344,9 @@ class DriverAPI extends ApiBase {
 
   // Utility Methods
   async getCurrentLocation() {
-    console.log("[DriverAPI] Calling getCurrentLocation() - Requesting geolocation");
+    console.log(
+      "[DriverAPI] Calling getCurrentLocation() - Requesting geolocation",
+    );
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
         const error = new Error("Geolocation not supported");
@@ -330,20 +382,32 @@ class DriverAPI extends ApiBase {
 
   // Add to DriverAPI class to prevent delivered booking update
   async bulkUpdateStatus(updates, newStatus) {
-    return super.request('/api/booking/bookings/bulk-update-status/', {
-      method: 'POST',
-      data: { updates: updates.map(id => ({ booking_id: id, new_status: newStatus })) }
-    }).then(res => res.data).catch(err => { throw err; });
+    return super
+      .request("/api/booking/bookings/bulk-update-status/", {
+        method: "POST",
+        data: {
+          updates: updates.map((id) => ({
+            booking_id: id,
+            new_status: newStatus,
+          })),
+        },
+      })
+      .then((res) => res.data)
+      .catch((err) => {
+        throw err;
+      });
   }
 
   // UPDATED: checkImmutable (now calls the new backend endpoint)
   async checkImmutable(jobId) {
     try {
-      const response = await super.request(`/api/booking/bookings/${jobId}/check-immutable/`);
+      const response = await super.request(
+        `/api/booking/bookings/${jobId}/check-immutable/`,
+      );
       return {
         success: true,
         immutable: response.data.immutable,
-        reason: response.data.reason
+        reason: response.data.reason,
       };
     } catch (error) {
       console.error("[DriverAPI] checkImmutable error:", error);
@@ -353,10 +417,13 @@ class DriverAPI extends ApiBase {
 
   async batchCheckImmutable(jobIds) {
     try {
-      const response = await super.request('/api/booking/bookings/bulk-check-immutable/', {
-        method: 'POST',
-        data: { ids: jobIds }
-      });
+      const response = await super.request(
+        "/api/booking/bookings/bulk-check-immutable/",
+        {
+          method: "POST",
+          data: { ids: jobIds },
+        },
+      );
       return { success: true, data: response.data };
     } catch (error) {
       console.error("[DriverAPI] Batch check error:", error);
@@ -364,6 +431,136 @@ class DriverAPI extends ApiBase {
     }
   }
 
+  // Get current route for the driver (requires driver_id parameter)
+  async getCurrentRoute(driver_id = null) {
+    /**
+     * Fetches the driver's current active route, including bookings/stops.
+     * @param {string} driver_id - Optional. If not provided, will fetch from profile first.
+     * @returns {Promise<Object>} - { success: boolean, data: Object | null, error?: string }
+     */
+    try {
+      // If driver_id not provided, fetch from profile
+      let id = driver_id;
+      if (!id) {
+        const profileResult = await this.getProfile();
+        if (!profileResult.success || !profileResult.data?.driver_profile) {
+          console.error("[DriverAPI] Could not fetch driver profile");
+          return { success: false, error: "Failed to fetch driver profile" };
+        }
+        id = profileResult.data.driver_profile;
+      }
+
+      const url = `/api/driver/live-tracking/current-route/?driver_id=${id}`;
+      console.log(`[DriverAPI] Fetching current route for driver: ${id}`);
+      const response = await this.request(url);
+      return { success: true, data: response.data };
+    } catch (error) {
+      if (error.response?.status === 404) {
+        console.log("[DriverAPI] No active route found (404)");
+        return { success: true, data: null }; // No route is valid
+      }
+      console.error("[DriverAPI] Get current route failed:", error);
+      return { success: false, error: error.message };
+    }
+  }
+  async toggleTracking() {
+    try {
+      const response = await super.request(
+        "/api/driver/live-driver/toggle-tracking/",
+        {
+          method: "POST",
+        },
+      );
+
+      const { is_tracking_enabled } = response.data;
+
+      // Update local state if you keep it
+      if (this.isTrackingEnabled !== undefined) {
+        this.isTrackingEnabled = is_tracking_enabled;
+      }
+
+      return {
+        success: true,
+        isEnabled: is_tracking_enabled,
+      };
+    } catch (error) {
+      console.error("[DriverAPI] Toggle tracking failed:", error);
+      return {
+        success: false,
+        message: error.response?.data?.message || "Failed to toggle tracking",
+        status: error.response?.status,
+      };
+    }
+  }
+
+  // Get current tracking status from profile
+  async getTrackingStatus() {
+    /**
+     * Fetches the current tracking status for the authenticated driver.
+     * @returns {Promise<Object>} - { success: boolean, isEnabled: boolean }
+     */
+    try {
+      const profileResult = await this.getProfile();
+      if (profileResult.success && profileResult.data) {
+        const driverProfile = profileResult.data.driver_profile;
+        return {
+          success: true,
+          isEnabled: driverProfile?.is_tracking_enabled || false,
+        };
+      }
+      return { success: false, isEnabled: false };
+    } catch (error) {
+      console.error("[DriverAPI] getTrackingStatus error:", error);
+      return { success: false, isEnabled: false };
+    }
+  }
+
+  // Send current location to backend via HTTP POST (called periodically by driver app)
+  async sendLocationUpdate(locationData) {
+    console.log("[DriverAPI] Sending location update:", locationData);
+    try {
+      const response = await this.request(
+        "/api/driver/live-tracking/update-location/",
+        {
+          method: "POST",
+          data: locationData,
+        },
+      );
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error("[DriverAPI] Location update failed:", error);
+      return {
+        success: false,
+        error: error.message,
+        status: error.response?.status,
+        details: error.response?.data, // Log validation errors
+      };
+    }
+  }
+  async fetchLiveLocations(filters = {}) {
+    /**
+     * Fetches live locations for all active drivers (admin only).
+     * @param {Object} filters - { hub_id, only_available, minutes_since_update }
+     * @returns {Promise<Object>} - { success: boolean, data: Array, error?: string }
+     */
+    try {
+      let url = "/api/driver/live-tracking/live/";
+      const params = new URLSearchParams();
+
+      if (filters.hub_id) params.append("hub_id", filters.hub_id);
+      if (filters.only_available) params.append("only_available", "true");
+      if (filters.minutes_since_update)
+        params.append("minutes_since_update", filters.minutes_since_update);
+
+      if (params.toString()) url += "?" + params.toString();
+
+      const response = await this.request(url);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error("[DriverAPI] Fetch live locations failed:", error);
+      return { success: false, error: error.message };
+    }
+  }
 
   getWeekStart() {
     const now = new Date();
@@ -375,22 +572,225 @@ class DriverAPI extends ApiBase {
   }
 
   // WebSocket connection for real-time updates
-  connectWebSocket() {
-    const wsUrl = `${this.baseURL.replace("http", "ws")}/driver/ws/`;
-    console.log(`[DriverAPI] Connecting WebSocket to: ${wsUrl}`);
-    const ws = new WebSocket(wsUrl);
+  // This is optional for drivers; mainly for admins. But if drivers need real-time updates (e.g., new assignments), use it.
+  connectWebSocket(onMessageCallback) {
+    let baseUrl = this.baseURL.trim(); // Trim any whitespace
+    console.log(`[DriverAPI] Raw baseURL from config: "${baseUrl}"`); // Debug log to check source issue
 
-    ws.onopen = () => console.log("[DriverAPI] WebSocket connected successfully");
-    ws.onclose = (event) =>
-      console.log("[DriverAPI] WebSocket disconnected:", {
-        code: event.code,
-        reason: event.reason,
-        wasClean: event.wasClean,
-      });
-    ws.onerror = (error) => console.error("[DriverAPI] WebSocket error:", error);
-    ws.onmessage = (event) => console.log("[DriverAPI] WebSocket message received:", event.data);
+    // Normalize: If no protocol, assume http://; fix common malformations like 'http//'
+    if (!baseUrl.startsWith("http://") && !baseUrl.startsWith("https://")) {
+      if (baseUrl.startsWith("//")) {
+        baseUrl = `http:${baseUrl}`; // Handle '//127.0.0.1:8000' → 'http://127.0.0.1:8000'
+      } else if (baseUrl.startsWith("http//")) {
+        baseUrl = baseUrl.replace("http//", "http://"); // Fix 'http//127.0.0.1:8000'
+      } else {
+        baseUrl = `http://${baseUrl}`; // Relative → full
+      }
+    }
+
+    let urlObj;
+    try {
+      urlObj = new URL(baseUrl);
+    } catch (err) {
+      console.error(
+        `[DriverAPI] Invalid baseURL: ${baseUrl}. Error: ${err.message}. Falling back to localhost.`,
+      );
+      urlObj = new URL("http://127.0.0.1:8000"); // Hard fallback to prevent crashes
+    }
+
+    const protocol = urlObj.protocol === "https:" ? "wss" : "ws";
+    const host = urlObj.host; // Correct host without protocol
+    const wsUrl = `${protocol}://${host}/ws/tracking/`;
+    console.log(`[DriverAPI] Connecting WebSocket to: ${wsUrl}`);
+
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      console.warn(
+        "[DriverAPI] No access_token in localStorage. Connection may fail.",
+      );
+    }
+
+    const fullWsUrl = `${wsUrl}?token=${token}`;
+    const ws = new WebSocket(fullWsUrl);
+    let pingInterval;
+
+    ws.onopen = () => {
+      console.log("[DriverAPI] WebSocket connected successfully");
+      // setWsConnected(true); // Assuming you pass this from dashboard
+      if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
+      // Ping every 30s to keep alive
+      pingInterval = setInterval(
+        () => ws.send(JSON.stringify({ type: "ping" })),
+        30000,
+      );
+    };
+
+    ws.onclose = (event) => {
+      console.log("[DriverAPI] WebSocket disconnected:", event);
+      if (pingInterval) clearInterval(pingInterval);
+      if (![4001, 4003].includes(event.code) && event.code !== 1000) {
+        const delay = Math.min(
+          1000 * Math.pow(2, this.reconnectAttempts || 0),
+          10000,
+        );
+        this.reconnectAttempts = (this.reconnectAttempts || 0) + 1;
+        this.reconnectTimeout = setTimeout(
+          () => this.connectWebSocket(onMessageCallback),
+          delay,
+        );
+      }
+    };
+    ws.onerror = (error) =>
+      console.error("[DriverAPI] WebSocket error:", error);
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      console.log("[DriverAPI] WebSocket message:", data);
+      if (onMessageCallback) onMessageCallback(data);
+    };
 
     return ws;
+  }
+
+  // NEW: Start periodic location updates (call when driver has active jobs)
+  startLocationTracking(intervalMs = 30000) {
+    // Default: every 30 seconds
+    if (this.locationWatcher) {
+      console.log(
+        "[DriverAPI] Location tracking already active - not starting duplicate watcher",
+      );
+      return; // Prevent multiple watchers
+    }
+
+    // Shared success handler
+    const handlePosition = async (position) => {
+      const locationData = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        speed_kmh: position.coords.speed ? position.coords.speed * 3.6 : null, // m/s → km/h
+        heading_degrees: position.coords.heading ?? null,
+        accuracy_meters: position.coords.accuracy ?? null,
+      };
+
+      try {
+        const result = await this.sendLocationUpdate(locationData);
+        if (result.success) {
+          console.log("[DriverAPI] Location sent successfully");
+        } else {
+          console.warn("[DriverAPI] Location send failed:", result);
+        }
+      } catch (err) {
+        console.error("[DriverAPI] Failed to send location update:", err);
+      }
+    };
+
+    const handleError = (error) => {
+      console.error("[DriverAPI] Geolocation error:", error);
+
+      if (error.code === error.TIMEOUT) {
+        console.warn(
+          "[DriverAPI] High-accuracy timeout occurred → falling back to low accuracy mode",
+        );
+
+        // Start low-accuracy watcher as fallback
+        this.locationWatcherLowAccuracy = navigator.geolocation.watchPosition(
+          handlePosition,
+          (lowErr) => {
+            console.error(
+              "[DriverAPI] Low-accuracy geolocation also failed:",
+              lowErr,
+            );
+            // You could add retry logic or notify user here
+          },
+          {
+            enableHighAccuracy: false,
+            timeout: 45000, // 45 seconds for low-accuracy
+            maximumAge: 10000, // Allow 10s old position
+          },
+        );
+      } else if (error.code === error.PERMISSION_DENIED) {
+        console.warn("[DriverAPI] Location permission denied");
+        // Optionally: this.stopLocationTracking();
+      }
+    };
+
+    // High-accuracy primary watcher
+    const highAccuracyOptions = {
+      enableHighAccuracy: true,
+      timeout: 60000, // 60 seconds
+      maximumAge: 0, // No cache — always fresh
+    };
+
+    this.locationWatcher = navigator.geolocation.watchPosition(
+      handlePosition,
+      handleError,
+      highAccuracyOptions,
+    );
+
+    console.log("[DriverAPI] Started high-accuracy location watcher");
+
+    // Fallback polling interval (runs in parallel as safety net)
+    this.locationInterval = setInterval(async () => {
+      try {
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            resolve,
+            reject,
+            highAccuracyOptions,
+          );
+        });
+
+        await handlePosition(position); // Reuse same handler
+      } catch (error) {
+        console.error(
+          "[DriverAPI] Interval high-accuracy getCurrentPosition failed:",
+          error,
+        );
+
+        if (error.code === error.TIMEOUT) {
+          console.warn(
+            "[DriverAPI] Interval timeout → trying low-accuracy fallback",
+          );
+
+          try {
+            const position = await new Promise((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: false,
+                timeout: 45000,
+                maximumAge: 10000,
+              });
+            });
+
+            await handlePosition(position);
+          } catch (lowErr) {
+            console.error(
+              "[DriverAPI] Low-accuracy interval fallback also failed:",
+              lowErr,
+            );
+          }
+        }
+      }
+    }, intervalMs);
+  }
+
+  // NEW: Stop location tracking (call when no active jobs)
+  stopLocationTracking() {
+    if (this.locationWatcher) {
+      navigator.geolocation.clearWatch(this.locationWatcher);
+      this.locationWatcher = null;
+      console.log("[DriverAPI] Stopped primary location watcher");
+    }
+
+    if (this.locationWatcherLowAccuracy) {
+      navigator.geolocation.clearWatch(this.locationWatcherLowAccuracy);
+      this.locationWatcherLowAccuracy = null;
+      console.log("[DriverAPI] Stopped low-accuracy fallback watcher");
+    }
+
+    if (this.locationInterval) {
+      clearInterval(this.locationInterval);
+      this.locationInterval = null;
+      console.log("[DriverAPI] Cleared location polling interval");
+    }
   }
 }
 
