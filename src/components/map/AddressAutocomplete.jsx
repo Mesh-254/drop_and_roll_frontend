@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from "react"
 import { useMapsLibrary } from "@vis.gl/react-google-maps"
 import { AlertCircle, Loader2 } from "lucide-react"
+import { toast } from "react-hot-toast"
 
 const AddressAutocomplete = ({
   label,
@@ -80,7 +81,7 @@ const AddressAutocomplete = ({
       address.latitude >= 51.65 && address.latitude <= 52.1 &&
       address.longitude >= -1.35 && address.longitude <= -0.65
     if (!isWithinBounds) {
-      alert("Selected address is outside our service area (Milton Keynes/Oxford). Please choose another.")
+      toast.error("Selected address is outside our service area (Milton Keynes/Oxford). Please choose another.")
       return
     }
 
