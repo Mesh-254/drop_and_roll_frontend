@@ -91,11 +91,11 @@ export default function Hero() {
               </svg>
             </button>
           </div>
-          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 animate-bounce">
+          {/* <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 animate-bounce">
             <div className="w-6 h-10 border-2 border-white rounded-full flex justify-center">
               <div className="w-1 h-3 bg-white rounded-full mt-2 animate-pulse"></div>
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
 
