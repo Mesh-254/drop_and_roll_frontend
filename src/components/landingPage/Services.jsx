@@ -1,178 +1,251 @@
 "use client";
 
-import { Zap, Clock, Building, Package, CheckCircle } from "lucide-react";
-// eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
+import { Zap, Truck, Briefcase, MapPin, Check } from "lucide-react";
 import { useState } from "react";
-import GetQuoteBook from "../quote/GetQuoteBook";
 
 const services = [
   {
+    id: 1,
+    name: "Same Day",
+    tier: "Express",
+    subtitle: "Ultra-fast local delivery",
     icon: Zap,
-    tier: "Same Day Delivery",
-    title: "Collected today.",
-    subtitle: "Delivered today.",
-    description: "Direct, point-to-point service across Milton Keynes, Oxford & surrounding areas.",
     features: [
-      { text: "pickup and delivery included", icon: CheckCircle },
-      { text: "fully tracked", icon: CheckCircle },
+      "Within 4 hours",
+      "Milton Keynes area",
+      "Priority handling",
+      "Real-time tracking",
     ],
-    price: "From £ 19.99/exl VAT",
-    action: "Same Day Delivery orders must be placed before 12:00 PM to guarantee same-day collection and delivery.",
+    price: "£12.99",
+    color: "from-orange-500 to-red-500",
+    bgColor: "bg-orange-50 dark:bg-orange-900/10",
+    borderColor: "border-orange-300 dark:border-orange-700",
   },
   {
-    icon: Clock,
+    id: 2,
+    name: "Standard",
     tier: "Standard",
-    title: "Next Day Delivery",
-    subtitle: "Urgent delivery",
-    description: "Ultra-fast delivery in urban areas.",
+    subtitle: "Reliable next-day delivery",
+    icon: Truck,
     features: [
-      { text: "Fast next-working-day delivery for urgent parcels", icon: CheckCircle },
-      { text: "Serving Milton Keynes, Oxford, and surrounding areas", icon: CheckCircle },
-      { text: "Pickup from sender and delivery to recipient included", icon: CheckCircle },
-      { text: "Simple, transparent pricing with no hidden fees", icon: CheckCircle },
-      { text: "Fully tracked service with proof of delivery", icon: CheckCircle },
+      "Next business day",
+      "Full tracking",
+      "Insured delivery",
+      "SMS updates",
     ],
-    price: "From £ 8.99/exl VAT",
-    action: "Get Started",
+    price: "£6.99",
+    color: "from-blue-500 to-cyan-500",
+    bgColor: "bg-blue-50 dark:bg-blue-900/10",
+    borderColor: "border-blue-300 dark:border-blue-700",
   },
   {
-    icon: Building,
+    id: 3,
+    name: "Business",
     tier: "Business",
-    title: "Recurring Business Deliveries",
-    subtitle: "For B2B customers",
-    description: "Reliable scheduled collections tailored to your business needs.",
+    subtitle: "Multi-location routing",
+    icon: Briefcase,
     features: [
-      { text: "Fixed weekly or monthly routes", icon: CheckCircle },
-      { text: "Predictable pricing", icon: CheckCircle },
-      { text: "Account-managed service", icon: CheckCircle },
-      { text: "Custom delivery planning", icon: CheckCircle },
+      "Scheduled delivery",
+      "Multiple stops",
+      "Signature required",
+      "Invoice billing",
     ],
-    price: "Get a quote.",
-    action: "Learn More",
+    price: "£8.99",
+    color: "from-purple-500 to-pink-500",
+    bgColor: "bg-purple-50 dark:bg-purple-900/10",
+    borderColor: "border-purple-300 dark:border-purple-700",
   },
   {
-    icon: Package,
-    tier: " Up to 200 miles.",
-    title: "Reliable, tracked delivery.",
-    subtitle: "Safe transport",
-    description: "Pickup and delivery included.",
+    id: 4,
+    name: "Up to 200 miles",
+    tier: "Nationwide",
+    subtitle: "Extended coverage delivery",
+    icon: MapPin,
     features: [
-      { text: "Temp monitoring", icon: CheckCircle },
-      { text: "Insulated packaging", icon: CheckCircle },
+      "UK-wide service",
+      "Flexible timing",
+      "Route optimized",
+      "24/7 support",
     ],
-    price: "Get a quote.",
-    action: "Learn More",
+    price: "£14.99",
+    color: "from-green-500 to-emerald-500",
+    bgColor: "bg-green-50 dark:bg-green-900/10",
+    borderColor: "border-green-300 dark:border-green-700",
   },
 ];
 
-export default function Services() {
-  const [showQuoteModal, setShowQuoteModal] = useState(false);
+const ServiceCard = ({ service, onGetQuote, index }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const Icon = service.icon;
 
-  const handleBookDelivery = () => {
-    setShowQuoteModal(true);
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: index * 0.1 }}
+      viewport={{ once: true }}
+      onHoverStart={() => setIsHovered(true)}
+      onHoverEnd={() => setIsHovered(false)}
+      className={`relative rounded-2xl overflow-hidden transition-all duration-300 ${
+        isHovered ? "transform scale-105" : ""
+      }`}
+    >
+      {/* Glowing Background Effect */}
+      {isHovered && (
+        <motion.div
+          layoutId={`glow-${service.id}`}
+          className={`absolute inset-0 bg-gradient-to-br ${service.color} opacity-5 blur-xl`}
+        />
+      )}
+
+      {/* Card Container */}
+      <div
+        className={`relative h-full rounded-2xl border-2 p-6 transition-all duration-300 backdrop-blur-sm
+          ${service.bgColor} ${service.borderColor}
+          ${isHovered ? "border-orange-500/50 shadow-2xl" : "shadow-lg"}`}
+      >
+        {/* Tier Badge */}
+        <div className="mb-4 flex items-center justify-between">
+          <span className="inline-block px-3 py-1 rounded-full text-xs font-bold tracking-wider text-orange-500 bg-orange-100 dark:bg-orange-900/40 uppercase">
+            {service.tier}
+          </span>
+        </div>
+
+        {/* Icon Circle */}
+        <motion.div
+          animate={
+            isHovered ? { scale: 1.1, rotate: 5 } : { scale: 1, rotate: 0 }
+          }
+          transition={{ duration: 0.3 }}
+          className="mb-6 flex items-center justify-center"
+        >
+          <div className={`relative w-20 h-20 rounded-full bg-orange-500/10 flex items-center justify-center border-2 border-orange-500/30
+            ${isHovered ? "bg-orange-500/20 border-orange-500/60 shadow-lg shadow-orange-500/30" : ""}`}
+          >
+            <Icon className="w-10 h-10 text-orange-500" />
+          </div>
+        </motion.div>
+
+        {/* Title and Subtitle */}
+        <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 font-montserrat">
+          {service.name}
+        </h3>
+        <p className="text-gray-600 dark:text-gray-400 text-sm mb-6">
+          {service.subtitle}
+        </p>
+
+        {/* Features List */}
+        <ul className="space-y-3 mb-6">
+          {service.features.map((feature, idx) => (
+            <motion.li
+              key={idx}
+              initial={{ opacity: 0, x: -10 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.1 + idx * 0.05 }}
+              viewport={{ once: true }}
+              className="flex items-center text-sm text-gray-700 dark:text-gray-300"
+            >
+              <Check className="w-5 h-5 text-orange-500 mr-3 flex-shrink-0" />
+              {feature}
+            </motion.li>
+          ))}
+        </ul>
+
+        {/* Price Section */}
+        <div className="mb-6 pb-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="text-3xl font-bold text-orange-500 font-montserrat">
+            {service.price}
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            excl. VAT
+          </p>
+        </div>
+
+        {/* CTA Button */}
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => onGetQuote(service)}
+          className={`w-full py-3 px-4 rounded-lg font-bold transition-all duration-300
+            bg-gradient-to-r from-orange-500 to-orange-600 
+            hover:from-orange-600 hover:to-orange-700
+            text-white shadow-lg hover:shadow-orange-500/30
+            transform hover:scale-105 active:scale-95
+            focus:outline-none focus:ring-2 focus:ring-orange-500/50`}
+        >
+          Get Quote
+        </motion.button>
+      </div>
+    </motion.div>
+  );
+};
+
+export default function Services({ onBookDelivery }) {
+  const handleGetQuote = (service) => {
+    if (onBookDelivery) {
+      onBookDelivery(service);
+    }
   };
 
   return (
-    <>
-      <section id="services" className="py-20 bg-black">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Section Header */}
-          <div className="text-center mb-12">
-            <h2 className="text-4xl lg:text-4 xl font-bold text-white-500 mb-4 font-montserrat">
-              Our Core Service Offerings
-            </h2>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed font-montserrat">
-              Tailored delivery solutions for all your shipping needs.
-            </p>
+    <section id="services" className="py-20 px-4 sm:px-6 lg:px-8 bg-white dark:bg-black">
+      <div className="max-w-7xl mx-auto">
+        {/* Section Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          viewport={{ once: true }}
+          className="text-center mb-16"
+        >
+          <h2 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6 font-montserrat text-balance">
+            Our Services
+          </h2>
+          <div className="flex items-center justify-center gap-4 mb-6">
+            <div className="h-1 w-12 bg-gray-200 dark:bg-gray-800"></div>
+            <div className="h-1 w-20 bg-orange-500 rounded-full"></div>
+            <div className="h-1 w-12 bg-gray-200 dark:bg-gray-800"></div>
           </div>
+          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+            Choose the perfect delivery service for your needs. Fast, reliable,
+            and transparent pricing.
+          </p>
+        </motion.div>
 
-          {/* Services Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {services.map((service, index) => {
-              const IconComponent = service.icon;
-              return (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 50 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: index * 0.1 }}
-                  viewport={{ once: true }}
-                  whileHover={{ scale: 1.05, rotateY: 5 }}
-                  className="bg-gradient-to-br from-gray-800 to-gray-900 p-5 rounded-2xl border border-gray-700 hover:border-orange-500/50 transition-all duration-300 group"
-                >
-                  {/* Service Icon */}
-                  <div className="flex justify-center mb-3">
-                    <div className="w-14 h-14 bg-orange-500/10 rounded-full flex items-center justify-center group-hover:bg-orange-500/20 transition-colors">
-                      <IconComponent className="w-7 h-7 text-orange-500 group-hover:scale-110 transition-transform" />
-                    </div>
-                  </div>
-
-                  {/* Service Tier */}
-                  <div className="flex justify-center mb-2">
-                    <span className="inline-block bg-orange-500/10 text-orange-500 text-sm font-bold px-2.5 py-1 rounded-full uppercase tracking-wide font-montserrat">
-                      {service.tier}
-                    </span>
-                  </div>
-
-                  {/* Service Title */}
-                  <div className="flex justify-center mb-1">
-                    <h3 className="text-xl font-bold text-white group-hover:text-orange-500 transition-colors font-montserrat">
-                      {service.title}
-                    </h3>
-                  </div>
-
-                  {/* Service Subtitle */}
-                  <p className="text-sm text-gray-400 mb-2 text-center leading-relaxed font-montserrat">
-                    {service.subtitle}
-                  </p>
-
-                  {/* Service Description */}
-                  <p className="text-base text-gray-400 mb-3 text-center leading-relaxed font-montserrat">
-                    {service.description}
-                  </p>
-
-                  {/* Features List */}
-                  <ul className="space-y-1.5 mb-4">
-                    {service.features.map((feature, featureIndex) => (
-                      <li
-                        key={featureIndex}
-                        className="text-base text-gray-400 flex items-center leading-6 font-montserrat"
-                      >
-                        <feature.icon className="w-4 h-4 text-orange-500 mr-1.5 flex-shrink-0" />
-                        {feature.text}
-                      </li>
-                    ))}
-                  </ul>
-
-                  {/* Price and Action */}
-                  <div className="text-center pt-4 border-t border-gray-700">
-                    <span className="text-lg text-orange-500 font-bold font-montserrat">
-                      {service.price}
-                    </span>
-                    <div className="mt-3">
-                      <button
-                        onClick={handleBookDelivery}
-                        className="w-full bg-orange-500/10 text-orange-500 py-1.5 rounded-lg hover:bg-orange-500 hover:text-white transition-colors duration-300 font-semibold text-sm font-montserrat"
-                      >
-                        {service.action}
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
+        {/* Services Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {services.map((service, index) => (
+            <ServiceCard
+              key={service.id}
+              service={service}
+              onGetQuote={handleGetQuote}
+              index={index}
+            />
+          ))}
         </div>
-      </section>
 
-      {/* Quote Modal */}
-      {showQuoteModal && (
-        <GetQuoteBook
-          isOpen={showQuoteModal}
-          onClose={() => setShowQuoteModal(false)}
-        />
-      )}
-    </>
+        {/* Bottom CTA */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 0.3 }}
+          viewport={{ once: true }}
+          className="mt-16 text-center"
+        >
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            Not sure which service is right for you?
+          </p>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => handleGetQuote(null)}
+            className="px-8 py-4 rounded-full bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-lg hover:shadow-orange-500/30 transition-all duration-300 transform hover:scale-105"
+          >
+            Get a Custom Quote
+          </motion.button>
+        </motion.div>
+      </div>
+    </section>
   );
 }
