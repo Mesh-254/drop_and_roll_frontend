@@ -2,6 +2,7 @@
 import { Routes, Route } from "react-router-dom";
 import { useEffect } from "react";
 import { GoogleOAuthProvider } from "@react-oauth/google";
+import { QuoteProvider } from "./contexts/QuoteContext";   // ← import this
 import Header from "./components/common/Header";
 import Hero from "./components/landingPage/Hero";
 import Services from "./components/landingPage/Services";
@@ -28,6 +29,9 @@ import QuotePage from "./components/quote/QuotePage";
 import BookingPage from "./components/bookings/BookingPage";
 import BookingHistory from "./components/bookings/BookingHistory";
 
+// NAVIGATION & PROFILE UPGRADE: Import new ProfilePage component
+import ProfilePage from "./components/profile/ProfilePage";
+
 import PaymentPage from "./components/payments/PaymentPage";
 import PaymentSuccess from "./components/payments/PaymentSuccess";
 import PaymentCancel from "./components/payments/PaymentCancel";
@@ -51,12 +55,12 @@ function MainLayout({ children }) {
 // HomePage now only includes content, no Header/Footer
 function HomePage() {
   return (
-    <>
+    <QuoteProvider>
       <Hero />
       <Services />
       <About />
       <ContactForm />
-    </>
+    </QuoteProvider>
   );
 }
 // function to handle admin redirect (before the return)
@@ -145,28 +149,32 @@ function App() {
           <Route
             path="/history"
             element={
-              <MainLayout>
-                <BookingHistory />
-              </MainLayout>
+              <ProtectedRoute allowedRoles={["customer"]}>
+                <MainLayout>
+                  <BookingHistory />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          {/* NAVIGATION & PROFILE UPGRADE: New /profile route with editable profile and theme toggle */}
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute allowedRoles={["customer", "driver"]}>
+                <MainLayout>
+                  <ProfilePage />
+                </MainLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/profile-settings"
             element={
-              <MainLayout>
-                <div className="min-h-screen bg-black pt-24 pb-12">
-                  <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <h1 className="text-3xl font-bold text-white mb-8">
-                      Profile Settings
-                    </h1>
-                    <div className="bg-gray-900 rounded-lg p-6">
-                      <p className="text-gray-400">
-                        Profile settings page coming soon...
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </MainLayout>
+              <ProtectedRoute allowedRoles={["customer", "driver"]}>
+                <MainLayout>
+                  <ProfilePage />
+                </MainLayout>
+              </ProtectedRoute>
             }
           />
           {/* Payment routes */}
