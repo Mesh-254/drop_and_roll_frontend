@@ -2,6 +2,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { bookingApi } from "../../api/BookingApi"; // ← make sure this is imported
 import {
   User,
   Package,
@@ -27,6 +28,8 @@ export default function ProfileDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const [activeSubmenu, setActiveSubmenu] = useState(null);
   const dropdownRef = useRef(null);
+  const [bookingsCount, setBookingsCount] = useState(0);
+  const [memberSince, setMemberSince] = useState("—");
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -44,6 +47,32 @@ export default function ProfileDropdown() {
       };
     }
   }, [isOpen]);
+
+  // Fetch real bookings count
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await bookingApi.getBookings();
+        if (res.success) {
+          setBookingsCount(res.data?.length || 0);
+        }
+      } catch (err) {
+        console.error("Failed to load bookings count", err);
+      }
+    };
+    if (user) fetchData();
+  }, [user]);
+
+  // Calculate member since
+  useEffect(() => {
+    if (user?.date_joined) {
+      const joinDate = new Date(user.date_joined);
+      const months = Math.floor(
+        (new Date() - joinDate) / (1000 * 60 * 60 * 24 * 30.44)
+      );
+      setMemberSince(months > 0 ? `${months}mo` : "New");
+    }
+  }, [user]);
 
   const handleLogout = async () => {
     await logout();
@@ -69,7 +98,7 @@ export default function ProfileDropdown() {
       label: "My Bookings",
       submenu: [
         { label: "Booking History", icon: FileText, action: () => navigate("/history") },
-        { label: "Track Delivery", icon: MapPin, action: () => navigate("/history") },
+        { label: "Track Delivery", icon: MapPin, action: () => navigate("/") },
       ],
     },
     {
@@ -170,8 +199,8 @@ export default function ProfileDropdown() {
             {/* NAVIGATION & PROFILE UPGRADE: User stats - removed "Total Spent" */}
             <div className="grid grid-cols-2 gap-3 px-6 py-6 border-b border-gray-800/50">
               {[
-                { label: "Total Orders", value: "12", icon: Package },
-                { label: "Member Since", value: "6mo", icon: Calendar },
+                { label: "Total Orders", value: bookingsCount, icon: Package },
+                { label: "Member Since", value: memberSince, icon: Calendar },
               ].map((stat, idx) => {
                 const Icon = stat.icon;
                 return (

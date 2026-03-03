@@ -614,7 +614,7 @@ export default function BookingHistory() {
                         onClick={() => {
                           setShowDetailsModal(false);
                           // TODO: Open track modal with tracking number
-                          navigate(`/history?track=${selectedBooking.tracking_number}`);
+                          navigate(`/tracking?track=${selectedBooking.tracking_number}`);
                         }}
                         className="flex-1 px-4 py-3 border-2 border-orange-500/30 text-orange-400 font-bold rounded-lg hover:border-orange-500/60 transition-all"
                       >
