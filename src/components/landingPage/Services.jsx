@@ -2,7 +2,8 @@
 
 import { motion } from "framer-motion";
 import { Zap, Truck, Briefcase, MapPin, Check } from "lucide-react";
-import { useState } from "react";
+import { useState, Suspense } from "react";
+import GetQuoteBook from "../quote/GetQuoteBook"; // Adjust path as needed
 
 const services = [
   {
@@ -181,11 +182,13 @@ const ServiceCard = ({ service, onGetQuote, index }) => {
   );
 };
 
-export default function Services({ onBookDelivery }) {
+export default function Services() {
+  const [showQuoteModal, setShowQuoteModal] = useState(false);
+
   const handleGetQuote = (service) => {
-    if (onBookDelivery) {
-      onBookDelivery(service);
-    }
+    // Optionally handle service-specific logic here (e.g., set in context if available)
+    console.log("Selected service:", service); // Placeholder for service handling
+    setShowQuoteModal(true);
   };
 
   return (
@@ -246,6 +249,22 @@ export default function Services({ onBookDelivery }) {
           </motion.button>
         </motion.div>
       </div>
+
+      {/* Quote Modal */}
+      {showQuoteModal && (
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
+              Loading...
+            </div>
+          }
+        >
+          <GetQuoteBook
+            isOpen={showQuoteModal}
+            onClose={() => setShowQuoteModal(false)}
+          />
+        </Suspense>
+      )}
     </section>
   );
 }
