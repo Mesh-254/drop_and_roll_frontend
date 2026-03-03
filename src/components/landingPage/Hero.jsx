@@ -2,9 +2,13 @@
 
 import { motion } from "framer-motion";
 import { MapPin, Zap, AlertCircle } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef, Suspense } from "react";
+import GetQuoteBook from "../quote/GetQuoteBook"; // Adjust path as needed
+import TrackParcelModal from "../track/TrackParcelModal"; // Adjust path as needed
+import { useQuoteContext } from "../../contexts/QuoteContext"; // Adjust path as needed
+import { useAuth } from "../../contexts/AuthContext"; // Adjust path as needed
 
-export default function Hero({ onBookDelivery, onQuickQuote }) {
+export default function Hero() {
   const [quickQuoteData, setQuickQuoteData] = useState({
     pickupPostcode: "",
     dropoffPostcode: "",
@@ -15,6 +19,10 @@ export default function Hero({ onBookDelivery, onQuickQuote }) {
     pickup: useRef(null),
     dropoff: useRef(null),
   };
+  const [showQuoteModal, setShowQuoteModal] = useState(false);
+  const [showTrackModal, setShowTrackModal] = useState(false);
+  const { setQuickQuotePostcodes } = useQuoteContext();
+  const { isAuthenticated } = useAuth();
 
   const handleQuickQuoteChange = (field, value) => {
     setQuickQuoteData((prev) => ({
@@ -61,13 +69,12 @@ export default function Hero({ onBookDelivery, onQuickQuote }) {
 
     setIsSubmitting(true);
 
-    // Call the parent's quick quote handler
-    if (onQuickQuote) {
-      await onQuickQuote({
-        pickupPostcode: quickQuoteData.pickupPostcode.replace(/\s+/g, ""),
-        dropoffPostcode: quickQuoteData.dropoffPostcode.replace(/\s+/g, ""),
-      });
-    }
+    // Set postcodes in context and open modal
+    setQuickQuotePostcodes(
+      quickQuoteData.pickupPostcode.replace(/\s+/g, ""),
+      quickQuoteData.dropoffPostcode.replace(/\s+/g, "")
+    );
+    setShowQuoteModal(true);
 
     setIsSubmitting(false);
   };
@@ -164,7 +171,7 @@ export default function Hero({ onBookDelivery, onQuickQuote }) {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={onBookDelivery}
+                onClick={() => setShowQuoteModal(true)}
                 className="px-8 py-4 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold shadow-lg hover:shadow-orange-500/40 transition-all duration-300"
               >
                 Get Quote & Book
@@ -172,6 +179,7 @@ export default function Hero({ onBookDelivery, onQuickQuote }) {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
+                onClick={() => setShowTrackModal(true)}
                 className="px-8 py-4 rounded-full border-2 border-orange-500/50 text-orange-400 hover:text-orange-300 hover:border-orange-400 font-bold transition-all duration-300 flex items-center justify-center gap-2"
               >
                 <Zap size={20} />
@@ -317,6 +325,37 @@ export default function Hero({ onBookDelivery, onQuickQuote }) {
           </div>
         </motion.div>
       </motion.div>
+
+      {/* Quote Modal */}
+      {showQuoteModal && (
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
+              Loading...
+            </div>
+          }
+        >
+          <GetQuoteBook
+            isOpen={showQuoteModal}
+            onClose={() => setShowQuoteModal(false)}
+          />
+        </Suspense>
+      )}
+      {/* Track Parcel Modal */}
+      {showTrackModal && (
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
+              Loading...
+            </div>
+          }
+        >
+          <TrackParcelModal
+            isOpen={showTrackModal}
+            onClose={() => setShowTrackModal(false)}
+          />
+        </Suspense>
+      )}
     </section>
   );
 }
