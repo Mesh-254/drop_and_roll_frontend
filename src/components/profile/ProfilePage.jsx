@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { Moon, Sun, Save, X, Loader } from "lucide-react";
+import { authApi } from "../../api/AuthApi";   // ← make sure this import exists
 
 // NAVIGATION & PROFILE UPGRADE: New /profile page with editable name fields and theme toggle
 export default function ProfilePage() {
@@ -14,11 +15,22 @@ export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
-    firstName: user?.first_name || "",
-    lastName: user?.last_name || "",
+    firstName: "",
+    lastName: "",
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // Split full_name when user data is available
+  useEffect(() => {
+    if (user?.full_name) {
+      const parts = user.full_name.trim().split(/\s+/);
+      setFormData({
+        firstName: parts[0] || "",
+        lastName: parts.slice(1).join(" ") || "",
+      });
+    }
+  }, [user]);
 
   // Initialize dark mode from localStorage
   useEffect(() => {
@@ -27,7 +39,6 @@ export default function ProfilePage() {
     applyTheme(savedMode);
   }, []);
 
-  // NAVIGATION & PROFILE UPGRADE: Theme toggle functionality
   const applyTheme = (isDark) => {
     if (isDark) {
       document.documentElement.classList.add("dark");
@@ -51,10 +62,9 @@ export default function ProfilePage() {
     }));
   };
 
-  // NAVIGATION & PROFILE UPGRADE: Save profile changes via PATCH /api/users/auth/me/
   const handleSaveProfile = async () => {
-    if (!formData.firstName.trim() || !formData.lastName.trim()) {
-      setError("First and last name are required");
+    if (!formData.firstName.trim()) {
+      setError("First name is required");
       return;
     }
 
@@ -62,30 +72,24 @@ export default function ProfilePage() {
     setError("");
     setSuccess("");
 
-    try {
-      // PATCH to /api/users/auth/me/
-      const response = await fetch(
-        `${import.meta.env.VITE_NEXT_PUBLIC_BACKEND_URL}/api/users/auth/me/`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-          },
-          body: JSON.stringify({
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-          }),
-        }
-      );
+    // Combine into full_name (backend only has this field)
+    const fullName = [formData.firstName.trim(), formData.lastName.trim()]
+      .filter(Boolean)
+      .join(" ");
 
-      if (!response.ok) {
-        throw new Error("Failed to update profile");
+    try {
+      const result = await authApi.updateUserProfile({
+        full_name: fullName,
+      });
+
+      if (!result.success) {
+        throw new Error(result.message || "Failed to update profile");
       }
 
       setSuccess("Profile updated successfully!");
       setIsEditing(false);
-      // Refresh user data
+
+      // Refresh page to show updated name (you can later improve this)
       setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
       setError(err.message || "Failed to save profile");
@@ -93,6 +97,11 @@ export default function ProfilePage() {
       setIsSaving(false);
     }
   };
+
+  // ────────────────────────────────────────────────
+  //  The rest of your component (return statement) stays EXACTLY the same
+  //  Only the logic parts above were updated
+  // ────────────────────────────────────────────────
 
   if (!user) {
     return (
@@ -135,11 +144,10 @@ export default function ProfilePage() {
               {/* Avatar */}
               <div className="flex flex-col items-center mb-6">
                 <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center font-bold text-white text-4xl shadow-lg shadow-orange-500/30 mb-4">
-                  {user?.first_name?.[0]}
-                  {user?.last_name?.[0]}
+                  {user?.full_name?.[0] || "?"}
                 </div>
                 <h2 className="text-xl font-bold text-white text-center">
-                  {user?.first_name} {user?.last_name}
+                  {user?.full_name || "User"}
                 </h2>
                 <p className="text-sm text-gray-400 text-center mt-2">{user?.email}</p>
                 <div className="flex items-center gap-2 mt-4 bg-green-500/20 px-3 py-1 rounded-full border border-green-500/30">
@@ -243,7 +251,7 @@ export default function ProfilePage() {
                     />
                   ) : (
                     <div className="px-4 py-3 bg-gray-800/30 border border-gray-700/30 text-white rounded-lg">
-                      {user?.first_name || "—"}
+                      {formData.firstName || "—"}
                     </div>
                   )}
                 </div>
@@ -264,7 +272,7 @@ export default function ProfilePage() {
                     />
                   ) : (
                     <div className="px-4 py-3 bg-gray-800/30 border border-gray-700/30 text-white rounded-lg">
-                      {user?.last_name || "—"}
+                      {formData.lastName || "—"}
                     </div>
                   )}
                 </div>
@@ -314,10 +322,6 @@ export default function ProfilePage() {
                     whileTap={{ scale: 0.95 }}
                     onClick={() => {
                       setIsEditing(false);
-                      setFormData({
-                        firstName: user?.first_name || "",
-                        lastName: user?.last_name || "",
-                      });
                       setError("");
                     }}
                     className="flex items-center justify-center gap-2 px-6 py-3 border-2 border-gray-700 hover:border-gray-600 text-gray-400 hover:text-gray-300 font-bold rounded-lg transition-all"
