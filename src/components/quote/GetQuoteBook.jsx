@@ -1,3 +1,4 @@
+// UPDATED: Multi-parcel support - Step 3 completely rewritten
 "use client";
 import { useNavigate } from "react-router-dom";
 import { bookingApi } from "../../api/BookingApi";
@@ -19,9 +20,11 @@ import {
   User,
   Mail,
   Phone,
+  Plus,
 } from "lucide-react";
 import MapComponent from "../map/MapComponent";
 import AddressAutocomplete from "../map/AddressAutocomplete";
+import ParcelCard from "./ParcelCard";
 import { APIProvider } from "@vis.gl/react-google-maps";
 
 const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -273,7 +276,12 @@ const QuoteDisplay = ({ quote, onDownloadPDF, isLoading, formData }) => {
   );
 };
 
-export default function GetQuoteModal({ isOpen, onClose }) {
+export default function GetQuoteModal({
+  isOpen,
+  onClose,
+  initialPickupPostcode,
+  initialDropoffPostcode,
+}) {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
@@ -287,15 +295,25 @@ export default function GetQuoteModal({ isOpen, onClose }) {
   const [quoteId, setQuoteId] = useState(null);
   const [lastQuoteData, setLastQuoteData] = useState(null);
 
-  const [pickupPostcode, setPickupPostcode] = useState("");
-  const [dropoffPostcode, setDropoffPostcode] = useState("");
+  const [pickupPostcode, setPickupPostcode] = useState(
+    initialPickupPostcode || "",
+  );
+  const [dropoffPostcode, setDropoffPostcode] = useState(
+    initialDropoffPostcode || "",
+  );
 
+  // UPDATED: Multi-parcel formData structure
   const [formData, setFormData] = useState({
     shipmentType: null,
     service: null,
-    weightKg: "",
-    fragile: false,
-    dimensions: { length: "", width: "", height: "" },
+    parcels: [
+      {
+        id: 1,
+        weightKg: "",
+        dimensions: { length: "", width: "", height: "" },
+        fragile: false,
+      },
+    ],
     pickupAddress: null,
     dropoffAddress: null,
     insurance: false,
@@ -311,6 +329,14 @@ export default function GetQuoteModal({ isOpen, onClose }) {
 
   const firstInputRef = useRef(null);
 
+  // Calculate total weight from all parcels
+  const totalWeight = useMemo(() => {
+    return formData.parcels.reduce((sum, parcel) => {
+      const weight = Number.parseFloat(parcel.weightKg) || 0;
+      return sum + weight;
+    }, 0);
+  }, [formData.parcels]);
+
   // Load shipping types and services on mount
   useEffect(() => {
     if (isOpen) {
@@ -318,6 +344,16 @@ export default function GetQuoteModal({ isOpen, onClose }) {
       loadServices();
     }
   }, [isOpen]);
+
+  // Auto-fill postcodes if provided
+  useEffect(() => {
+    if (initialPickupPostcode && currentStep === 4) {
+      setPickupPostcode(initialPickupPostcode);
+    }
+    if (initialDropoffPostcode && currentStep === 4) {
+      setDropoffPostcode(initialDropoffPostcode);
+    }
+  }, [currentStep, initialPickupPostcode, initialDropoffPostcode]);
 
   const loadShipmentTypes = async () => {
     setIsLoadingTypes(true);
@@ -360,7 +396,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
         try {
           const dist = await bookingApi.calculateDistance(
             formData.pickupAddress,
-            formData.dropoffAddress
+            formData.dropoffAddress,
           );
           setFormData((prev) => ({ ...prev, distanceKm: dist }));
           setValidation((prev) => ({ ...prev, distance: null }));
@@ -385,9 +421,9 @@ export default function GetQuoteModal({ isOpen, onClose }) {
     if (
       !formData.shipmentType ||
       !formData.service ||
-      !formData.weightKg ||
       !formData.pickupAddress ||
-      !formData.dropoffAddress
+      !formData.dropoffAddress ||
+      formData.parcels.length === 0
     ) {
       setValidation((prev) => ({
         ...prev,
@@ -396,17 +432,24 @@ export default function GetQuoteModal({ isOpen, onClose }) {
       return;
     }
 
+    // Calculate average weight for quote (backend should handle per-parcel logic)
+    const totalWeight = formData.parcels.reduce(
+      (sum, p) => sum + (Number.parseFloat(p.weightKg) || 0),
+      0,
+    );
+    const fragileCount = formData.parcels.filter((p) => p.fragile).length;
+
     const quoteData = {
       shipmentType: formData.shipmentType,
       service: formData.service,
-      weightKg: Number.parseFloat(formData.weightKg),
+      weightKg: totalWeight,
       distanceKm: formData.distanceKm,
-      fragile: formData.fragile,
+      fragile: fragileCount > 0,
       insuranceAmount: Number.parseFloat(formData.insuranceAmount) || 0,
       dimensions: {
-        width: Number.parseFloat(formData.dimensions.width),
-        length: Number.parseFloat(formData.dimensions.length),
-        height: Number.parseFloat(formData.dimensions.height),
+        width: Number.parseFloat(formData.parcels[0]?.dimensions.width) || 0,
+        length: Number.parseFloat(formData.parcels[0]?.dimensions.length) || 0,
+        height: Number.parseFloat(formData.parcels[0]?.dimensions.height) || 0,
         unit: "cm",
       },
     };
@@ -458,6 +501,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
     setValidation((prev) => ({ ...prev, service: null }));
   };
 
+  // UPDATED: Multi-parcel validation
   const validateStep = (step, data) => {
     const errors = {};
 
@@ -473,31 +517,37 @@ export default function GetQuoteModal({ isOpen, onClose }) {
         }
         break;
       case 3:
-        if (!data.weightKg || Number.parseFloat(data.weightKg) <= 0) {
-          errors.weightKg = "Please enter a valid weight";
-        } else if (
-          data.shipmentType?.name === "Parcels" &&
-          Number.parseFloat(data.weightKg) > 31.5
-        ) {
-          errors.weightKg = "Parcel weight cannot exceed 31.5kg";
-        }
-        if (
-          !data.dimensions.width ||
-          Number.parseFloat(data.dimensions.width) <= 0
-        ) {
-          errors.width = "Please enter a valid width";
-        }
-        if (
-          !data.dimensions.length ||
-          Number.parseFloat(data.dimensions.length) <= 0
-        ) {
-          errors.length = "Please enter a valid length";
-        }
-        if (
-          !data.dimensions.height ||
-          Number.parseFloat(data.dimensions.height) <= 0
-        ) {
-          errors.height = "Please enter a valid height";
+        // Validate all parcels
+        const parcelErrors = {};
+        data.parcels.forEach((parcel, idx) => {
+          const pErrors = {};
+          if (!parcel.weightKg || Number.parseFloat(parcel.weightKg) <= 0) {
+            pErrors.weightKg = "Enter valid weight";
+          }
+          if (
+            !parcel.dimensions.length ||
+            Number.parseFloat(parcel.dimensions.length) <= 0
+          ) {
+            pErrors.length = "Required";
+          }
+          if (
+            !parcel.dimensions.width ||
+            Number.parseFloat(parcel.dimensions.width) <= 0
+          ) {
+            pErrors.width = "Required";
+          }
+          if (
+            !parcel.dimensions.height ||
+            Number.parseFloat(parcel.dimensions.height) <= 0
+          ) {
+            pErrors.height = "Required";
+          }
+          if (Object.keys(pErrors).length > 0) {
+            parcelErrors[idx] = pErrors;
+          }
+        });
+        if (Object.keys(parcelErrors).length > 0) {
+          errors.parcels = parcelErrors;
         }
         break;
       case 4:
@@ -536,34 +586,27 @@ export default function GetQuoteModal({ isOpen, onClose }) {
       case 2:
         return data.service !== null;
       case 3:
-        return (
-          data.weightKg &&
-          Number.parseFloat(data.weightKg) > 0 &&
-          data.dimensions.width &&
-          Number.parseFloat(data.dimensions.width) > 0 &&
-          data.dimensions.length &&
-          Number.parseFloat(data.dimensions.length) > 0 &&
-          data.dimensions.height &&
-          Number.parseFloat(data.dimensions.height) > 0
+        return data.parcels.every(
+          (p) =>
+            p.weightKg &&
+            Number.parseFloat(p.weightKg) > 0 &&
+            p.dimensions.width &&
+            Number.parseFloat(p.dimensions.width) > 0 &&
+            p.dimensions.length &&
+            Number.parseFloat(p.dimensions.length) > 0 &&
+            p.dimensions.height &&
+            Number.parseFloat(p.dimensions.height) > 0,
         );
       case 4:
         return data.pickupAddress && data.dropoffAddress;
       case 5:
         const errors = validateStep(5, data);
-        console.log("Step 5 validity:", {
-          quote: !!quote,
-          errors: Object.keys(errors).length === 0,
-          receiverEmail: !!data.receiverEmail,
-          receiverPhone: !!data.receiverPhone,
-          isLoadingQuote,
-        });
         return quote !== null && Object.keys(errors).length === 0;
       default:
         return false;
     }
   };
 
-  // Real-time validation for receiver inputs
   const handleReceiverInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     const errors = validateStep(5, { ...formData, [field]: value });
@@ -572,6 +615,46 @@ export default function GetQuoteModal({ isOpen, onClose }) {
       receiverEmail: errors.receiverEmail || null,
       receiverPhone: errors.receiverPhone || null,
     }));
+  };
+
+  // UPDATED: Parcel management handlers
+  const handleParcelUpdate = (index, updatedParcel) => {
+    setFormData((prev) => {
+      const newParcels = [...prev.parcels];
+      newParcels[index] = updatedParcel;
+      return { ...prev, parcels: newParcels };
+    });
+    setValidation((prev) => {
+      const newValidation = { ...prev };
+      if (newValidation.parcels && newValidation.parcels[index]) {
+        delete newValidation.parcels[index];
+      }
+      return newValidation;
+    });
+  };
+
+  const handleAddParcel = () => {
+    if (formData.parcels.length < 5) {
+      const newParcel = {
+        id: Math.max(...formData.parcels.map((p) => p.id), 0) + 1,
+        weightKg: "",
+        dimensions: { length: "", width: "", height: "" },
+        fragile: false,
+      };
+      setFormData((prev) => ({
+        ...prev,
+        parcels: [...prev.parcels, newParcel],
+      }));
+    }
+  };
+
+  const handleRemoveParcel = (index) => {
+    if (formData.parcels.length > 1) {
+      setFormData((prev) => ({
+        ...prev,
+        parcels: prev.parcels.filter((_, i) => i !== index),
+      }));
+    }
   };
 
   const nextStep = () => {
@@ -607,6 +690,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
           quote,
           formData: {
             ...formData,
+            weightKg: totalWeight, // For backward compatibility
             receiverEmail: formData.receiverEmail,
             receiverPhone: formData.receiverPhone,
           },
@@ -637,16 +721,16 @@ export default function GetQuoteModal({ isOpen, onClose }) {
     yPos += 10;
     doc.text(`Service Type: ${breakdown.service_type}`, 30, yPos);
     yPos += 8;
-    doc.text(`Shipment Type: ${breakdown.shipment_type}`, 30, yPos);
+    doc.text(`Total Weight: ${totalWeight}kg`, 30, yPos);
     yPos += 8;
-    doc.text(`Weight: ${formData.weightKg}kg`, 30, yPos);
+    doc.text(`Number of Parcels: ${formData.parcels.length}`, 30, yPos);
     yPos += 8;
     doc.text(
       `Pickup: ${formData.pickupAddress?.line1 || "N/A"}, ${
         formData.pickupAddress?.city || "N/A"
       }`,
       30,
-      yPos
+      yPos,
     );
     yPos += 8;
     doc.text(
@@ -654,7 +738,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
         formData.dropoffAddress?.city || "N/A"
       }`,
       30,
-      yPos
+      yPos,
     );
     yPos += 8;
     doc.text(`Distance: ${quote.distance_km}km`, 30, yPos);
@@ -667,13 +751,13 @@ export default function GetQuoteModal({ isOpen, onClose }) {
     doc.text(
       `Weight Charge: £${breakdown.weight_charge?.toFixed(2)}`,
       30,
-      yPos
+      yPos,
     );
     yPos += 8;
     doc.text(
       `Distance Charge: £${breakdown.distance_charge?.toFixed(2)}`,
       30,
-      yPos
+      yPos,
     );
     yPos += 8;
     doc.text(`Subtotal: £${breakdown.subtotal?.toFixed(2)}`, 30, yPos);
@@ -683,7 +767,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
       doc.text(
         `Fragile Surcharge: £${breakdown.fragile_charge?.toFixed(2)}`,
         30,
-        yPos
+        yPos,
       );
       yPos += 8;
     }
@@ -692,7 +776,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
       doc.text(
         `Insurance Fee: £${breakdown.insurance_fee?.toFixed(2)}`,
         30,
-        yPos
+        yPos,
       );
       yPos += 8;
     }
@@ -742,8 +826,8 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                         isCompleted
                           ? "bg-green-500 text-white"
                           : isActive
-                          ? "bg-orange-500 text-white"
-                          : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                            ? "bg-orange-500 text-white"
+                            : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
                       }
                     `}
                     >
@@ -756,8 +840,8 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                         isActive
                           ? "text-orange-500"
                           : isCompleted
-                          ? "text-green-500"
-                          : "text-gray-500 dark:text-gray-400"
+                            ? "text-green-500"
+                            : "text-gray-500 dark:text-gray-400"
                       }
                     `}
                     >
@@ -840,15 +924,17 @@ export default function GetQuoteModal({ isOpen, onClose }) {
               </div>
             )}
 
+            {/* UPDATED: Step 3 - Multi-parcel form */}
             {currentStep === 3 && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-                      Parcel Details
+                      Your Parcels
                     </h3>
                     <p className="text-gray-600 dark:text-gray-400">
-                      Service: {formData.service?.name}
+                      Service: {formData.service?.name} • (Maximum 5 parcels per
+                      booking)
                     </p>
                   </div>
                   <button
@@ -860,199 +946,87 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                   </button>
                 </div>
 
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Weight (kg) *
-                    </label>
-                    <input
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      value={formData.weightKg}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          weightKg: e.target.value,
-                        }))
-                      }
-                      placeholder="Enter weight in kilograms"
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                    />
-                    {validation.weightKg && (
-                      <div className="flex items-center text-red-500 text-sm mt-2">
-                        <AlertCircle size={16} className="mr-2" />
-                        {validation.weightKg}
-                      </div>
-                    )}
-                  </div>
+                {/* Total Weight Display */}
+                <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Total weight:{" "}
+                    <span className="font-bold text-orange-600 dark:text-orange-400">
+                      {totalWeight.toFixed(1)} kg
+                    </span>
+                  </p>
+                </div>
 
-                  <div className="flex items-center space-x-3 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                {/* Parcels List */}
+                <div className="space-y-4">
+                  {formData.parcels.map((parcel, index) => (
+                    <ParcelCard
+                      key={parcel.id}
+                      parcel={parcel}
+                      parcelIndex={index}
+                      onUpdate={handleParcelUpdate}
+                      onRemove={handleRemoveParcel}
+                      validation={validation.parcels}
+                      canRemove={formData.parcels.length > 1}
+                      totalParcels={formData.parcels.length}
+                    />
+                  ))}
+                </div>
+
+                {/* Add Parcel Button */}
+                {formData.parcels.length < 5 && (
+                  <button
+                    onClick={handleAddParcel}
+                    className="w-full py-3 px-4 rounded-lg border-2 border-dashed border-orange-300 dark:border-orange-700 text-orange-500 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/10 font-medium transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Plus size={20} />
+                    Add Another Parcel
+                  </button>
+                )}
+
+                {/* Insurance Option */}
+                <div className="space-y-4 mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center space-x-3">
                     <input
                       type="checkbox"
-                      id="fragile"
-                      checked={formData.fragile || false}
+                      id="insurance"
+                      checked={formData.insurance || false}
                       onChange={(e) =>
                         setFormData((prev) => ({
                           ...prev,
-                          fragile: e.target.checked,
+                          insurance: e.target.checked,
                         }))
                       }
                       className="w-5 h-5 text-orange-500 border-gray-300 dark:border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
                     />
                     <label
-                      htmlFor="fragile"
-                      className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-1"
+                      htmlFor="insurance"
+                      className="text-sm font-medium text-gray-700 dark:text-gray-300"
                     >
-                      Is this parcel fragile?
+                      Add insurance coverage for all parcels
                     </label>
-                    <div className="group relative">
-                      <AlertCircle
-                        size={16}
-                        className="text-gray-400 cursor-help"
-                      />
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
-                        Extra handling for delicate items (may incur additional
-                        fees)
-                      </div>
-                    </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <h4 className="text-lg font-medium text-gray-900 dark:text-white">
-                      Package Dimensions
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Width (cm) *
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={formData.dimensions.width || ""}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              dimensions: {
-                                ...prev.dimensions,
-                                width: e.target.value,
-                              },
-                            }))
-                          }
-                          placeholder="Width"
-                          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                        />
-                        {validation.width && (
-                          <div className="flex items-center text-red-500 text-sm mt-2">
-                            <AlertCircle size={16} className="mr-2" />
-                            {validation.width}
-                          </div>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Length (cm) *
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={formData.dimensions.length || ""}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              dimensions: {
-                                ...prev.dimensions,
-                                length: e.target.value,
-                              },
-                            }))
-                          }
-                          placeholder="Length"
-                          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                        />
-                        {validation.length && (
-                          <div className="flex items-center text-red-500 text-sm mt-2">
-                            <AlertCircle size={16} className="mr-2" />
-                            {validation.length}
-                          </div>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Height (cm) *
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={formData.dimensions.height || ""}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              dimensions: {
-                                ...prev.dimensions,
-                                height: e.target.value,
-                              },
-                            }))
-                          }
-                          placeholder="Height"
-                          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                        />
-                        {validation.height && (
-                          <div className="flex items-center text-red-500 text-sm mt-2">
-                            <AlertCircle size={16} className="mr-2" />
-                            {validation.height}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-3">
+                  {formData.insurance && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Total Insurance Amount (£)
+                      </label>
                       <input
-                        type="checkbox"
-                        id="insurance"
-                        checked={formData.insurance || false}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.insuranceAmount || ""}
                         onChange={(e) =>
                           setFormData((prev) => ({
                             ...prev,
-                            insurance: e.target.checked,
+                            insuranceAmount: e.target.value,
                           }))
                         }
-                        className="w-5 h-5 text-orange-500 border-gray-300 dark:border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
+                        placeholder="Enter insurance value"
+                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
                       />
-                      <label
-                        htmlFor="insurance"
-                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                      >
-                        Add insurance coverage
-                      </label>
                     </div>
-
-                    {formData.insurance && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Insurance Amount (£)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={formData.insuranceAmount || ""}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              insuranceAmount: e.target.value,
-                            }))
-                          }
-                          placeholder="Enter insurance value"
-                          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                        />
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1065,9 +1039,9 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                       Pickup & Dropoff Locations
                     </h3>
                     <p className="text-gray-600 dark:text-gray-400">
-                      Weight: {formData.weightKg}kg, Dimensions:{" "}
-                      {formData.dimensions.length}×{formData.dimensions.width}×
-                      {formData.dimensions.height}cm
+                      Total Weight: {totalWeight.toFixed(1)}kg •{" "}
+                      {formData.parcels.length} parcel
+                      {formData.parcels.length !== 1 ? "s" : ""}
                     </p>
                   </div>
                   <button
@@ -1259,7 +1233,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                         onChange={(e) =>
                           handleReceiverInputChange(
                             "receiverEmail",
-                            e.target.value
+                            e.target.value,
                           )
                         }
                         placeholder="Enter receiver's email address"
@@ -1284,7 +1258,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                         onChange={(e) =>
                           handleReceiverInputChange(
                             "receiverPhone",
-                            e.target.value
+                            e.target.value,
                           )
                         }
                         onKeyPress={(e) => {
@@ -1310,7 +1284,7 @@ export default function GetQuoteModal({ isOpen, onClose }) {
                   quote={quote}
                   onDownloadPDF={downloadQuotePDF}
                   isLoading={isLoadingQuote}
-                  formData={formData}
+                  formData={{ ...formData, weightKg: totalWeight }}
                 />
               </div>
             )}
