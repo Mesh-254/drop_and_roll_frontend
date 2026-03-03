@@ -259,9 +259,15 @@ export default function BookingHistory() {
                 >
                   <option value="">All Statuses</option>
                   <option value="pending">Pending</option>
-                  <option value="in-progress">In Progress</option>
-                  <option value="completed">Completed</option>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="assigned">Assigned</option>
+                  <option value="picked_up">Picked Up</option>
+                  <option value="at_hub">At Hub</option>
+                  <option value="in_transit">In Transit</option>
+                  <option value="delivered">Delivered</option>
                   <option value="cancelled">Cancelled</option>
+                  <option value="failed">Failed</option>
+                  <option value="refunded">Refunded</option>
                 </select>
               </div>
             )}
