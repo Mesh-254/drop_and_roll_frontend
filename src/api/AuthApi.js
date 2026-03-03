@@ -160,6 +160,27 @@ class AuthApi extends ApiBase {
     }
   }
 
+  async updateUserProfile(data) {
+  try {
+    const response = await this.request("/api/users/auth/me/", {
+      method: "PATCH",
+      data,
+    });
+    return { success: true, data: response.data };
+  } catch (error) {
+    const backendError = error.response?.data || {};
+    return {
+      success: false,
+      message:
+        backendError.detail ||
+        backendError.error ||
+        backendError.message ||
+        error.message ||
+        "Failed to update profile",
+    };
+  }
+}
+
   async changePassword(oldPassword, newPassword) {
     try {
       const response = await this.request("/api/users/auth/change-password/", {
