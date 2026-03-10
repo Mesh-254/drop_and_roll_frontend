@@ -78,29 +78,59 @@ export class BookingApi extends ApiBase {
 
   async createQuote(quoteData) {
     try {
-      const backendData = {
+      // Defensive mapping + rounding to 2 decimal places (backend uses Decimal)
+      const parcels = (quoteData.parcels || []).map((p, idx) => {
+        const weight = Number.parseFloat(p.weightKg);
+        if (Number.isNaN(weight) || weight <= 0) {
+          throw new Error(`Invalid weight for parcel ${idx + 1}`);
+        }
+
+        const dims = p.dimensions || {};
+        const length = Number.parseFloat(dims.length) || 0;
+        const width = Number.parseFloat(dims.width) || 0;
+        const height = Number.parseFloat(dims.height) || 0;
+
+        if (length <= 0 || width <= 0 || height <= 0) {
+          throw new Error(`Invalid dimensions for parcel ${idx + 1}`);
+        }
+
+        return {
+          weight_kg: weight.toFixed(2),
+          dimensions: {
+            length: length.toFixed(1),
+            width: width.toFixed(1),
+            height: height.toFixed(1),
+          },
+          fragile: !!p.fragile,
+        };
+      });
+
+      if (parcels.length === 0) {
+        throw new Error("At least one parcel is required");
+      }
+
+      const payload = {
         shipping_type_id: quoteData.shipmentType?.id,
         service_type_id: quoteData.service?.id,
-        weight_kg: Number.parseFloat(quoteData.weightKg),
-        distance_km: Number.parseFloat(quoteData.distanceKm),
-        fragile: quoteData.fragile || false,
-        insurance_amount: Number.parseFloat(quoteData.insuranceAmount) || 0,
-        dimensions: quoteData.dimensions || {},
-        surge: Number.parseFloat(quoteData.surge) || 1.0,
-        discount: Number.parseFloat(quoteData.discount) || 0.0,
+        distance_km: Number(quoteData.distanceKm || 0),
+        parcels,
+        insurance_amount: Number(quoteData.insuranceAmount || 0),
+        discount: Number(quoteData.discount || 0),
       };
-      console.log("Quote payload:", backendData);
+      console.log("Quote payload:", payload);
       const response = await this.request("/api/booking/quotes/compute/", {
         method: "POST",
-        data: backendData,
+        data: payload,
         includeAuth: false,
       });
+
       return { success: true, data: response.data };
     } catch (error) {
+      console.error("[createQuote] failed:", error);
       return {
         success: false,
-        code: error.code || "QUOTE_ERROR",
-        message: error.message || "Failed to compute quote",
+        code: error.code || "QUOTE_CREATE_FAILED",
+        message: error.message || "Failed to create quote",
       };
     }
   }
@@ -116,10 +146,10 @@ export class BookingApi extends ApiBase {
           postal_code: bookingData.pickupAddress.postal_code, // Changed from postalCode to postal_code for consistency with AddressAutocomplete
           country: "GB",
           latitude: Number.parseFloat(
-            bookingData.pickupAddress.latitude.toFixed(6)
+            bookingData.pickupAddress.latitude.toFixed(6),
           ),
           longitude: Number.parseFloat(
-            bookingData.pickupAddress.longitude.toFixed(6)
+            bookingData.pickupAddress.longitude.toFixed(6),
           ),
         },
         dropoff_address: {
@@ -130,10 +160,10 @@ export class BookingApi extends ApiBase {
           postal_code: bookingData.dropoffAddress.postal_code, // Changed from postalCode to postal_code
           country: "GB",
           latitude: Number.parseFloat(
-            bookingData.dropoffAddress.latitude.toFixed(6)
+            bookingData.dropoffAddress.latitude.toFixed(6),
           ),
           longitude: Number.parseFloat(
-            bookingData.dropoffAddress.longitude.toFixed(6)
+            bookingData.dropoffAddress.longitude.toFixed(6),
           ),
         },
         quote_id: bookingData.quoteId,
@@ -215,7 +245,7 @@ export class BookingApi extends ApiBase {
   async getBooking(bookingId) {
     try {
       const response = await this.request(
-        `/api/booking/bookings/${bookingId}/`
+        `/api/booking/bookings/${bookingId}/`,
       ); // Fixed URL
       return { success: true, data: response.data };
     } catch (error) {
@@ -234,7 +264,7 @@ export class BookingApi extends ApiBase {
         {
           method: "POST",
           data: { status },
-        }
+        },
       );
       return { success: true, data: response.data };
     } catch (error) {
@@ -249,12 +279,12 @@ export class BookingApi extends ApiBase {
     try {
       const response = await this.request(
         `/api/booking/track/?tracking_number=${encodeURIComponent(
-          trackingNumber
+          trackingNumber,
         )}`,
         {
           method: "GET",
           includeAuth: false, // Public endpoint
-        }
+        },
       );
       return { success: true, data: response.data };
     } catch (error) {
