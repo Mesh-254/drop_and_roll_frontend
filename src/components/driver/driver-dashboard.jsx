@@ -26,6 +26,7 @@ import {
   Zap,
 } from "lucide-react";
 import { PerformanceMetrics } from "./performance-metrics";
+import { ActiveJobsOverviewCard } from "./active-jobs-overview-card";
 import { EarningsChart } from "./earnings-chart";
 import { DeliveryStatusUpdates } from "./delivery-status-updates";
 import { JobDetailsModal } from "./job-details-modal";
@@ -587,8 +588,7 @@ export default function DriverDashboard() {
   const navigation = [
     { name: "Overview", icon: Home, key: "overview" },
     { name: "Jobs", icon: Briefcase, key: "jobs" },
-    { name: "Map", icon: MapPin, key: "map" }, // Add map tab
-    { name: "Earnings", icon: DollarSign, key: "earnings" },
+    { name: "Map", icon: MapPin, key: "map" },
     { name: "Documents", icon: FileText, key: "documents" },
     { name: "Profile", icon: User, key: "profile" },
   ];
@@ -657,7 +657,7 @@ export default function DriverDashboard() {
               Live Tracking
             </h3>
             <div className="flex gap-2 w-full sm:w-auto">
-              <button
+              {/* <button
                 onClick={handleToggleTracking}
                 disabled={toggleLoading}
                 className={`flex-1 sm:flex-none px-4 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
@@ -683,7 +683,7 @@ export default function DriverDashboard() {
                     </span>
                   </>
                 )}
-              </button>
+              </button> */}
               <button
                 onClick={toggleManualTracking}
                 disabled={toggleLoading}
@@ -718,7 +718,7 @@ export default function DriverDashboard() {
                 {trackingStatus}
               </p>
             </div>
-            <div className="p-3 bg-muted rounded-lg">
+            {/* <div className="p-3 bg-muted rounded-lg">
               <p className="text-xs text-muted-foreground mb-1">
                 Backend Status
               </p>
@@ -727,7 +727,7 @@ export default function DriverDashboard() {
               >
                 {backendTrackingStatus ? "ACTIVE" : "INACTIVE"}
               </p>
-            </div>
+            </div> */}
             <div className="p-3 bg-muted rounded-lg">
               <p className="text-xs text-muted-foreground mb-1">
                 Manual Override
@@ -756,16 +756,6 @@ export default function DriverDashboard() {
           )}
         </div>
 
-        {/* Map Container */}
-        <div className="bg-card border border-border rounded-lg overflow-hidden shadow-sm">
-          <div
-            id="driver-map"
-            className="w-full h-96 lg:h-[600px]"
-            style={{ backgroundColor: "#f0f0f0" }}
-          >
-            {/* Map will be rendered here by initMap function */}
-          </div>
-        </div>
       </div>
     );
   };
@@ -919,95 +909,25 @@ export default function DriverDashboard() {
 
         <main className="flex-1 p-4 lg:p-6 max-w-none">
           {activeTab === "overview" && (
-            <div className="space-y-6 max-w-none">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-                <div className="bg-card border border-border rounded-lg p-4 lg:p-6 mobile-card shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Total Deliveries
-                      </p>
-                      <p className="text-2xl lg:text-3xl font-bold text-foreground">
-                        {metrics.totalDeliveries}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Completed: {metrics.totalDeliveries}
-                      </p>
-                    </div>
-                    <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Package className="h-6 w-6 text-primary" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-card border border-border rounded-lg p-4 lg:p-6 mobile-card shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Today's Earnings
-                      </p>
-                      <p className="text-2xl lg:text-3xl font-bold text-foreground">
-                        {formatCurrency(metrics.earningsToday)}
-                      </p>
-                      <p className="text-xs text-green-600 mt-1">
-                        From {metrics.completedToday} deliveries
-                      </p>
-                    </div>
-                    <div className="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center flex-shrink-0">
-                      <DollarSign className="h-6 w-6 text-green-600" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-card border border-border rounded-lg p-4 lg:p-6 mobile-card shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Average Rating
-                      </p>
-                      <p className="text-2xl lg:text-3xl font-bold text-foreground">
-                        {metrics.averageRating.toFixed(1)}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Out of 5 stars
-                      </p>
-                    </div>
-                    <div className="w-12 h-12 bg-yellow-500/10 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Star className="h-6 w-6 text-yellow-500" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-card border border-border rounded-lg p-4 lg:p-6 mobile-card shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-muted-foreground">
-                        Active Jobs
-                      </p>
-                      <p className="text-2xl lg:text-3xl font-bold text-foreground">
-                        {metrics.activeJobs}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        In progress
-                      </p>
-                    </div>
-                    <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Clock className="h-6 w-6 text-blue-600" />
-                    </div>
-                  </div>
-                </div>
+            <div className="space-y-5 max-w-none">
+              {/* Welcome Message */}
+              <div className="mb-6">
+                <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
+                  Welcome back, {profile?.first_name || "Driver"}!
+                </h1>
               </div>
 
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 max-w-none">
-                <EarningsChart earnings={earnings} detailed={false} />
-                <PerformanceMetrics
-                  rating={metrics.averageRating}
-                  completionRate={metrics.completionRate}
-                  totalDeliveries={metrics.totalDeliveries}
-                />
-              </div>
+              {/* Performance Metrics Card */}
+              <PerformanceMetrics metrics={metrics} />
 
-              <DeliveryStatusUpdates jobs={jobs.slice(0, 5)} />
+              {/* Active Jobs Card */}
+              <ActiveJobsOverviewCard
+                jobs={jobs}
+                onJobClick={handleJobClick}
+                onViewAll={() => setActiveTab("jobs")}
+              />
+
+            
             </div>
           )}
 
@@ -1024,40 +944,6 @@ export default function DriverDashboard() {
                 }}
                 isAuthenticated={isLoggedIn}
               />
-            </div>
-          )}
-
-          {activeTab === "earnings" && (
-            <div className="space-y-6 max-w-none">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-                <div className="bg-card border border-border rounded-lg p-4 lg:p-6 mobile-card shadow-sm">
-                  <h3 className="text-lg font-semibold text-foreground mb-2">
-                    Today
-                  </h3>
-                  <p className="text-2xl lg:text-3xl font-bold text-primary">
-                    {formatCurrency(earnings.today)}
-                  </p>
-                </div>
-                <div className="bg-card border border-border rounded-lg p-4 lg:p-6 mobile-card shadow-sm">
-                  <h3 className="text-lg font-semibold text-foreground mb-2">
-                    This Week
-                  </h3>
-                  <p className="text-2xl lg:text-3xl font-bold text-green-600">
-                    {formatCurrency(earnings.weekly)}
-                  </p>
-                </div>
-                <div className="bg-card border border-border rounded-lg p-4 lg:p-6 mobile-card shadow-sm">
-                  <h3 className="text-lg font-semibold text-foreground mb-2">
-                    This Month
-                  </h3>
-                  <p className="text-2xl lg:text-3xl font-bold text-blue-600">
-                    {formatCurrency(earnings.monthly)}
-                  </p>
-                </div>
-              </div>
-              <div className="max-w-none">
-                <EarningsChart earnings={earnings} detailed={true} />
-              </div>
             </div>
           )}
 

@@ -8,94 +8,111 @@ import {
   User,
   Package,
   AlertTriangle,
-  Navigation,
   Calendar,
   ChevronLeft,
   X,
   Lock,
+  CheckCircle2,
+  AlertCircle,
+  ImageIcon,
+  FileText,
 } from "lucide-react";
 import { driverApi } from "../../api/driver-api";
 import { ProofOfDelivery } from "./proof-of-delivery";
-import MapComponent from "../map/MapComponent";
-import { APIProvider } from "@vis.gl/react-google-maps";
-
-const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-const libraries = ["places", "maps", "geometry", "routes"];
 
 function ProofOfDeliveryView({ proofData, onClose }) {
-  const pods = Array.isArray(proofData)
-    ? proofData
-    : proofData
-    ? [proofData]
-    : [];
+  const pods = Array.isArray(proofData) ? proofData : proofData ? [proofData] : [];
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
       <div
-        className="bg-card rounded-xl p-6 max-w-lg w-full mx-4"
+        className="bg-white rounded-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
-          aria-label="Close modal"
-        >
-          <X className="h-5 w-5" />
-        </button>
-        <h2 className="text-xl font-bold text-foreground mb-4">
-          Proof of Delivery
-        </h2>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-slate-900">Proof of Delivery</h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+            aria-label="Close modal"
+          >
+            <X className="h-5 w-5 text-slate-600" />
+          </button>
+        </div>
+
         {pods.length > 0 ? (
-          pods.map((pod, index) => (
-            <div
-              key={pod.id || index}
-              className="space-y-4 border-b pb-4 last:border-b-0"
-            >
-              {pods.length > 1 && (
-                <h3 className="text-lg font-semibold">Proof #{index + 1}</h3>
-              )}
-              {pod.photo && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Photo</p>
-                  <img
-                    src={pod.photo || "/placeholder.svg"}
-                    alt={`Proof of Delivery ${index + 1}`}
-                    className="w-full h-48 object-cover rounded-lg mt-1"
-                  />
+          <div className="space-y-6">
+            {pods.map((pod, index) => (
+              <div key={pod.id || index} className="border border-slate-200 rounded-lg p-5">
+                {pods.length > 1 && (
+                  <h3 className="font-bold text-slate-900 mb-4 text-lg">
+                    Proof #{index + 1}
+                  </h3>
+                )}
+
+                {/* Photo - Large Display */}
+                {pod.photo && (
+                  <div className="mb-5">
+                    <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">
+                      Photo
+                    </p>
+                    <img
+                      src={pod.photo || "/placeholder.svg"}
+                      alt={`Proof of Delivery ${index + 1}`}
+                      className="w-full max-h-96 object-contain rounded-lg bg-slate-50 border border-slate-200"
+                    />
+                  </div>
+                )}
+
+                {/* Notes */}
+                {pod.notes && (
+                  <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">
+                      Notes
+                    </p>
+                    <p className="text-slate-900 whitespace-pre-wrap">{pod.notes}</p>
+                  </div>
+                )}
+
+                {/* Metadata */}
+                <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                  {pod.location?.lat && pod.location?.lng && (
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                      <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">
+                        Location
+                      </p>
+                      <p className="text-slate-900 font-mono text-xs">
+                        {pod.location.lat.toFixed(6)}, {pod.location.lng.toFixed(6)}
+                      </p>
+                      {pod.location.accuracy && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          ±{pod.location.accuracy.toFixed(0)}m accuracy
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {pod.created_at && (
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                      <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1">
+                        Submitted
+                      </p>
+                      <p className="text-slate-900">
+                        {new Date(pod.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
-              {pod.notes && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Notes</p>
-                  <p className="text-foreground">{pod.notes}</p>
-                </div>
-              )}
-              {pod.location?.lat && pod.location?.lng && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Location</p>
-                  <p className="text-foreground">
-                    Lat: {pod.location.lat}, Lng: {pod.location.lng}
-                  </p>
-                </div>
-              )}
-              {pod.created_at && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Submitted At</p>
-                  <p className="text-foreground">
-                    {new Date(pod.created_at).toLocaleString()}
-                  </p>
-                </div>
-              )}
-              {!pod.photo && !pod.notes && !pod.location && (
-                <p className="text-muted-foreground">No details available</p>
-              )}
-            </div>
-          ))
+              </div>
+            ))}
+          </div>
         ) : (
-          <p className="text-muted-foreground">No proof details available</p>
+          <div className="text-center py-12">
+            <ImageIcon className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-600 font-medium">No proof details available</p>
+          </div>
         )}
       </div>
     </div>
@@ -105,14 +122,12 @@ function ProofOfDeliveryView({ proofData, onClose }) {
 export function JobDetailPage({ jobId, onBack }) {
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [immutable, setImmutable] = useState(false); // New: Track if job is locked (DELIVERED + POD)
-  const [immutableReason, setImmutableReason] = useState(""); // New: Reason for lock
+  const [immutable, setImmutable] = useState(false);
+  const [immutableReason, setImmutableReason] = useState("");
   const [showProofModal, setShowProofModal] = useState(false);
   const [showProofViewModal, setShowProofViewModal] = useState(false);
   const [proofData, setProofData] = useState(null);
   const [currentLocation, setCurrentLocation] = useState(null);
-  const [isNearDropoff, setIsNearDropoff] = useState(false);
-  const [mapError, setMapError] = useState(null);
   const [hasProof, setHasProof] = useState(false);
 
   const statuses = [
@@ -186,28 +201,16 @@ export function JobDetailPage({ jobId, onBack }) {
     try {
       const location = await driverApi.getCurrentLocation();
       setCurrentLocation(location);
-      if (job?.data?.dropoff_address?.coordinates && job?.data?.status) {
-        const distance = calculateDistance(
-          location,
-          job.data.dropoff_address.coordinates
-        );
-        setIsNearDropoff(job.data.status === "in_transit" && distance <= 100);
-      }
     } catch (error) {
       console.error("Failed to get current location:", error);
     }
-  }, [job]);
-
-  const calculateDistance = useCallback((loc1, loc2) => {
-    return 100;
   }, []);
 
   const handleStatusUpdate = useCallback(
     async (newStatus) => {
       if (immutable) {
         toast.error(
-          immutableReason ||
-            "Job is delivered with POD submitted—cannot update status."
+          immutableReason || "Job is locked—cannot update status."
         );
         return;
       }
@@ -215,11 +218,7 @@ export function JobDetailPage({ jobId, onBack }) {
       if (!window.confirm(`Mark job as ${getStatusText(newStatus)}?`)) return;
 
       try {
-        await driverApi.updateJobStatus(
-          job.data.id,
-          newStatus,
-          currentLocation
-        );
+        await driverApi.updateJobStatus(job.data.id, newStatus, currentLocation);
         setJob({
           ...job,
           data: {
@@ -229,9 +228,7 @@ export function JobDetailPage({ jobId, onBack }) {
           },
         });
         toast.success(`Job status updated to ${getStatusText(newStatus)}`);
-        if (newStatus === "in_transit") {
-          await getCurrentLocation();
-        }
+
         const immutabilityCheck = await driverApi.checkImmutable(job.data.id);
         if (immutabilityCheck.success) {
           setImmutable(immutabilityCheck.immutable);
@@ -253,23 +250,19 @@ export function JobDetailPage({ jobId, onBack }) {
 
   const getStatusColor = useCallback((status) => {
     const colors = {
-      pending: "bg-gray-500",
-      scheduled: "bg-orange-500",
-      assigned: "bg-blue-500",
-      picked_up: "bg-yellow-500",
-      at_hub: "bg-purple-500",
-      in_transit: "bg-indigo-500",
-      delivered: "bg-green-500",
-      cancelled: "bg-red-500",
-      failed: "bg-red-500",
+      assigned: "bg-blue-100 text-blue-700 border border-blue-200",
+      picked_up: "bg-amber-100 text-amber-700 border border-amber-200",
+      at_hub: "bg-purple-100 text-purple-700 border border-purple-200",
+      in_transit: "bg-indigo-100 text-indigo-700 border border-indigo-200",
+      delivered: "bg-green-100 text-green-700 border border-green-200",
+      cancelled: "bg-red-100 text-red-700 border border-red-200",
+      failed: "bg-red-100 text-red-700 border border-red-200",
     };
-    return colors[status] || "bg-gray-500";
+    return colors[status] || "bg-slate-100 text-slate-700 border border-slate-200";
   }, []);
 
   const getStatusText = useCallback((status) => {
     const texts = {
-      pending: "Pending",
-      scheduled: "Scheduled",
       assigned: "Assigned",
       picked_up: "Picked Up",
       at_hub: "At Hub",
@@ -287,15 +280,12 @@ export function JobDetailPage({ jobId, onBack }) {
   const formatDimensions = useCallback((dimensions) => {
     if (!dimensions || typeof dimensions !== "object") return "N/A";
     const { length = 0, width = 0, height = 0 } = dimensions;
-    return `${Number.parseFloat(length) || 0}x${
-      Number.parseFloat(width) || 0
-    }x${Number.parseFloat(height) || 0} cm`;
+    return `${Number.parseFloat(length) || 0}×${Number.parseFloat(width) || 0}×${Number.parseFloat(height) || 0} cm`;
   }, []);
 
   const isUrgentPickup = useCallback((scheduledPickupAt) => {
     if (!scheduledPickupAt) return false;
-    const diffMinutes =
-      (new Date(scheduledPickupAt) - new Date()) / (1000 * 60);
+    const diffMinutes = (new Date(scheduledPickupAt) - new Date()) / (1000 * 60);
     return diffMinutes <= 30 && diffMinutes >= 0;
   }, []);
 
@@ -309,26 +299,6 @@ export function JobDetailPage({ jobId, onBack }) {
     return "N/A";
   }, []);
 
-  const pickupAddress = useMemo(() => {
-    const addr = job?.data?.pickup_address;
-    return addr?.latitude && addr?.longitude
-      ? {
-          latitude: Number.parseFloat(addr.latitude),
-          longitude: Number.parseFloat(addr.longitude),
-        }
-      : null;
-  }, [job?.data?.pickup_address]);
-
-  const dropoffAddress = useMemo(() => {
-    const addr = job?.data?.dropoff_address;
-    return addr?.latitude && addr?.longitude
-      ? {
-          latitude: Number.parseFloat(addr.latitude),
-          longitude: Number.parseFloat(addr.longitude),
-        }
-      : null;
-  }, [job?.data?.dropoff_address]);
-
   const nextStatus = useMemo(
     () => getNextStatus(job?.data?.status),
     [job?.data?.status, getNextStatus]
@@ -336,10 +306,10 @@ export function JobDetailPage({ jobId, onBack }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading job details...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-blue-600 mx-auto mb-4" />
+          <p className="text-slate-600 font-medium">Loading job details...</p>
         </div>
       </div>
     );
@@ -347,64 +317,42 @@ export function JobDetailPage({ jobId, onBack }) {
 
   if (!job?.data) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="text-center">
-          <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">
-            Job not found
-          </h3>
-          <p className="text-muted-foreground">
-            The requested job could not be loaded.
-          </p>
+          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-bold text-slate-900 mb-2">Job not found</h3>
+          <p className="text-slate-600">The requested job could not be loaded.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       {/* Header */}
-      <div className="bg-card border-b border-border sticky top-0 z-10 p-4">
-        <div className="flex items-center gap-4">
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 px-4 py-2 bg-card text-foreground border border-border rounded-lg hover:bg-muted hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-primary"
+            className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-900 rounded-lg hover:bg-slate-200 transition-colors font-medium text-sm"
             aria-label="Go back"
           >
-            <ChevronLeft className="h-5 w-5" />
-            <span className="text-sm font-medium">Back</span>
+            <ChevronLeft className="h-4 w-4" />
+            Back
           </button>
-          <div className="flex-1">
-            <h1 className="text-xl font-bold text-foreground">
-              Job #{job.data.id}
+          <div className="text-right">
+            <h1 className="text-2xl font-bold text-slate-900">
+              Job #{job.data.id?.slice(-8) || job.data.id}
             </h1>
-            <div className="flex items-center gap-2">
-              <span
-                className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                  job.data.status
-                )} text-primary-foreground`}
-                aria-label={`Status: ${getStatusText(job.data.status)}`}
-              >
+            <div className="flex flex-wrap items-center justify-end gap-2 mt-2">
+              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(job.data.status)}`}>
                 {getStatusText(job.data.status)}
-                {immutable && (
-                  <Lock
-                    className="h-3 w-3 inline ml-1 text-destructive"
-                    title="Locked - POD Submitted"
-                  />
-                )}
+                {immutable && <Lock className="h-3 w-3 inline ml-1" />}
               </span>
               {isUrgentPickup(job.data.scheduled_pickup_at) && (
-                <AlertTriangle
-                  className="h-4 w-4 text-orange-500"
-                  title="Urgent pickup"
-                />
-              )}
-              {immutable && (
-                <span
-                  className="text-xs text-destructive ml-2"
-                  title={immutableReason}
-                >
-                  {immutableReason || "Status Locked"}
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700 border border-red-200 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  Urgent Pickup
                 </span>
               )}
             </div>
@@ -412,350 +360,263 @@ export function JobDetailPage({ jobId, onBack }) {
         </div>
       </div>
 
-      <div className="p-4 space-y-6 max-w-4xl mx-auto">
-        {/* Locations */}
-        <div className="bg-card rounded-xl p-6">
-          <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-            <MapPin className="h-5 w-5" />
-            Locations
-          </h2>
-          <div className="space-y-6">
-            <div className="space-y-3">
-              <h3 className="font-medium text-foreground flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full" />
-                Pickup
-              </h3>
-              <div className="ml-6 space-y-2">
-                <p className="text-muted-foreground">
-                  {formatAddress(job.data.pickup_address)}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Immutable Banner */}
+        {immutable && (
+          <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-lg">
+            <div className="flex items-start gap-3">
+              <Lock className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-bold text-red-900">Job Locked</h3>
+                <p className="text-sm text-red-700 mt-1">
+                  {immutableReason || "This job has been delivered with proof submitted and cannot be modified."}
                 </p>
-                {job.data.customer?.phone && (
-                  <button
-                    onClick={() =>
-                      (window.location.href = `tel:${job.data.customer.phone.replace(
-                        /\D/g,
-                        ""
-                      )}`)
-                    }
-                    className="flex items-center gap-2 text-sm text-primary hover:underline"
-                    aria-label={`Call sender: ${job.data.customer.phone}`}
-                  >
-                    <Phone className="h-4 w-4" />
-                    {job.data.customer.phone}
-                  </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Next Action Button - Prominent */}
+        {nextStatus && !immutable && (
+          <div className="mb-6">
+            <button
+              onClick={() => handleStatusUpdate(nextStatus)}
+              className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-lg rounded-lg hover:shadow-lg transition-all shadow-md hover:from-blue-700 hover:to-blue-800"
+            >
+              {nextStatus === "picked_up" && "► Pick Up This Job"}
+              {nextStatus === "at_hub" && "◆ Mark as At Hub"}
+              {nextStatus === "in_transit" && "↗ Mark as In Transit"}
+              {nextStatus === "delivered" && "✓ Complete Delivery"}
+            </button>
+          </div>
+        )}
+
+        {/* Main Content Grid */}
+        <div className="space-y-6">
+          {/* Locations Card */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-blue-600" />
+              Delivery Route
+            </h2>
+
+            <div className="space-y-6">
+              {/* Pickup */}
+              <div className="border-l-4 border-green-500 pl-4">
+                <h3 className="font-bold text-slate-900 flex items-center gap-2 mb-3">
+                  <div className="w-2.5 h-2.5 bg-green-500 rounded-full" />
+                  Pickup Location
+                </h3>
+                <div className="space-y-3 text-sm">
+                  <p className="text-slate-900 font-medium text-base">
+                    {formatAddress(job.data.pickup_address) || "N/A"}
+                  </p>
+                  {job.data.customer?.phone && (
+                    <button
+                      onClick={() =>
+                        (window.location.href = `tel:${job.data.customer.phone.replace(
+                          /\D/g,
+                          ""
+                        )}`)
+                      }
+                      className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      <Phone className="h-4 w-4" />
+                      {job.data.customer.phone}
+                    </button>
+                  )}
+                  {job.data.customer?.name && (
+                    <div className="flex items-center gap-2 text-slate-700">
+                      <User className="h-4 w-4 text-slate-400" />
+                      {job.data.customer.name}
+                    </div>
+                  )}
+                  {job.data.scheduled_pickup_at && (
+                    <div className="flex items-center gap-2 text-slate-700">
+                      <Calendar className="h-4 w-4 text-slate-400" />
+                      {new Date(job.data.scheduled_pickup_at).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="flex items-center gap-3 text-slate-400">
+                <div className="flex-1 h-px bg-slate-200" />
+                <span className="text-xs font-semibold">DELIVERY</span>
+                <div className="flex-1 h-px bg-slate-200" />
+              </div>
+
+              {/* Delivery */}
+              <div className="border-l-4 border-blue-500 pl-4">
+                <h3 className="font-bold text-slate-900 flex items-center gap-2 mb-3">
+                  <div className="w-2.5 h-2.5 bg-blue-500 rounded-full" />
+                  Delivery Location
+                </h3>
+                <div className="space-y-3 text-sm">
+                  <p className="text-slate-900 font-medium text-base">
+                    {formatAddress(job.data.dropoff_address) || "N/A"}
+                  </p>
+                  {job.data.receiver_phone && (
+                    <button
+                      onClick={() =>
+                        (window.location.href = `tel:${job.data.receiver_phone.replace(
+                          /\D/g,
+                          ""
+                        )}`)
+                      }
+                      className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      <Phone className="h-4 w-4" />
+                      {job.data.receiver_phone}
+                    </button>
+                  )}
+                  {job.data.receiver_name && (
+                    <div className="flex items-center gap-2 text-slate-700">
+                      <User className="h-4 w-4 text-slate-400" />
+                      {job.data.receiver_name}
+                    </div>
+                  )}
+                  {job.data.receiver_email && (
+                    <div className="text-slate-600 text-xs">{job.data.receiver_email}</div>
+                  )}
+                  {job.data.scheduled_dropoff_at && (
+                    <div className="flex items-center gap-2 text-slate-700">
+                      <Calendar className="h-4 w-4 text-slate-400" />
+                      {new Date(job.data.scheduled_dropoff_at).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Package Details Card */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+              <Package className="h-5 w-5 text-slate-600" />
+              Package Details
+            </h2>
+
+            <div className="grid sm:grid-cols-2 gap-6">
+              <div>
+                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2 block">
+                  Description
+                </label>
+                <p className="text-slate-900 text-base mb-3">
+                  {job.data.notes || "N/A"}
+                </p>
+                {job.data.quote?.fragile && (
+                  <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 px-3 py-2 rounded-lg border border-red-200 w-fit">
+                    <AlertTriangle className="h-4 w-4" />
+                    Fragile - Handle with care
+                  </div>
                 )}
-                {job.data.scheduled_pickup_at && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
-                    {new Date(job.data.scheduled_pickup_at).toLocaleString()}
+                {job.data.quote?.service_type?.name && (
+                  <div className="mt-3 text-sm">
+                    <p className="text-slate-600 font-medium">
+                      Service: <span className="text-blue-600">{job.data.quote.service_type.name}</span>
+                    </p>
                   </div>
                 )}
               </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2 block">
+                  Dimensions & Weight
+                </label>
+                <div className="space-y-2 text-slate-900">
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Weight:</span>
+                    <span className="font-medium">{job.data.quote?.weight_kg || 0} kg</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">Dimensions:</span>
+                    <span className="font-medium font-mono text-sm">
+                      {formatDimensions(job.data.quote?.dimensions)}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="space-y-3">
-              <h3 className="font-medium text-foreground flex items-center gap-2">
-                <div className="w-2 h-2 bg-primary rounded-full" />
-                Delivery
-              </h3>
-              <div className="ml-6 space-y-2">
-                <p className="text-muted-foreground">
-                  {formatAddress(job.data.dropoff_address)}
+
+            {job.data.tracking_number && (
+              <div className="mt-6 pt-6 border-t border-slate-200">
+                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">
+                  Tracking Number
                 </p>
-                {job.data.receiver_phone && (
+                <p className="text-slate-900 font-mono text-base">
+                  {job.data.tracking_number}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Proof of Delivery Section */}
+          {job.data.status === "delivered" && (
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200 p-6 shadow-sm">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-bold text-green-900 text-lg">Proof of Delivery</h3>
+                    <p className="text-sm text-green-700 mt-1">
+                      {hasProof
+                        ? "✓ Proof submitted and verified"
+                        : "Submission required to complete this delivery"}
+                    </p>
+                  </div>
+                </div>
+                {hasProof && proofData && (
                   <button
-                    onClick={() =>
-                      (window.location.href = `tel:${job.data.receiver_phone.replace(
-                        /\D/g,
-                        ""
-                      )}`)
-                    }
-                    className="flex items-center gap-2 text-sm text-primary hover:underline"
-                    aria-label={`Call receiver: ${job.data.receiver_phone}`}
+                    onClick={() => setShowProofViewModal(true)}
+                    className="px-4 py-2 bg-white text-green-600 font-semibold rounded-lg hover:bg-green-50 transition-colors border border-green-200"
                   >
-                    <Phone className="h-4 w-4" />
-                    Receiver: {job.data.receiver_phone}
+                    <FileText className="h-4 w-4 inline mr-1" />
+                    View Proof
                   </button>
                 )}
-                {job.data.receiver_email && (
-                  <p className="text-sm text-muted-foreground">
-                    Email: {job.data.receiver_email}
-                  </p>
-                )}
-                {job.data.scheduled_dropoff_at && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
-                    {new Date(job.data.scheduled_dropoff_at).toLocaleString()}
-                  </div>
-                )}
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Package Details */}
-        <div className="bg-card rounded-xl p-6">
-          <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Package Details
-          </h2>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">Description</p>
-              <p className="text-foreground">{job.data.notes || "N/A"}</p>
-              {job.data.quote?.fragile && (
-                <div className="flex items-center gap-2 text-sm text-destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  Fragile - Handle with care
-                </div>
-              )}
-              {job.data.quote?.service_type?.name && (
-                <p className="text-sm text-blue-500">
-                  Service: {job.data.quote.service_type.name}
-                </p>
-              )}
-            </div>
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Dimensions & Weight
-              </p>
-              <div className="space-y-1 text-sm text-foreground">
-                <p>Weight: {job.data.quote?.weight_kg || 0} kg</p>
-                <p>Size: {formatDimensions(job.data.quote?.dimensions)}</p>
-              </div>
-              {job.data.notes && (
-                <div className="mt-4 p-3 bg-muted/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    <strong>Notes:</strong> {job.data.notes}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4 pt-4 mt-4 border-t border-border">
-            <div>
-              <p className="text-sm text-muted-foreground">Tracking Number</p>
-              <p className="text-foreground font-mono text-sm">
-                {job.data.tracking_number || "N/A"}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Sender Info */}
-        <div className="bg-card rounded-xl p-6">
-          <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Sender
-          </h2>
-          <div className="flex flex-col sm:flex-row gap-6">
-            <div className="flex-1 space-y-2">
-              <p className="text-foreground font-medium">
-                {job.data.customer?.name || job.data.guest_email || "N/A"}
-              </p>
-              {job.data.customer?.phone && (
+              {!hasProof && !immutable && (
                 <button
-                  onClick={() =>
-                    (window.location.href = `tel:${job.data.customer.phone.replace(
-                      /\D/g,
-                      ""
-                    )}`)
-                  }
-                  className="flex items-center gap-2 text-sm text-primary hover:underline"
-                  aria-label={`Call sender: ${job.data.customer.phone}`}
+                  onClick={() => setShowProofModal(true)}
+                  className="mt-4 w-full px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"
                 >
-                  <Phone className="h-4 w-4" />
-                  Call Sender
+                  Submit Proof of Delivery
                 </button>
               )}
             </div>
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Updated</p>
-              <p className="text-sm text-foreground">
-                {new Date(job.data.updated_at).toLocaleString()}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Receiver Info */}
-        <div className="bg-card rounded-xl p-6">
-          <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Receiver
-          </h2>
-          <div className="flex flex-col sm:flex-row gap-6">
-            <div className="flex-1 space-y-2">
-              {job.data.receiver_phone && (
-                <button
-                  onClick={() =>
-                    (window.location.href = `tel:${job.data.receiver_phone.replace(
-                      /\D/g,
-                      ""
-                    )}`)
-                  }
-                  className="flex items-center gap-2 text-sm text-primary hover:underline"
-                  aria-label={`Call receiver: ${job.data.receiver_phone}`}
-                >
-                  <Phone className="h-4 w-4" />
-                  {job.data.receiver_phone}
-                </button>
-              )}
-              {job.data.receiver_email && (
-                <p className="text-sm text-muted-foreground">
-                  Email: {job.data.receiver_email}
-                </p>
-              )}
-              {!job.data.receiver_phone && !job.data.receiver_email && (
-                <p className="text-sm text-muted-foreground">
-                  No receiver details available
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Status Update Section */}
-        <div className="bg-card rounded-xl p-6 border-primary/20 border">
-          <h2 className="font-semibold text-foreground mb-4">Next Action</h2>
-          <div className="flex flex-col gap-4">
-            {nextStatus && (
-              <button
-                onClick={async () => {
-                  if (job.data.status === "in_transit") {
-                    setShowProofModal(true);
-                  } else {
-                    await handleStatusUpdate(nextStatus);
-                  }
-                }}
-                disabled={immutable}
-                className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                title={immutable ? immutableReason : undefined}
-              >
-                {job.data.status === "assigned" && "Mark Picked Up"}
-                {job.data.status === "picked_up" && "Mark At Hub"}
-                {job.data.status === "at_hub" && "Start Transit"}
-                {job.data.status === "in_transit" && "Mark Delivered"}
-              </button>
-            )}
-            {job.data.status === "delivered" && hasProof && (
-              <button
-                onClick={() => setShowProofViewModal(true)}
-                className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-              >
-                View Proof of Delivery
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <div className="bg-card rounded-xl p-6">
-          <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-            <Navigation className="h-5 w-5" />
-            Navigation
-          </h2>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-lg font-medium text-gray-900 dark:text-white">
-                Route Preview
-              </h4>
-              {job.data.quote?.distance_km > 0 && (
-                <span className="text-sm font-medium text-orange-600 dark:text-orange-400">
-                  Distance: {job.data.quote.distance_km}km
-                </span>
-              )}
-            </div>
-            {mapError ? (
-              <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg flex items-center justify-center">
-                <AlertTriangle className="h-6 w-6 text-red-500 mr-2" />
-                <p className="text-red-600 dark:text-red-300">{mapError}</p>
-              </div>
-            ) : !pickupAddress && !dropoffAddress ? (
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg flex items-center justify-center">
-                <AlertTriangle className="h-6 w-6 text-yellow-500 mr-2" />
-                <p className="text-yellow-600 dark:text-yellow-300">
-                  Map cannot be displayed: Missing coordinates
-                </p>
-              </div>
-            ) : (
-              <APIProvider apiKey={apiKey} libraries={libraries}>
-                <MapComponent
-                  pickupAddress={pickupAddress}
-                  dropoffAddress={dropoffAddress}
-                  isLoading={loading}
-                  error={mapError}
-                  className="w-full h-96 rounded-lg border border-gray-300 dark:border-gray-600"
-                  onError={(error) =>
-                    setMapError(error?.message || "Map failed to load")
-                  }
-                />
-              </APIProvider>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
-      {/* Proof of Delivery Modal */}
       {/* Proof of Delivery Modal */}
       {showProofModal && (
         <ProofOfDelivery
-          jobId={job.data.id} // Keep jobId for backward compatibility in ProofOfDelivery component
+          jobId={job.data.id}
           onClose={() => setShowProofModal(false)}
           onSubmit={async (proofData) => {
-            // Prevent submission if job is already locked (delivered + POD submitted)
-            if (immutable) {
-              toast.error(
-                immutableReason || "This job is locked and cannot be updated."
-              );
-              return;
-            }
-
             try {
-              // Step 1: Submit Proof of Delivery (photo, notes, location)
-              const podResult = await driverApi.submitProofOfDelivery(
+              const response = await driverApi.submitProofOfDelivery(
                 job.data.id,
                 proofData
               );
-
-              if (!podResult.success) {
-                throw new Error(
-                  podResult.message || "Failed to submit proof of delivery"
-                );
+              if (response.success) {
+                toast.success("Proof of delivery submitted successfully!");
+                setShowProofModal(false);
+                await loadJobDetails();
+              } else {
+                toast.error(response.message || "Failed to submit proof");
               }
-
-              // Step 2: Mark job as 'delivered' (triggers status change + confirmation prompt)
-              // This reuses your existing logic: confirmation, location pass, immutability check
-              await handleStatusUpdate("delivered");
-
-              // Step 3: Refresh UI state
-              setShowProofModal(false);
-              setHasProof(true); // Optimistic update
-
-              // Reload proof data and full job details to reflect new status/POD
-              await Promise.all([
-                loadProofOfDelivery(job.data.id),
-                loadJobDetails(),
-              ]);
-
-              toast.success(
-                "Proof of delivery submitted and job marked as delivered!"
-              );
             } catch (error) {
-              console.error("[JobDetailPage] POD submission failed:", error);
-
-              // Improved error messaging from API response if available
-              const errorMessage =
-                error.response?.data?.detail ||
-                error.message ||
-                "Failed to submit proof of delivery. Please try again.";
-
-              toast.error(errorMessage);
+              console.error("Error submitting proof:", error);
+              toast.error("Failed to submit proof of delivery");
             }
           }}
         />
       )}
 
-      {/* Proof of Delivery View Modal */}
+      {/* Proof View Modal */}
       {showProofViewModal && (
         <ProofOfDeliveryView
           proofData={proofData}
