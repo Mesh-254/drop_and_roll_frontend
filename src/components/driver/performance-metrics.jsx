@@ -1,112 +1,80 @@
-import { Star, TrendingUp, Award, Target } from "lucide-react";
+import React from "react";
+import { Star, TrendingUp, Package } from "lucide-react";
 
-export function PerformanceMetrics({
-  rating = 0,
-  completedJobs = 0,
-  totalJobs = 0,
-  ratings = [],
-}) {
-  const completionRate =
-    totalJobs > 0 ? ((completedJobs / totalJobs) * 100).toFixed(1) : 0;
+export function PerformanceMetrics({ metrics = {} }) {
+  const {
+    averageRating = 0,
+    completionRate = 0,
+    totalDeliveries = 0,
+  } = metrics;
 
-  const renderStars = (rating) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
-
-    for (let i = 0; i < 5; i++) {
-      if (i < fullStars) {
-        stars.push(
-          <Star key={i} className="h-4 w-4 fill-primary text-primary" />
-        );
-      } else if (i === fullStars && hasHalfStar) {
-        stars.push(
-          <Star key={i} className="h-4 w-4 fill-primary/50 text-primary/50" />
-        );
-      } else {
-        stars.push(<Star key={i} className="h-4 w-4 text-muted-foreground" />);
-      }
-    }
-    return stars;
+  // Determine star rating color based on rating value
+  const getStarColor = () => {
+    if (averageRating >= 4.5) return "text-green-500";
+    if (averageRating >= 4) return "text-blue-500";
+    if (averageRating >= 3.5) return "text-orange-500";
+    return "text-red-500";
   };
 
+  const starColor = getStarColor();
+
   return (
-    <div className="bg-card border border-border rounded-lg shadow-sm">
-      <div className="p-6 pb-4">
-        <h3 className="text-foreground font-sans flex items-center gap-2 text-lg font-semibold">
-          <Award className="h-5 w-5 text-primary" />
-          Performance Metrics
-        </h3>
+    <div className="bg-gradient-to-br from-orange-50 to-orange-50/50 dark:from-slate-900 dark:to-slate-800/50 border border-orange-200/50 dark:border-orange-900/30 rounded-2xl p-6 md:p-8 shadow-sm backdrop-blur-sm">
+      {/* Title */}
+      <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-6">
+        Performance Metrics
+      </h2>
+
+      {/* Large Centered Rating */}
+      <div className="text-center mb-8">
+        <div className="flex items-center justify-center gap-3 mb-3">
+          {/* Big Star Icon */}
+          <Star className={`w-12 h-12 ${starColor} fill-current`} />
+        </div>
+        <div className="text-5xl md:text-6xl font-bold text-slate-900 dark:text-white mb-2">
+          {averageRating.toFixed(1)}
+        </div>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          Average Rating
+        </p>
       </div>
-      <div className="px-6 pb-6 space-y-6">
-        {/* Rating Display */}
-        <div className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <span className="text-3xl font-sans font-bold text-foreground">
-              {Number.parseFloat(rating).toFixed(1)}
+
+      {/* Two Compact KPI Cards Side-by-Side */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Completion Rate */}
+        <div className="bg-white dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+              Completion Rate
             </span>
-            <div className="flex items-center gap-1">
-              {renderStars(Number.parseFloat(rating))}
-            </div>
+            <TrendingUp className="w-4 h-4 text-orange-500" />
           </div>
-          <p className="text-muted-foreground text-sm">Average Rating</p>
-        </div>
-
-        {/* Metrics Grid */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-muted rounded-lg p-4 text-center">
-            <div className="flex items-center justify-center mb-2">
-              <Target className="h-5 w-5 text-primary" />
-            </div>
-            <p className="text-2xl font-sans font-bold text-foreground">
-              {completionRate}%
-            </p>
-            <p className="text-muted-foreground text-sm">Completion Rate</p>
+          <div className="text-3xl font-bold text-slate-900 dark:text-white">
+            {completionRate}%
           </div>
-
-          <div className="bg-muted rounded-lg p-4 text-center">
-            <div className="flex items-center justify-center mb-2">
-              <TrendingUp className="h-5 w-5 text-green-500" />
-            </div>
-            <p className="text-2xl font-sans font-bold text-foreground">
-              {completedJobs}
-            </p>
-            <p className="text-muted-foreground text-sm">Jobs Completed</p>
+          {/* Simple progress bar */}
+          <div className="mt-3 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-orange-500 to-orange-600 transition-all duration-300"
+              style={{ width: `${completionRate}%` }}
+            />
           </div>
         </div>
 
-        {/* Recent Reviews */}
-        {ratings && ratings.length > 0 && (
-          <div>
-            <h4 className="font-medium text-foreground mb-3">Recent Reviews</h4>
-            <div className="space-y-3 max-h-32 overflow-y-auto">
-              {ratings.slice(0, 3).map((review, index) => (
-                <div key={index} className="bg-muted rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-1">
-                      {renderStars(review.rating)}
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(review.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                  {review.comment && (
-                    <p className="text-sm text-foreground">{review.comment}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Performance Indicators */}
-        <div className="pt-4 border-t border-border">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">This Month</span>
-            <span className="text-primary font-medium">
-              {completedJobs} deliveries
+        {/* Jobs Completed This Month */}
+        <div className="bg-white dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+              Deliveries
             </span>
+            <Package className="w-4 h-4 text-orange-500" />
           </div>
+          <div className="text-3xl font-bold text-slate-900 dark:text-white">
+            {totalDeliveries}
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-500 mt-2">
+            Total completed
+          </p>
         </div>
       </div>
     </div>
