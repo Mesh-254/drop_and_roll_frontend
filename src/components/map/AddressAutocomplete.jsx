@@ -1,152 +1,264 @@
-"use client"
+"use client";
 
-import { useRef, useState, useEffect } from "react"
-import { useMapsLibrary } from "@vis.gl/react-google-maps"
-import { AlertCircle, Loader2 } from "lucide-react"
-import { toast } from "react-hot-toast"
+import { useState, useEffect, useRef, useCallback } from "react";
+import { AlertCircle, Loader2, MapPin, Search, X } from "lucide-react";
+import { toast } from "react-hot-toast";
+import { bookingApi } from "../../api/BookingApi";
+
+const SERVICE_AREAS = {
+  MILTON_KEYNES: "MK",
+  OXFORD: "OX",
+};
+
+const BOUNDS = {
+  southWest: { lat: 51.65, lng: -1.35 },
+  northEast: { lat: 52.1, lng: -0.65 },
+};
+
+const UK_POSTCODE_REGEX = /^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$/i;
 
 const AddressAutocomplete = ({
   label,
-  value,
   onSelect,
-  disabled = false,
-  postcode,
-  onPostcodeChange,
-  suggestions = [],
-  isLoading = false,
   validation,
-  placeholder,
+  placeholder = "Enter postcode (e.g. MK10 1AA)",
 }) => {
-  const autocompleteRef = useRef(null)
-  const inputRef = useRef(null)
-  const places = useMapsLibrary("places")
+  const [inputValue, setInputValue] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
-  useEffect(() => {
-    if (!places || !inputRef.current) return
+  const debounceTimer = useRef(null);
+  const wrapperRef = useRef(null);
 
-    const options = {
-      bounds: new window.google.maps.LatLngBounds(
-        new window.google.maps.LatLng(51.65, -1.35),
-        new window.google.maps.LatLng(52.1, -0.65)
-      ),
-      strictBounds: true,
-      componentRestrictions: { country: "gb" },
-      types: ["address"],
-      fields: ["address_components", "geometry", "name"],
+  // Filter to ONLY MK and OX
+  const filterToServiceArea = (results) => {
+    return results.filter((sugg) => {
+      const outcode = (sugg.outcode || sugg.postcode || "").split(" ")[0].toUpperCase();
+      return outcode.startsWith(SERVICE_AREAS.MILTON_KEYNES) ||
+             outcode.startsWith(SERVICE_AREAS.OXFORD);
+    });
+  };
+
+  // Debounced search
+  const searchPostcodes = useCallback(async (query) => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+
+    debounceTimer.current = setTimeout(async () => {
+      const trimmed = query.trim().toUpperCase();
+      if (trimmed.length < 2) {
+        setSuggestions([]);
+        return;
+      }
+
+      setIsLoading(true);
+      const result = await bookingApi.searchPostcodes(trimmed);
+      setIsLoading(false);
+
+      if (result.success && result.data) {
+        const filtered = filterToServiceArea(result.data);
+        const sorted = [...filtered].sort((a, b) => a.postcode.localeCompare(b.postcode));
+        setSuggestions(sorted);
+      } else {
+        setSuggestions([]);
+      }
+    }, 250);
+  }, []);
+
+  const handleInputChange = (e) => {
+    const value = e.target.value.toUpperCase();
+    setInputValue(value);
+    setShowSuggestions(true);
+    searchPostcodes(value);
+  };
+
+  // Safe mapping to Django Address model
+  const mapToAddress = (postcodeData) => {
+    const outcode = postcodeData.outcode || "";
+
+    const isInServiceArea =
+      outcode.startsWith(SERVICE_AREAS.MILTON_KEYNES) ||
+      outcode.startsWith(SERVICE_AREAS.OXFORD);
+
+    const lat = parseFloat(postcodeData.latitude);
+    const lng = parseFloat(postcodeData.longitude);
+
+    const withinBounds =
+      lat >= BOUNDS.southWest.lat &&
+      lat <= BOUNDS.northEast.lat &&
+      lng >= BOUNDS.southWest.lng &&
+      lng <= BOUNDS.northEast.lng;
+
+    if (!isInServiceArea || !withinBounds) {
+      toast.error("We only deliver in Milton Keynes (MK) and Oxford (OX) areas.", {
+        duration: 4000,
+      });
+      return null;
     }
 
-    const autocomplete = new places.Autocomplete(inputRef.current, options)
-    autocompleteRef.current = autocomplete
-
-    const listener = autocomplete.addListener("place_changed", handlePlaceChanged)
-
-    return () => {
-      google.maps.event.removeListener(listener)
-      autocompleteRef.current = null
-    }
-  }, [places])
-
-  const handlePlaceChanged = () => {
-    if (!autocompleteRef.current) return
-    const place = autocompleteRef.current.getPlace()
-    if (!place?.geometry?.location) return
-
-    const components = place.address_components.reduce((acc, comp) => {
-      const type = comp.types[0]
-      if (type === "street_number") acc.street_number = comp.long_name
-      if (type === "route") acc.route = comp.long_name
-      if (type === "locality") acc.city = comp.long_name
-      if (type === "postal_town") acc.city = acc.city || comp.long_name
-      if (type === "administrative_area_level_1") acc.region = comp.long_name
-      if (type === "postal_code") acc.postal_code = comp.long_name
-      if (type === "country") acc.country = comp.short_name
-      if (type === "sublocality" || type === "neighborhood") acc.line2 = comp.long_name
-      if (!acc.city && type === "administrative_area_level_2") acc.city = comp.long_name
-      return acc
-    }, {})
-
-    const address = {
-      line1: `${components.street_number || ""} ${components.route || ""}`.trim() || place.name,
-      line2: components.line2 || "",
-      city: components.city || "",
-      region: components.region || "",
-      postal_code: components.postal_code || "",
-      country: components.country || "GB",
-      latitude: place.geometry.location.lat(),
-      longitude: place.geometry.location.lng(),
+    return {
+      line1: `${postcodeData.admin_ward || ""} ${postcodeData.parish ? postcodeData.parish.split(",")[0] : ""}`.trim() || postcodeData.admin_district || "Unknown Street",
+      line2: postcodeData.admin_district || "",
+      city: postcodeData.admin_district || postcodeData.region || "",
+      region: postcodeData.admin_county || "",
+      postal_code: postcodeData.postcode,
+      country: "GB",
+      latitude: lat,
+      longitude: lng,
       validated: true,
-    }
+    };
+  };
 
-    const isWithinBounds =
-      address.latitude >= 51.65 && address.latitude <= 52.1 &&
-      address.longitude >= -1.35 && address.longitude <= -0.65
-    if (!isWithinBounds) {
-      toast.error("Selected address is outside our service area (Milton Keynes/Oxford). Please choose another.")
-      return
-    }
+  const handleSuggestionSelect = async (suggestion) => {
+    setShowSuggestions(false);
+    setInputValue(suggestion.postcode);
 
-    if (typeof onSelect === "function") {
-      onSelect(address)
+    setIsLoading(true);
+    const result = await bookingApi.lookupPostcode(suggestion.postcode);
+    setIsLoading(false);
+
+    if (result.success && result.data) {
+      const address = mapToAddress(result.data);
+      if (address) {
+        setSelectedAddress(address);
+        onSelect(address);
+        // No toast here — we use the green selected box only
+      }
     } else {
-      console.error("onSelect is not a function:", onSelect)
+      toast.error("Could not retrieve full address details. Please try again.", {
+        duration: 3000,
+      });
+    }
+  };
+
+  const handleManualLookup = async () => {
+    const trimmed = inputValue.trim();
+    if (!trimmed) return;
+
+    // Only allow lookup if it looks like a real postcode
+    if (!UK_POSTCODE_REGEX.test(trimmed)) {
+      toast.error("Please enter a valid UK postcode (e.g. MK10 1AA)", { duration: 3000 });
+      return;
     }
 
-    if (typeof onPostcodeChange === "function" && components.postal_code) {
-      onPostcodeChange(components.postal_code)
-    }
-  }
+    setShowSuggestions(false);
+    await handleSuggestionSelect({ postcode: trimmed });
+  };
 
-  if (!places || isLoading) {
-    return (
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
-        <div className="flex items-center justify-center h-10">
-          <Loader2 className="h-5 w-5 text-orange-500 animate-spin" />
-          <span className="ml-2 text-sm text-gray-500">Loading autocomplete...</span>
+  const clearSelection = () => {
+    setSelectedAddress(null);
+    setInputValue("");
+    setSuggestions([]);
+    onSelect(null);
+  };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="space-y-2" ref={wrapperRef}>
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+        {label} <span className="text-red-500">*</span>
+      </label>
+
+      <div className="relative">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+              <Search size={18} />
+            </div>
+            <input
+              type="text"
+              value={inputValue}
+              onChange={handleInputChange}
+              placeholder={placeholder}
+              className="w-full pl-11 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all"
+              onFocus={() => setShowSuggestions(true)}
+            />
+          </div>
+
+          <button
+            onClick={handleManualLookup}
+            disabled={isLoading || !inputValue.trim()}
+            className="px-6 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white font-medium rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
+          >
+            {isLoading ? <Loader2 size={18} className="animate-spin" /> : <MapPin size={18} />}
+            Lookup
+          </button>
         </div>
-        {validation && (
-          <div className="flex items-center text-red-500 text-sm">
-            <AlertCircle size={16} className="mr-2" />
-            {validation}
+
+        {/* Suggestions – ONLY MK/OX */}
+        {showSuggestions && suggestions.length > 0 && (
+          <ul className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl shadow-2xl max-h-72 overflow-auto py-1">
+            {suggestions.map((sugg, idx) => (
+              <li
+                key={idx}
+                onClick={() => handleSuggestionSelect(sugg)}
+                className="px-4 py-3 hover:bg-orange-50 dark:hover:bg-orange-900/30 cursor-pointer flex items-center gap-3 group border-b border-gray-100 last:border-none"
+              >
+                <MapPin size={18} className="text-orange-500 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-gray-900 dark:text-white group-hover:text-orange-600">
+                    {sugg.postcode}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                    {sugg.admin_district || sugg.region || "Milton Keynes / Oxford"}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Loading */}
+        {showSuggestions && isLoading && suggestions.length === 0 && (
+          <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl shadow-xl p-6 text-center">
+            <Loader2 size={22} className="animate-spin mx-auto text-orange-500" />
+            <p className="text-sm text-gray-500 mt-3">Searching postcodes...</p>
           </div>
         )}
       </div>
-    )
-  }
 
-  return (
-    <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
-      <input
-        ref={inputRef}
-        type="text"
-        value={value || postcode || ""}
-        onChange={(e) => typeof onPostcodeChange === "function" && onPostcodeChange(e.target.value)}
-        placeholder={placeholder || `Enter ${label.toLowerCase()} address`}
-        disabled={disabled}
-        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors disabled:opacity-50"
-      />
-      {suggestions.length > 0 && (
-        <ul className="mt-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800">
-          {suggestions.map((suggestion, index) => (
-            <li
-              key={index}
-              className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-              onClick={() => typeof onSelect === "function" && onSelect(suggestion)}
+      {/* Green Selected Box (only one toast-like feedback) */}
+      {/* {selectedAddress && (
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 text-sm">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <p className="font-medium text-green-800 dark:text-green-200 flex items-center gap-2">
+                <MapPin size={16} /> Address Selected
+              </p>
+              <p className="mt-1 text-green-700 dark:text-green-300">
+                {selectedAddress.line1}, {selectedAddress.city}{" "}
+                <span className="font-medium">{selectedAddress.postal_code}</span>
+              </p>
+            </div>
+            <button
+              onClick={clearSelection}
+              className="text-green-600 hover:text-green-800 p-1 -mt-1"
             >
-              {suggestion.line1}, {suggestion.city}
-            </li>
-          ))}
-        </ul>
-      )}
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+      )} */}
+
       {validation && (
-        <div className="flex items-center text-red-500 text-sm">
+        <div className="flex items-center text-red-500 text-sm mt-1">
           <AlertCircle size={16} className="mr-2" />
           {validation}
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
-export default AddressAutocomplete
+export default AddressAutocomplete;

@@ -76,47 +76,92 @@ export class BookingApi extends ApiBase {
     return deg * (Math.PI / 180);
   }
 
-  async createQuote(quoteData) {
-    try {
-      // Defensive mapping + rounding to 2 decimal places (backend uses Decimal)
-      const parcels = (quoteData.parcels || []).map((p, idx) => {
-        const weight = Number.parseFloat(p.weightKg);
-        if (Number.isNaN(weight) || weight <= 0) {
-          throw new Error(`Invalid weight for parcel ${idx + 1}`);
-        }
+// Postcode search by partial query, 
+// returns list of matching postcodes with basic info (no lat/lng)
+// for autocomplete suggestions
 
-        const dims = p.dimensions || {};
-        const length = Number.parseFloat(dims.length) || 0;
-        const width = Number.parseFloat(dims.width) || 0;
-        const height = Number.parseFloat(dims.height) || 0;
+async searchPostcodes(query) {
+  if (!query || query.trim().length < 2) {
+    return { success: true, data: [] };
+  }
+  try {
+    const response = await fetch(
+      `https://api.postcodes.io/postcodes?query=${encodeURIComponent(
+        query.trim()
+      )}&limit=10`
+    );
+    if (!response.ok) throw new Error("Postcode search failed");
+    const json = await response.json();
+    return { success: true, data: json.result || [] };
+  } catch (error) {
+    console.error("Postcodes.io search error:", error);
+    return { success: false, message: error.message };
+  }
+}
 
-        if (length <= 0 || width <= 0 || height <= 0) {
-          throw new Error(`Invalid dimensions for parcel ${idx + 1}`);
-        }
+// postcode lookup by exact code, returns detailed info including lat/lng
 
-        return {
-          weight_kg: weight.toFixed(2),
-          dimensions: {
-            length: length.toFixed(1),
-            width: width.toFixed(1),
-            height: height.toFixed(1),
-          },
-          fragile: !!p.fragile,
-        };
-      });
+async lookupPostcode(postcode) {
+  const clean = postcode.replace(/\s+/g, "").toUpperCase();
+  try {
+    const response = await fetch(
+      `https://api.postcodes.io/postcodes/${encodeURIComponent(clean)}`
+    );
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error("Postcode not found");
+      }
+      throw new Error("Postcode lookup failed");
+    }
+    const json = await response.json();
+    return { success: true, data: json.result };
+  } catch (error) {
+    console.error("Postcodes.io lookup error:", error);
+    return { success: false, message: error.message };
+  }
+}
 
-      if (parcels.length === 0) {
-        throw new Error("At least one parcel is required");
+//  Create quote and booking methods with improved error handling and validation
+async createQuote(quoteData) {
+  try {
+    if (!quoteData.parcels || quoteData.parcels.length === 0) {
+      throw new Error("At least one parcel is required");
+    }
+
+    const parcels = quoteData.parcels.map((p, idx) => {
+      const weight = Number.parseFloat(p.weightKg);
+      if (Number.isNaN(weight) || weight <= 0) {
+        throw new Error(`Invalid weight for parcel ${idx + 1}`);
       }
 
-      const payload = {
-        shipping_type_id: quoteData.shipmentType?.id,
-        service_type_id: quoteData.service?.id,
-        distance_km: Number(quoteData.distanceKm || 0),
-        parcels,
-        insurance_amount: Number(quoteData.insuranceAmount || 0),
-        discount: Number(quoteData.discount || 0),
+      const dims = p.dimensions || {};
+      const length = Number.parseFloat(dims.length) || 0;
+      const width = Number.parseFloat(dims.width) || 0;
+      const height = Number.parseFloat(dims.height) || 0;
+
+      if (length <= 0 || width <= 0 || height <= 0) {
+        throw new Error(`Invalid dimensions for parcel ${idx + 1}`);
+      }
+
+      return {
+        weight_kg: weight.toFixed(2),
+        dimensions: {
+          length: length.toFixed(1),
+          width: width.toFixed(1),
+          height: height.toFixed(1),
+        },
+        fragile: !!p.fragile,
       };
+    });
+
+    const payload = {
+      shipping_type_id: quoteData.shipmentType?.id,
+      service_type_id: quoteData.service?.id,
+      distance_km: Number(quoteData.distanceKm || 0),
+      parcels,
+      insurance_amount: Number(quoteData.insuranceAmount || 0),
+      discount: Number(quoteData.discount || 0),
+    };
       console.log("Quote payload:", payload);
       const response = await this.request("/api/booking/quotes/compute/", {
         method: "POST",
