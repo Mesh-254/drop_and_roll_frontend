@@ -432,6 +432,17 @@ export default function GetQuoteModal({
       return;
     }
 
+    // ─── Build proper multi-parcel payload for backend ─────────────────────
+    const parcelsPayload = formData.parcels.map((p) => ({
+      weightKg: Number.parseFloat(p.weightKg) || 0,
+      dimensions: {
+        length: Number.parseFloat(p.dimensions.length) || 0,
+        width: Number.parseFloat(p.dimensions.width) || 0,
+        height: Number.parseFloat(p.dimensions.height) || 0,
+      },
+      fragile: !!p.fragile,
+    }));
+
     // Calculate average weight for quote (backend should handle per-parcel logic)
     const totalWeight = formData.parcels.reduce(
       (sum, p) => sum + (Number.parseFloat(p.weightKg) || 0),
@@ -446,12 +457,7 @@ export default function GetQuoteModal({
       distanceKm: formData.distanceKm,
       fragile: fragileCount > 0,
       insuranceAmount: Number.parseFloat(formData.insuranceAmount) || 0,
-      dimensions: {
-        width: Number.parseFloat(formData.parcels[0]?.dimensions.width) || 0,
-        length: Number.parseFloat(formData.parcels[0]?.dimensions.length) || 0,
-        height: Number.parseFloat(formData.parcels[0]?.dimensions.height) || 0,
-        unit: "cm",
-      },
+      parcels: parcelsPayload
     };
 
     const quoteDataString = JSON.stringify(quoteData);
@@ -1172,11 +1178,11 @@ export default function GetQuoteModal({
                       )}
                     </div>
 
-                    <MapComponent
+                    {/* <MapComponent
                       pickupAddress={formData.pickupAddress}
                       dropoffAddress={formData.dropoffAddress}
                       className="w-full h-64 rounded-lg border border-gray-300 dark:border-gray-600"
-                    />
+                    /> */}
                   </div>
                 )}
               </div>
