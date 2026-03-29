@@ -22,6 +22,10 @@ export default function Hero() {
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [showTrackModal, setShowTrackModal] = useState(false);
   const { setQuickQuotePostcodes } = useQuoteContext();
+  const [prefillPostcodes, setPrefillPostcodes] = useState({
+    pickup: "",
+    dropoff: "",
+  });
   const { isAuthenticated } = useAuth();
 
   const handleQuickQuoteChange = (field, value) => {
@@ -69,11 +73,15 @@ export default function Hero() {
 
     setIsSubmitting(true);
 
+    const cleanPickup = quickQuoteData.pickupPostcode.replace(/\s+/g, "");
+    const cleanDropoff = quickQuoteData.dropoffPostcode.replace(/\s+/g, "");
+
     // Set postcodes in context and open modal
-    setQuickQuotePostcodes(
-      quickQuoteData.pickupPostcode.replace(/\s+/g, ""),
-      quickQuoteData.dropoffPostcode.replace(/\s+/g, "")
-    );
+    setQuickQuotePostcodes(cleanPickup, cleanDropoff);
+
+    // NEW: Pass to modal
+    setPrefillPostcodes({ pickup: cleanPickup, dropoff: cleanDropoff });
+
     setShowQuoteModal(true);
 
     setIsSubmitting(false);
@@ -337,7 +345,16 @@ export default function Hero() {
         >
           <GetQuoteBook
             isOpen={showQuoteModal}
-            onClose={() => setShowQuoteModal(false)}
+            onClose={() => {
+              setShowQuoteModal(false);
+              // Optional: clear prefill after close
+              setTimeout(
+                () => setPrefillPostcodes({ pickup: "", dropoff: "" }),
+                300,
+              );
+            }}
+            initialPickupPostcode={prefillPostcodes.pickup}
+            initialDropoffPostcode={prefillPostcodes.dropoff}
           />
         </Suspense>
       )}

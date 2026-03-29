@@ -20,10 +20,12 @@ const UK_POSTCODE_REGEX = /^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$/i;
 const AddressAutocomplete = ({
   label,
   onSelect,
+  postcode = "", // ← NEW: controlled value
+  onPostcodeChange,
   validation,
   placeholder = "Enter postcode (e.g. MK10 1AA)",
 }) => {
-  const [inputValue, setInputValue] = useState("");
+  const [inputValue, setInputValue] = useState(postcode); // ← NEW: initialize with prop
   const [suggestions, setSuggestions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState(null);
@@ -32,15 +34,38 @@ const AddressAutocomplete = ({
   const debounceTimer = useRef(null);
   const wrapperRef = useRef(null);
 
+
+  // Sync external postcode prop (from hero or parent state)
+  useEffect(() => {
+    setInputValue(postcode);
+  }, [postcode]);
+
+  // Auto-verify + lookup when a postcode is pre-filled from hero
+  useEffect(() => {
+    if (postcode && UK_POSTCODE_REGEX.test(postcode) && !selectedAddress) {
+      // Small delay so the input is rendered first
+      const timer = setTimeout(() => {
+        handleManualLookup();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [postcode, selectedAddress]);
+
+
   // Filter to ONLY MK and OX
   const filterToServiceArea = (results) => {
     return results.filter((sugg) => {
-      const outcode = (sugg.outcode || sugg.postcode || "").split(" ")[0].toUpperCase();
-      return outcode.startsWith(SERVICE_AREAS.MILTON_KEYNES) ||
-             outcode.startsWith(SERVICE_AREAS.OXFORD);
+      const outcode = (sugg.outcode || sugg.postcode || "")
+        .split(" ")[0]
+        .toUpperCase();
+      return (
+        outcode.startsWith(SERVICE_AREAS.MILTON_KEYNES) ||
+        outcode.startsWith(SERVICE_AREAS.OXFORD)
+      );
     });
   };
 
+  
   // Debounced search
   const searchPostcodes = useCallback(async (query) => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
@@ -58,7 +83,9 @@ const AddressAutocomplete = ({
 
       if (result.success && result.data) {
         const filtered = filterToServiceArea(result.data);
-        const sorted = [...filtered].sort((a, b) => a.postcode.localeCompare(b.postcode));
+        const sorted = [...filtered].sort((a, b) =>
+          a.postcode.localeCompare(b.postcode),
+        );
         setSuggestions(sorted);
       } else {
         setSuggestions([]);
@@ -69,6 +96,7 @@ const AddressAutocomplete = ({
   const handleInputChange = (e) => {
     const value = e.target.value.toUpperCase();
     setInputValue(value);
+    onPostcodeChange?.(value);           // ← update parent state
     setShowSuggestions(true);
     searchPostcodes(value);
   };
@@ -91,14 +119,20 @@ const AddressAutocomplete = ({
       lng <= BOUNDS.northEast.lng;
 
     if (!isInServiceArea || !withinBounds) {
-      toast.error("We only deliver in Milton Keynes (MK) and Oxford (OX) areas.", {
-        duration: 4000,
-      });
+      toast.error(
+        "We only deliver in Milton Keynes (MK) and Oxford (OX) areas.",
+        {
+          duration: 4000,
+        },
+      );
       return null;
     }
 
     return {
-      line1: `${postcodeData.admin_ward || ""} ${postcodeData.parish ? postcodeData.parish.split(",")[0] : ""}`.trim() || postcodeData.admin_district || "Unknown Street",
+      line1:
+        `${postcodeData.admin_ward || ""} ${postcodeData.parish ? postcodeData.parish.split(",")[0] : ""}`.trim() ||
+        postcodeData.admin_district ||
+        "Unknown Street",
       line2: postcodeData.admin_district || "",
       city: postcodeData.admin_district || postcodeData.region || "",
       region: postcodeData.admin_county || "",
@@ -113,6 +147,7 @@ const AddressAutocomplete = ({
   const handleSuggestionSelect = async (suggestion) => {
     setShowSuggestions(false);
     setInputValue(suggestion.postcode);
+    onPostcodeChange?.(suggestion.postcode);
 
     setIsLoading(true);
     const result = await bookingApi.lookupPostcode(suggestion.postcode);
@@ -123,25 +158,18 @@ const AddressAutocomplete = ({
       if (address) {
         setSelectedAddress(address);
         onSelect(address);
-        // No toast here — we use the green selected box only
       }
     } else {
-      toast.error("Could not retrieve full address details. Please try again.", {
-        duration: 3000,
-      });
+      toast.error("Could not retrieve full address details.", { duration: 3000 });
     }
   };
 
   const handleManualLookup = async () => {
     const trimmed = inputValue.trim();
-    if (!trimmed) return;
-
-    // Only allow lookup if it looks like a real postcode
-    if (!UK_POSTCODE_REGEX.test(trimmed)) {
+    if (!trimmed || !UK_POSTCODE_REGEX.test(trimmed)) {
       toast.error("Please enter a valid UK postcode (e.g. MK10 1AA)", { duration: 3000 });
       return;
     }
-
     setShowSuggestions(false);
     await handleSuggestionSelect({ postcode: trimmed });
   };
@@ -149,7 +177,7 @@ const AddressAutocomplete = ({
   const clearSelection = () => {
     setSelectedAddress(null);
     setInputValue("");
-    setSuggestions([]);
+    onPostcodeChange?.("");
     onSelect(null);
   };
 
@@ -191,7 +219,11 @@ const AddressAutocomplete = ({
             disabled={isLoading || !inputValue.trim()}
             className="px-6 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white font-medium rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
           >
-            {isLoading ? <Loader2 size={18} className="animate-spin" /> : <MapPin size={18} />}
+            {isLoading ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              <MapPin size={18} />
+            )}
             Lookup
           </button>
         </div>
@@ -211,7 +243,9 @@ const AddressAutocomplete = ({
                     {sugg.postcode}
                   </div>
                   <div className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                    {sugg.admin_district || sugg.region || "Milton Keynes / Oxford"}
+                    {sugg.admin_district ||
+                      sugg.region ||
+                      "Milton Keynes / Oxford"}
                   </div>
                 </div>
               </li>
@@ -222,7 +256,10 @@ const AddressAutocomplete = ({
         {/* Loading */}
         {showSuggestions && isLoading && suggestions.length === 0 && (
           <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl shadow-xl p-6 text-center">
-            <Loader2 size={22} className="animate-spin mx-auto text-orange-500" />
+            <Loader2
+              size={22}
+              className="animate-spin mx-auto text-orange-500"
+            />
             <p className="text-sm text-gray-500 mt-3">Searching postcodes...</p>
           </div>
         )}

@@ -345,7 +345,7 @@ export default function GetQuoteModal({
     }
   }, [isOpen]);
 
-  // Auto-fill postcodes if provided
+  // // Auto-fill from hero (runs once when modal opens)
   useEffect(() => {
     if (initialPickupPostcode && currentStep === 4) {
       setPickupPostcode(initialPickupPostcode);
