@@ -16,9 +16,11 @@ import {
   AlertCircle,
   ImageIcon,
   FileText,
+  Camera, // NEW: For QR scan button
 } from "lucide-react";
 import { driverApi } from "../../api/driver-api";
 import { ProofOfDelivery } from "./proof-of-delivery";
+import { QRScannerModal } from "./QRScannerModal"; // NEW: QR Scanner component
 
 function ProofOfDeliveryView({ proofData, onClose }) {
   const pods = Array.isArray(proofData) ? proofData : proofData ? [proofData] : [];
@@ -124,11 +126,13 @@ export function JobDetailPage({ jobId, onBack }) {
   const [loading, setLoading] = useState(true);
   const [immutable, setImmutable] = useState(false);
   const [immutableReason, setImmutableReason] = useState("");
-  const [showProofModal, setShowProofModal] = useState(false);
-  const [showProofViewModal, setShowProofViewModal] = useState(false);
+  const [showProofModal, setShowProofModal] = useState(false); // For submitting new proof
+  const [showProofViewModal, setShowProofViewModal] = useState(false); // For viewing submitted proof
   const [proofData, setProofData] = useState(null);
   const [currentLocation, setCurrentLocation] = useState(null);
   const [hasProof, setHasProof] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false); // NEW: QR scanner state
+  const [showProofDeliveryFlow, setShowProofDeliveryFlow] = useState(false); // NEW: Proof delivery flow for marking as delivered
 
   const statuses = [
     { current: "pending", next: "scheduled" },
@@ -212,6 +216,13 @@ export function JobDetailPage({ jobId, onBack }) {
         toast.error(
           immutableReason || "Job is locked—cannot update status."
         );
+        return;
+      }
+
+      // BLOCK: If trying to mark as "delivered", open Proof of Delivery instead
+      if (newStatus === "delivered") {
+        console.log("[JobDetailPage] Blocking direct delivered status - opening ProofOfDelivery");
+        setShowProofDeliveryFlow(true);
         return;
       }
 
@@ -299,6 +310,65 @@ export function JobDetailPage({ jobId, onBack }) {
     return "N/A";
   }, []);
 
+  // NEW: Handle Proof of Delivery submission for marking as delivered
+  // NOTE: submitProofOfDelivery now automatically updates status to "delivered" atomically
+  const handleProofOfDeliverySubmit = useCallback(
+    async (proofData) => {
+      try {
+        console.log("[JobDetailPage] Submitting proof of delivery for job:", job.data.id);
+
+        // Single API call that submits proof AND updates status to "delivered" atomically
+        const result = await driverApi.submitProofOfDelivery(
+          job.data.id,
+          proofData
+        );
+
+        if (!result.success) {
+          throw new Error(result.message || "Failed to submit proof");
+        }
+
+        console.log("[JobDetailPage] Proof submitted and status updated:", result);
+        toast.success("Delivery completed successfully! ✓");
+        
+        // Close modal
+        setShowProofDeliveryFlow(false);
+
+        // Reload job details to show updated status
+        await loadJobDetails();
+      } catch (error) {
+        console.error("[JobDetailPage] Proof submission error:", error);
+        toast.error(error.message || "Failed to complete delivery");
+      }
+    },
+    [job?.data?.id]
+  );
+
+  // NEW: Handle QR scan success
+  const handleQRScanSuccess = useCallback(
+    async (qrContent) => {
+      try {
+        const result = await driverApi.scanQr(qrContent);
+        if (result.success) {
+          toast.success("Label scanned successfully! Job picked up.", {
+            duration: 3,
+          });
+          setShowQRScanner(false);
+          // Refresh job details
+          await loadJobDetails();
+        } else {
+          toast.error(
+            result.message ||
+              "Failed to scan QR. Please try again or manually update status."
+          );
+        }
+      } catch (error) {
+        console.error("[JobDetailPage] QR scan error:", error);
+        toast.error("QR scan failed. Please try again.");
+      }
+    },
+    [loadJobDetails]
+  );
+
   const nextStatus = useMemo(
     () => getNextStatus(job?.data?.status),
     [job?.data?.status, getNextStatus]
@@ -378,10 +448,21 @@ export function JobDetailPage({ jobId, onBack }) {
 
         {/* Next Action Button - Prominent */}
         {nextStatus && !immutable && (
-          <div className="mb-6">
+          <div className="mb-6 flex flex-col sm:flex-row gap-3">
+            {/* NEW: QR Scan button for assigned jobs */}
+            {job?.data?.status === "assigned" && (
+              <button
+                onClick={() => setShowQRScanner(true)}
+                className="flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-green-600 to-green-700 text-white font-bold text-lg rounded-lg hover:shadow-lg transition-all shadow-md hover:from-green-700 hover:to-green-800"
+              >
+                <Camera className="h-5 w-5" />
+                Scan Label QR (Recommended)
+              </button>
+            )}
+
             <button
               onClick={() => handleStatusUpdate(nextStatus)}
-              className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-lg rounded-lg hover:shadow-lg transition-all shadow-md hover:from-blue-700 hover:to-blue-800"
+              className="flex-1 px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-lg rounded-lg hover:shadow-lg transition-all shadow-md hover:from-blue-700 hover:to-blue-800"
             >
               {nextStatus === "picked_up" && "► Pick Up This Job"}
               {nextStatus === "at_hub" && "◆ Mark as At Hub"}
@@ -621,6 +702,24 @@ export function JobDetailPage({ jobId, onBack }) {
         <ProofOfDeliveryView
           proofData={proofData}
           onClose={() => setShowProofViewModal(false)}
+        />
+      )}
+
+      {/* NEW: QR Scanner Modal */}
+      {showQRScanner && (
+        <QRScannerModal
+          jobId={job?.data?.id}
+          onClose={() => setShowQRScanner(false)}
+          onScanSuccess={handleQRScanSuccess}
+        />
+      )}
+
+      {/* NEW: Proof of Delivery Flow Modal (for marking as delivered) */}
+      {showProofDeliveryFlow && (
+        <ProofOfDelivery
+          jobId={job?.data?.id}
+          onClose={() => setShowProofDeliveryFlow(false)}
+          onSubmit={handleProofOfDeliverySubmit}
         />
       )}
     </div>

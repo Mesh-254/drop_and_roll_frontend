@@ -109,6 +109,49 @@ class DriverAPI extends ApiBase {
     );
     return response.data;
   }
+
+  // STEP: Scan QR method
+  async scanQr(qrContent) {
+    if (!qrContent || typeof qrContent !== "string" || !qrContent.trim()) {
+      console.error("[DriverAPI] scanQr called with invalid qrContent");
+      return {
+        success: false,
+        code: "INVALID_INPUT",
+        message: "qr_content is required and must be a non-empty string",
+      };
+    }
+
+    try {
+      console.log(`[DriverAPI] Scanning QR: ${qrContent.substring(0, 80)}...`);
+      
+      const response = await super.request("/api/booking/scan-qr/", {
+        method: "POST",
+        data: { qr_content: qrContent.trim() },
+      });
+
+      console.log("[DriverAPI] QR scan successful:", response.data);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error("[DriverAPI] QR scan failed:", {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+      });
+
+      return {
+        success: false,
+        code: error.code || "SCAN_ERROR",
+        message:
+          error.response?.data?.error ||
+          error.response?.data?.detail ||
+          error.message ||
+          "Failed to scan QR code",
+        status: error.response?.status,
+      };
+    }
+  }
+
+
   async getProofOfDelivery(bookingId) {
     if (!bookingId || typeof bookingId !== "string") {
       console.error("[DriverAPI] Invalid bookingId provided:", bookingId);

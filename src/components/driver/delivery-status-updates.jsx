@@ -17,8 +17,12 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertCircle,
+  RefreshCw,
+  Camera, // NEW: For QR scan button
 } from "lucide-react";
 import { driverApi } from "../../api/driver-api";
+import { QRScannerModal } from "./QRScannerModal"; // NEW: QR Scanner component
+import { ProofOfDelivery } from "./proof-of-delivery"; // NEW: Proof of Delivery component
 
 export function DeliveryStatusUpdates({
   jobs: initialJobs = [],
@@ -37,7 +41,15 @@ export function DeliveryStatusUpdates({
   const [hasMoreJobs, setHasMoreJobs] = useState(true);
   const [immutableChecks, setImmutableChecks] = useState({});
   const [isCheckingImmutable, setIsCheckingImmutable] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [selectedJobForQR, setSelectedJobForQR] = useState(null);
+  const [showProofModal, setShowProofModal] = useState(false);
+  const [pendingDeliveryJob, setPendingDeliveryJob] = useState(null);
+  const [pendingDeliveryJobs, setPendingDeliveryJobs] = useState([]); // For bulk
   const observerTarget = useRef(null);
+
+  // NEW: Auto-refresh interval ref (for cleanup)
+  const autoRefreshIntervalRef = useRef(null);
 
   const fetchJobs = useCallback(
     async (page, append = false) => {
@@ -128,6 +140,29 @@ export function DeliveryStatusUpdates({
     setJobs([]);
     fetchJobs(1, false);
   }, [statusFilter, onStatusUpdate, fetchJobs]);
+
+  // STEP 4: Auto-refresh every 8 seconds when on "all" or "assigned" tab (critical for QR scan updates)
+  useEffect(() => {
+    // Clear any existing interval
+    if (autoRefreshIntervalRef.current) {
+      clearInterval(autoRefreshIntervalRef.current);
+    }
+
+    // Only auto-refresh on relevant tabs where QR scan would affect the list
+    if (statusFilter === "all" || statusFilter === "assigned") {
+      autoRefreshIntervalRef.current = setInterval(() => {
+        console.log("[DeliveryStatusUpdates] Auto-refresh triggered (QR scan / status change)");
+        fetchJobs(1, false); // Force full refresh from page 1
+      }, 8000);
+    }
+
+    // Cleanup on unmount or when filter changes
+    return () => {
+      if (autoRefreshIntervalRef.current) {
+        clearInterval(autoRefreshIntervalRef.current);
+      }
+    };
+  }, [statusFilter, fetchJobs]);
 
   useEffect(() => {
     if (statusFilter !== "all") {
@@ -239,6 +274,15 @@ export function DeliveryStatusUpdates({
         return;
       }
 
+      // BLOCK: If trying to mark as "delivered", open Proof of Delivery instead
+      if (newStatus === "delivered") {
+        console.log("[DeliveryStatusUpdates] Blocking bulk delivered - opening ProofOfDelivery for each job");
+        setPendingDeliveryJobs(updatableJobs);
+        setShowProofModal(true);
+        toast.info("You will need to submit proof of delivery for each job");
+        return;
+      }
+
       const confirmMsg =
         skippedCount > 0
           ? `Update ${updatableJobs.length} jobs to ${newStatus
@@ -283,6 +327,14 @@ export function DeliveryStatusUpdates({
         return;
       }
 
+      // BLOCK: If trying to mark as "delivered", open Proof of Delivery instead
+      if (newStatus === "delivered") {
+        console.log("[DeliveryStatusUpdates] Blocking direct delivered status - opening ProofOfDelivery");
+        setPendingDeliveryJob(jobId);
+        setShowProofModal(true);
+        return;
+      }
+
       if (
         !window.confirm(
           `Mark this job as ${newStatus.toUpperCase().replace("_", " ")}?`
@@ -313,6 +365,81 @@ export function DeliveryStatusUpdates({
       }
     },
     [checkSingleImmutable, onStatusUpdate]
+  );
+
+  // NEW: Manual refresh button handler (great UX for QR scan confirmation)
+  const handleManualRefresh = useCallback(() => {
+    toast.loading("Refreshing jobs...", { id: "refresh-toast" });
+    fetchJobs(1, false).finally(() => {
+      toast.success("Jobs refreshed", { id: "refresh-toast" });
+    });
+  }, [fetchJobs]);
+
+  // NEW: Handle QR scan success
+  const handleQRScanSuccess = useCallback(
+    async (qrContent) => {
+      try {
+        const result = await driverApi.scanQr(qrContent);
+        if (result.success) {
+          toast.success("Label scanned successfully! Job picked up.", {
+            duration: 3,
+          });
+          setShowQRScanner(false);
+          setSelectedJobForQR(null);
+          // Refresh the jobs list to show updated status
+          await fetchJobs(1, false);
+        } else {
+          toast.error(
+            result.message ||
+              "Failed to scan QR. Please try again or manually update status."
+          );
+        }
+      } catch (error) {
+        console.error("[DeliveryStatusUpdates] QR scan error:", error);
+        toast.error("QR scan failed. Please try again.");
+      }
+    },
+    [fetchJobs]
+  );
+
+  // NEW: Handle Proof of Delivery submission
+  // NEW: Handle Proof of Delivery submission
+  // NOTE: submitProofOfDelivery now automatically updates status to "delivered" atomically
+  const handleProofOfDeliverySubmit = useCallback(
+    async (proofData) => {
+      try {
+        const jobId = pendingDeliveryJob || (pendingDeliveryJobs.length > 0 ? pendingDeliveryJobs[0] : null);
+        console.log("[DeliveryStatusUpdates] Submitting proof of delivery for job:", jobId, {
+          hasPhoto: !!proofData.photo,
+          location: proofData.location,
+        });
+
+        // Single API call that submits proof AND updates status to "delivered" atomically
+        const result = await driverApi.submitProofOfDelivery(jobId, proofData);
+
+        if (!result.success) {
+          throw new Error(result.message || "Failed to submit proof");
+        }
+
+        console.log("[DeliveryStatusUpdates] Proof submitted and status updated:", result);
+        toast.success("Delivery completed successfully! ✓");
+        
+        // Close modal and reset state
+        setShowProofModal(false);
+        setPendingDeliveryJob(null);
+        setPendingDeliveryJobs([]);
+        setSelectedJobs([]);
+        setBulkActionOpen(false);
+
+        // Refresh the jobs list to show updated status
+        await fetchJobs(1, false);
+        if (onStatusUpdate) onStatusUpdate();
+      } catch (error) {
+        console.error("[DeliveryStatusUpdates] Proof submission error:", error);
+        toast.error(error.message || "Failed to complete delivery");
+      }
+    },
+    [pendingDeliveryJob, pendingDeliveryJobs, fetchJobs, onStatusUpdate]
   );
 
   const getNextStatus = (currentStatus) => {
@@ -377,6 +504,16 @@ export function DeliveryStatusUpdates({
                 {totalCount} total jobs • {filteredJobs.length} visible
               </p>
             </div>
+
+            {/* NEW: Manual Refresh Button (highly visible for QR scan confirmation) */}
+            <button
+              onClick={handleManualRefresh}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </button>
+
             {selectedJobs.length > 0 && (
               <div className="relative">
                 <button
@@ -572,8 +709,23 @@ export function DeliveryStatusUpdates({
                         </div>
                       </div>
 
-                      {/* Right: Action Button */}
+                      {/* Right: Action Buttons */}
                       <div className="flex flex-col gap-2 sm:items-end">
+                        {/* NEW: QR Scan button for assigned jobs */}
+                        {job.status === "assigned" && !isImmutable && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedJobForQR(job);
+                              setShowQRScanner(true);
+                            }}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors shadow-sm whitespace-nowrap"
+                          >
+                            <Camera className="h-4 w-4" />
+                            Scan Label
+                          </button>
+                        )}
+
                         {canUpdate ? (
                           <button
                             onClick={(e) => {
@@ -665,6 +817,31 @@ export function DeliveryStatusUpdates({
           </div>
         )}
       </div>
+
+      {/* NEW: QR Scanner Modal */}
+      {showQRScanner && (
+        <QRScannerModal
+          jobId={selectedJobForQR?.id}
+          onClose={() => {
+            setShowQRScanner(false);
+            setSelectedJobForQR(null);
+          }}
+          onScanSuccess={handleQRScanSuccess}
+        />
+      )}
+
+      {/* NEW: Proof of Delivery Modal */}
+      {showProofModal && (
+        <ProofOfDelivery
+          jobId={pendingDeliveryJob || (pendingDeliveryJobs.length > 0 ? pendingDeliveryJobs[0] : null)}
+          onClose={() => {
+            setShowProofModal(false);
+            setPendingDeliveryJob(null);
+            setPendingDeliveryJobs([]);
+          }}
+          onSubmit={handleProofOfDeliverySubmit}
+        />
+      )}
     </div>
   );
 }
