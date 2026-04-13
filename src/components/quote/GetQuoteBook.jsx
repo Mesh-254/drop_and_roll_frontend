@@ -206,53 +206,48 @@ const QuoteDisplay = ({ quote, onDownloadPDF, isLoading, formData }) => {
       <div className="space-y-3">
         <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
           <span className="text-gray-700 dark:text-gray-300">
-            Base Price ({breakdown.service_type})
+            Base Price
           </span>
           <span className="font-medium text-gray-900 dark:text-white">
             £{breakdown.base_price?.toFixed(2) || "0.00"}
           </span>
         </div>
 
-        <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
-          <span className="text-gray-700 dark:text-gray-300">
-            Weight Charge ({formData.weightKg}kg × £0.50)
-          </span>
-          <span className="font-medium text-gray-900 dark:text-white">
-            £{breakdown.weight_charge?.toFixed(2) || "0.00"}
-          </span>
-        </div>
-
-        <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
-          <span className="text-gray-700 dark:text-gray-300">
-            Distance Charge ({quote.distance_km}km × £0.10)
-          </span>
-          <span className="font-medium text-gray-900 dark:text-white">
-            £{breakdown.distance_charge?.toFixed(2) || "0.00"}
-          </span>
-        </div>
-
-        <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
-          <span className="text-gray-700 dark:text-gray-300">Subtotal</span>
-          <span className="font-medium text-gray-900 dark:text-white">
-            £{breakdown.subtotal?.toFixed(2) || "0.00"}
-          </span>
-        </div>
-
-        {breakdown.fragile_charge > 0 && (
+        {breakdown.extra_parcels > 0 && (
           <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
             <span className="text-gray-700 dark:text-gray-300">
-              Fragile Surcharge (25%)
+              Extra Parcels ({breakdown.extra_parcels} × £{breakdown.extra_parcel_charge_per?.toFixed(2)})
             </span>
             <span className="font-medium text-gray-900 dark:text-white">
-              £{breakdown.fragile_charge?.toFixed(2) || "0.00"}
+              £{breakdown.extra_parcel_fee?.toFixed(2) || "0.00"}
             </span>
           </div>
         )}
 
+        {breakdown.extra_distance_km > 0 && (
+          <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
+            <span className="text-gray-700 dark:text-gray-300">
+              Distance Charge ({breakdown.extra_distance_km?.toFixed(1)} km)
+            </span>
+            <span className="font-medium text-gray-900 dark:text-white">
+              £{breakdown.extra_distance_charge?.toFixed(2) || "0.00"}
+            </span>
+          </div>
+        )}
+
+        <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
+          <span className="text-gray-700 dark:text-gray-300">
+            Service Adjustment ({breakdown.service_type} × {breakdown.service_multiplier?.toFixed(2)}){breakdown.service_minimum_applied ? " - Minimum Applied" : ""}
+          </span>
+          <span className="font-medium text-gray-900 dark:text-white">
+            £{breakdown.service_adjusted_subtotal?.toFixed(2) || "0.00"}
+          </span>
+        </div>
+
         {breakdown.insurance_fee > 0 && (
           <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
             <span className="text-gray-700 dark:text-gray-300">
-              Insurance Fee (2%)
+              Insurance Fee
             </span>
             <span className="font-medium text-gray-900 dark:text-white">
               £{breakdown.insurance_fee?.toFixed(2) || "0.00"}
@@ -265,10 +260,7 @@ const QuoteDisplay = ({ quote, onDownloadPDF, isLoading, formData }) => {
             Total Price
           </span>
           <span className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-            £
-            {quote.final_price
-              ? Number.parseFloat(quote.final_price).toFixed(2)
-              : "0.00"}
+            £{breakdown.final_price?.toFixed(2) || "0.00"}
           </span>
         </div>
       </div>

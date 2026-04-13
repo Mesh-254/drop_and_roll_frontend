@@ -126,16 +126,16 @@ export default function PaymentSuccess() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-80 py-25">
       <div className="max-w-2xl mx-auto px-4">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4">
             <CheckCircle className="h-12 w-12 text-green-500" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl font-bold text-green-200 mb-2">
             Payment Successful
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-200">
             Thank you for your payment! Your booking is confirmed.
           </p>
         </div>
@@ -205,12 +205,12 @@ export default function PaymentSuccess() {
                   {booking.dropoff_address?.city}
                 </span>
               </div>
-              <div className="flex justify-between items-center py-2">
+              {/* <div className="flex justify-between items-center py-2">
                 <span className="text-gray-600">Scheduled Pickup:</span>
                 <span className="text-sm text-gray-900">
                   {new Date(booking.scheduled_pickup_at).toLocaleString()}
                 </span>
-              </div>
+              </div> */}
             </div>
           </div>
         )}

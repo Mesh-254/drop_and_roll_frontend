@@ -3,10 +3,8 @@ import { useState, useCallback, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { bookingApi } from "../../api/BookingApi";
 import { useAuth } from "../../contexts/AuthContext";
-import dayjs from "dayjs";
 import {
   X,
-  Calendar,
   User,
   MapPin,
   Package,
@@ -52,43 +50,6 @@ const ContactInfo = ({ formData, onUpdate, validation, isAuthenticated }) => {
   );
 };
 
-const generateTimeSlots = (serviceType) => {
-  const slots = [];
-  const now = dayjs();
-  const startDate = now.add(1, "hour");
-
-  for (let day = 0; day < 7; day++) {
-    const date = startDate.add(day, "day");
-
-    let startHour = 8;
-    let endHour = 18;
-    let interval = 2;
-
-    if (serviceType?.name?.toLowerCase().includes("express")) {
-      startHour = 8;
-      endHour = 20;
-      interval = 1;
-    }
-
-    for (let hour = startHour; hour < endHour; hour += interval) {
-      const slotTime = date.hour(hour).minute(0).second(0);
-
-      if (day === 0 && slotTime.isBefore(now)) {
-        continue;
-      }
-
-      slots.push({
-        value: slotTime.toISOString(),
-        label: slotTime.format("ddd, MMM D - h:mm A"),
-        date: slotTime.format("YYYY-MM-DD"),
-        time: slotTime.format("HH:mm"),
-      });
-    }
-  }
-
-  return slots;
-};
-
 export default function BookingModal({
   isOpen,
   onClose,
@@ -104,8 +65,6 @@ export default function BookingModal({
   const { isAuthenticated, user } = useAuth();
 
   const [formData, setFormData] = useState({
-    scheduledPickupAt: "",
-    scheduledDropoffAt: "",
     promoCode: "",
     notes: "",
     guestEmail: user?.email || "",
@@ -125,8 +84,6 @@ export default function BookingModal({
     }
   }, [location.state]);
 
-  const [timeSlots] = useState(() => generateTimeSlots(quote?.service_type));
-
   const updateFormData = useCallback((updates) => {
     setFormData((prev) => ({ ...prev, ...updates }));
     setValidation((prev) => {
@@ -145,10 +102,6 @@ export default function BookingModal({
 
   const validateForm = () => {
     const errors = {};
-
-    if (!formData.scheduledPickupAt) {
-      errors.scheduledPickupAt = "Please select a pickup time";
-    }
 
     if (!isAuthenticated) {
       if (!formData.guestEmail?.trim()) {
@@ -193,8 +146,6 @@ export default function BookingModal({
         quoteId: quote.id,
         pickupAddress: formData.pickupAddress,
         dropoffAddress: formData.dropoffAddress,
-        scheduledPickupAt: formData.scheduledPickupAt,
-        scheduledDropoffAt: formData.scheduledDropoffAt || null,
         promoCode: formData.promoCode || null,
         notes: formData.notes || null,
         receiverEmail: formData.receiverEmail,
@@ -326,60 +277,6 @@ export default function BookingModal({
             validation={validation}
             isAuthenticated={isAuthenticated}
           />
-
-          {/* ... existing scheduling and additional options code ... */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-              <Calendar className="h-5 w-5 text-orange-500 mr-2" />
-              Schedule Pickup
-            </h3>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Pickup Time *
-              </label>
-              <select
-                value={formData.scheduledPickupAt}
-                onChange={(e) =>
-                  updateFormData({ scheduledPickupAt: e.target.value })
-                }
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-              >
-                <option value="">Select pickup time</option>
-                {timeSlots.map((slot) => (
-                  <option key={slot.value} value={slot.value}>
-                    {slot.label}
-                  </option>
-                ))}
-              </select>
-              {validation.scheduledPickupAt && (
-                <div className="flex items-center text-red-500 text-sm mt-2">
-                  <AlertCircle size={16} className="mr-2" />
-                  {validation.scheduledPickupAt}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Dropoff Time (Optional)
-              </label>
-              <select
-                value={formData.scheduledDropoffAt}
-                onChange={(e) =>
-                  updateFormData({ scheduledDropoffAt: e.target.value })
-                }
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-              >
-                <option value="">Select dropoff time (optional)</option>
-                {timeSlots.map((slot) => (
-                  <option key={slot.value} value={slot.value}>
-                    {slot.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
 
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">

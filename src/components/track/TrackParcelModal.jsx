@@ -69,15 +69,11 @@ export default function TrackParcelModal({ isOpen, onClose }) {
 
     switch (status) {
       case "picked_up":
-        return <Package className="text-orange-500 animate-pulse" size={24} />;
+        return <Package className="text-orange-500" size={24} />;
       case "in_transit":
-        return (
-          <motion.div animate={{ x: [-2, 2, -2] }} transition={{ duration: 2, repeat: Infinity }}>
-            <Truck className="text-blue-400" size={24} />
-          </motion.div>
-        );
+        return <Truck className="text-blue-400" size={24} />;
       case "out_for_delivery":
-        return <MapPin className="text-yellow-400 animate-pulse" size={24} />;
+        return <MapPin className="text-yellow-400" size={24} />;
       case "delivered":
         return <CheckCircle className="text-green-400" size={24} />;
       default:
@@ -332,23 +328,7 @@ export default function TrackParcelModal({ isOpen, onClose }) {
                             )}
 
                             {/* Step Icon */}
-                            <motion.div
-                              animate={
-                                isCurrentStep && !event.completed
-                                  ? { scale: [1, 1.1, 1] }
-                                  : {}
-                              }
-                              transition={{
-                                duration: 2,
-                                repeat: Infinity,
-                                ease: "easeInOut",
-                              }}
-                              className={`flex-shrink-0 z-10 ${
-                                isCurrentStep && !event.completed
-                                  ? "ring-4 ring-orange-500/30 rounded-full"
-                                  : ""
-                              }`}
-                            >
+                            <div className="flex-shrink-0 z-10">
                               <div
                                 className={`flex items-center justify-center w-12 h-12 rounded-full transition-all ${
                                   event.completed
@@ -360,7 +340,7 @@ export default function TrackParcelModal({ isOpen, onClose }) {
                               >
                                 {getStatusIcon(event.status, event.completed)}
                               </div>
-                            </motion.div>
+                            </div>
 
                             {/* Step Content */}
                             <div className="flex-1 py-2">

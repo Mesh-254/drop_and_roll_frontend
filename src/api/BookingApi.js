@@ -76,10 +76,14 @@ export class BookingApi extends ApiBase {
     return deg * (Math.PI / 180);
   }
 
-// Postcode search by partial query, 
-// returns list of matching postcodes with basic info (no lat/lng)
-// for autocomplete suggestions
-
+/**
+ * DEPRECATED: Use Ideal Postcodes API in AddressAutocomplete component instead.
+ * This method is retained for backward compatibility only.
+ * It returns only postcode centroids, not premise-level addresses.
+ *
+ * Search postcodes by partial query using postcodes.io
+ * Returns basic postcode info (no individual addresses)
+ */
 async searchPostcodes(query) {
   if (!query || query.trim().length < 2) {
     return { success: true, data: [] };
@@ -94,13 +98,62 @@ async searchPostcodes(query) {
     const json = await response.json();
     return { success: true, data: json.result || [] };
   } catch (error) {
-    console.error("Postcodes.io search error:", error);
+    console.error("[DEPRECATED] Postcodes.io search error:", error);
     return { success: false, message: error.message };
   }
 }
 
-// postcode lookup by exact code, returns detailed info including lat/lng
+/**
+ * Search for premise-level addresses using Ideal Postcodes API
+ * Returns actual house numbers, street names, and building details
+ * This is the recommended method for postcode searches
+ */
+async searchPostcodeAddresses(query, apiKey) {
+  if (!query || query.trim().length < 2) {
+    return { success: true, data: [] };
+  }
+  if (!apiKey) {
+    return {
+      success: false,
+      message: "Ideal Postcodes API key not configured",
+    };
+  }
 
+  try {
+    const normalized = query.trim().toUpperCase().replace(/\s+/g, " ");
+    const url = new URL("https://api.idealpostcodes.com/v1/autocomplete/addresses");
+    url.searchParams.append("query", normalized);
+    url.searchParams.append("api_key", apiKey);
+    url.searchParams.append("limit", "8");
+
+    const response = await fetch(url.toString());
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return { success: true, data: [] };
+      }
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return { success: true, data: data.result || [] };
+  } catch (error) {
+    console.error("[BookingApi] Ideal Postcodes search error:", error);
+    return {
+      success: false,
+      message: error.message || "Failed to search addresses",
+    };
+  }
+}
+
+/**
+ * DEPRECATED: Use Ideal Postcodes API instead.
+ * This method returns only postcode centroid, not individual addresses.
+ * Retained for backward compatibility.
+ *
+ * Lookup postcode by exact code (postcodes.io)
+ * Returns centroid lat/lng and area info (not premise-level addresses)
+ */
 async lookupPostcode(postcode) {
   const clean = postcode.replace(/\s+/g, "").toUpperCase();
   try {
@@ -116,9 +169,56 @@ async lookupPostcode(postcode) {
     const json = await response.json();
     return { success: true, data: json.result };
   } catch (error) {
-    console.error("Postcodes.io lookup error:", error);
+    console.error("[DEPRECATED] Postcodes.io lookup error:", error);
     return { success: false, message: error.message };
   }
+}
+
+/**
+ * Validate address is within service area (MK or OX postcodes)
+ * and geographic bounds
+ */
+validateAddressInServiceArea(address) {
+  const SERVICE_AREAS = ["MK", "OX"];
+  const BOUNDS = {
+    southWest: { lat: 51.65, lng: -1.35 },
+    northEast: { lat: 52.1, lng: -0.65 },
+  };
+
+  // Check postcode
+  const postcodeTrimmed = (address.postal_code || "")
+    .replace(/\s+/g, "")
+    .toUpperCase();
+  const isInServiceArea = SERVICE_AREAS.some((area) =>
+    postcodeTrimmed.startsWith(area)
+  );
+
+  if (!isInServiceArea) {
+    return {
+      valid: false,
+      message: "We only deliver in Milton Keynes (MK) and Oxford (OX) areas",
+    };
+  }
+
+  // Check bounds
+  const lat = address.latitude;
+  const lng = address.longitude;
+
+  if (
+    !lat ||
+    !lng ||
+    lat < BOUNDS.southWest.lat ||
+    lat > BOUNDS.northEast.lat ||
+    lng < BOUNDS.southWest.lng ||
+    lng > BOUNDS.northEast.lng
+  ) {
+    return {
+      valid: false,
+      message: "Address is outside our service area",
+    };
+  }
+
+  return { valid: true };
 }
 
 //  Create quote and booking methods with improved error handling and validation
@@ -216,8 +316,8 @@ async createQuote(quoteData) {
         scheduled_dropoff_at: bookingData.scheduledDropoffAt || null,
         promo_code: bookingData.promoCode || null,
         notes: bookingData.notes || null,
-        receiver_email: bookingData.receiverEmail,
-        receiver_phone: bookingData.receiverPhone,
+        receiver_email: bookingData.receiverEmail || null,
+        receiver_phone: bookingData.receiverPhone || null,
       };
 
       if (bookingData.guestEmail) {

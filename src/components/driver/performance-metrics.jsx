@@ -40,14 +40,14 @@ export function PerformanceMetrics({ metrics = {} }) {
       </div>
 
       {/* Two Compact KPI Cards Side-by-Side */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         {/* Completion Rate */}
         <div className="bg-white dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wide">
               Completion Rate
             </span>
-            <TrendingUp className="w-4 h-4 text-orange-500" />
+            <TrendingUp className="w-4 h-4 text-green-500" />
           </div>
           <div className="text-3xl font-bold text-slate-900 dark:text-white">
             {completionRate}%
@@ -55,14 +55,14 @@ export function PerformanceMetrics({ metrics = {} }) {
           {/* Simple progress bar */}
           <div className="mt-3 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-orange-500 to-orange-600 transition-all duration-300"
+              className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-300"
               style={{ width: `${completionRate}%` }}
             />
           </div>
         </div>
 
         {/* Jobs Completed This Month */}
-        <div className="bg-white dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+        {/* <div className="bg-white dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wide">
               Deliveries
@@ -75,7 +75,7 @@ export function PerformanceMetrics({ metrics = {} }) {
           <p className="text-xs text-slate-500 dark:text-slate-500 mt-2">
             Total completed
           </p>
-        </div>
+        </div> */}
       </div>
     </div>
   );

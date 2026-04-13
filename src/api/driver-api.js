@@ -184,43 +184,57 @@ class DriverAPI extends ApiBase {
     }
   }
 
-  async submitProofOfDelivery(bookingId, proofData) {
+    async submitProofOfDelivery(bookingId, proofData) {
     console.log(
-      `[DriverAPI] Submitting proof for booking ${bookingId} with data:`,
+      `[DriverAPI] Submitting proof for booking ${bookingId}`,
       {
         hasPhoto: !!proofData.photo,
         hasNotes: !!proofData.notes,
         hasLocation: !!proofData.location,
-      },
+      }
     );
+
     const formData = new FormData();
     if (proofData.photo) formData.append("photo", proofData.photo);
     if (proofData.notes) formData.append("notes", proofData.notes);
-    if (proofData.location)
+    if (proofData.location) {
       formData.append("location", JSON.stringify(proofData.location));
+    }
 
     try {
+      // SINGLE API CALL – backend handles POD + status update atomically
       const response = await super.request(
         `/api/tracking/pod/?booking=${bookingId}`,
         {
           method: "POST",
           data: formData,
           headers: { "Content-Type": undefined },
-        },
+        }
       );
-      // Fetch updated job details to ensure status is "delivered"
+
+      console.log("[DriverAPI] Proof of Delivery submitted successfully:", response.data);
+
+      // Optional: Refresh job to confirm new status in UI
       const updatedJob = await this.getJob(bookingId);
-      return { success: true, data: response.data, updatedJob };
+
+      return {
+        success: true,
+        data: response.data,
+        updatedJob,
+        statusUpdated: true,
+      };
     } catch (error) {
       console.error(
         `[DriverAPI] Failed to submit proof for booking ${bookingId}:`,
-        error,
+        error
       );
       return {
         success: false,
         code: error.code || "REQUEST_ERROR",
         message:
-          error.response?.data?.detail || "Failed to submit proof of delivery",
+          error.response?.data?.detail ||
+          error.response?.data?.error ||
+          "Failed to submit proof of delivery",
         status: error.response?.status,
       };
     }
