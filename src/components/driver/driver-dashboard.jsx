@@ -53,7 +53,7 @@ export default function DriverDashboard() {
   });
   const [ratings, setRatings] = useState([]);
   const [metrics, setMetrics] = useState({
-    totalDeliveries: 0,
+    // totalDeliveries: 0,
     completedToday: 0,
     earningsToday: 0,
     earningsWeek: 0,
@@ -518,7 +518,7 @@ export default function DriverDashboard() {
       if (metricsResp.success) {
         const m = metricsResp.data;
         setMetrics({
-          totalDeliveries: m.total_deliveries, // Successful jobs (delivered)
+          // totalDeliveries: m.total_deliveries, // Successful jobs (delivered)
           completedToday: m.completed_today,
           earningsToday: earningsData.today,
           earningsWeek: earningsData.weekly,

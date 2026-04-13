@@ -703,6 +703,11 @@ export function DeliveryStatusUpdates({
                                 <p className="text-slate-600 font-medium">
                                   To: {formatAddress(job.dropoff_address) || "N/A"}
                                 </p>
+                                {job.receiver_phone && (
+                                  <p className="text-slate-600 font-medium mt-1">
+                                    Recipient: {job.receiver_phone}
+                                  </p>
+                                )}
                               </div>
                             </div>
                           </div>
