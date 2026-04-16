@@ -321,50 +321,68 @@ export function DeliveryStatusUpdates({
 
   const handleSingleStatusUpdate = useCallback(
     async (jobId, newStatus) => {
+      // Step 1: Check if the job is locked (immutable)
       const check = await checkSingleImmutable(jobId);
       if (check.immutable) {
         toast.error(check.reason || "Job is locked—cannot update.");
         return;
       }
 
-      // BLOCK: If trying to mark as "delivered", open Proof of Delivery instead
+      // Step 2: Special handling for "delivered" status → open Proof of Delivery modal
       if (newStatus === "delivered") {
-        console.log("[DeliveryStatusUpdates] Blocking direct delivered status - opening ProofOfDelivery");
+        console.log("[DeliveryStatusUpdates] Opening ProofOfDelivery for job:", jobId);
         setPendingDeliveryJob(jobId);
         setShowProofModal(true);
         return;
       }
 
+      // Step 3: Confirm with user before updating
       if (
         !window.confirm(
           `Mark this job as ${newStatus.toUpperCase().replace("_", " ")}?`
         )
-      )
+      ) {
         return;
+      }
 
       try {
+        // Step 4: Call backend to update status
         await driverApi.updateJobStatus(jobId, newStatus);
-        toast.success(
-          `Job status updated to ${newStatus.toUpperCase().replace("_", " ")}`
-        );
+
+        // Step 5: Optimistic UI update + SMART removal
+        // We remove the job from the list immediately when status becomes "at_hub"
+        // because it means the pickup leg is complete (dropped at hub)
         setJobs((prev) =>
-          prev.map((job) =>
-            job.id === jobId
-              ? {
-                  ...job,
-                  status: newStatus,
-                  updated_at: new Date().toISOString(),
-                }
-              : job
-          )
+          prev
+            .map((job) =>
+              job.id === jobId
+                ? {
+                    ...job,
+                    status: newStatus,
+                    updated_at: new Date().toISOString(),
+                  }
+                : job
+            )
+            // Remove from UI if status changed to "at_hub" (completed pickup)
+            .filter((job) => !(job.id === jobId && newStatus === "at_hub"))
         );
+
+        // Step 6: Single success toast
+        toast.success(
+          `Job marked as ${newStatus.toUpperCase().replace("_", " ")}`
+        );
+
+        // Step 7: Notify parent component (triggers refresh if needed)
         if (onStatusUpdate) onStatusUpdate();
       } catch (error) {
-        toast.error("Failed to update job status");
         console.error("[DeliveryStatusUpdates] Single status update error:", error);
+        toast.error("Failed to update job status");
+
+        // Fallback: Refresh from server to keep UI in sync
+        await fetchJobs(1, false);
       }
     },
-    [checkSingleImmutable, onStatusUpdate]
+    [checkSingleImmutable, onStatusUpdate, fetchJobs]
   );
 
   // NEW: Manual refresh button handler (great UX for QR scan confirmation)
