@@ -52,7 +52,7 @@ export default function ProfileDropdown() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await bookingApi.getBookings();
+        const res = await bookingApi.getBookingHistory();
         if (res.success) {
           setBookingsCount(res.data?.length || 0);
         }

@@ -21,6 +21,7 @@ export function JobDetailsModal({
   onClose,
   onUpdateBookingStatus,
   onBulkDelivery,
+  onReportFailure, // Callback for reporting failures
 }) {
   const [selectedBookings, setSelectedBookings] = useState([]);
   const [bulkPhoto, setBulkPhoto] = useState(null);
@@ -291,18 +292,31 @@ export function JobDetailsModal({
                             </div>
 
                             {/* Action Buttons */}
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                               {booking.status === "assigned" && (
-                                <button
-                                  onClick={() =>
-                                    onUpdateBookingStatus(booking.id, "picked_up")
-                                  }
-                                  className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-colors ${getActionButtonClass(
-                                    booking.status
-                                  )}`}
-                                >
-                                  ► Pick Up
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() =>
+                                      onUpdateBookingStatus(booking.id, "picked_up")
+                                    }
+                                    className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-colors ${getActionButtonClass(
+                                      booking.status
+                                    )}`}
+                                  >
+                                    ► Pick Up
+                                  </button>
+                                  {onReportFailure && (
+                                    <button
+                                      onClick={() =>
+                                        onReportFailure(booking.id, "pickup", booking.id)
+                                      }
+                                      className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-amber-500 hover:bg-amber-600 text-white transition-colors flex items-center gap-1"
+                                    >
+                                      <AlertTriangle className="h-3.5 w-3.5" />
+                                      Pickup Issue
+                                    </button>
+                                  )}
+                                </>
                               )}
                               {booking.status === "picked_up" && (
                                 <button
@@ -317,16 +331,29 @@ export function JobDetailsModal({
                                 </button>
                               )}
                               {booking.status === "in_transit" && (
-                                <button
-                                  onClick={() =>
-                                    onUpdateBookingStatus(booking.id, "delivered")
-                                  }
-                                  className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-colors ${getActionButtonClass(
-                                    "in_transit"
-                                  )}`}
-                                >
-                                  ✓ Deliver
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() =>
+                                      onUpdateBookingStatus(booking.id, "delivered")
+                                    }
+                                    className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-colors ${getActionButtonClass(
+                                      "in_transit"
+                                    )}`}
+                                  >
+                                    ✓ Deliver
+                                  </button>
+                                  {onReportFailure && (
+                                    <button
+                                      onClick={() =>
+                                        onReportFailure(booking.id, "delivery", booking.id)
+                                      }
+                                      className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-orange-500 hover:bg-orange-600 text-white transition-colors flex items-center gap-1"
+                                    >
+                                      <AlertTriangle className="h-3.5 w-3.5" />
+                                      Delivery Issue
+                                    </button>
+                                  )}
+                                </>
                               )}
                               {booking.status === "delivered" && (
                                 <div className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-slate-100 text-slate-600">

@@ -17,6 +17,9 @@ import {
   CheckCircle,
   XCircle,
   X,
+  FileText,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { bookingApi } from "../../api/BookingApi";
@@ -34,12 +37,17 @@ export default function BookingHistory() {
   const [error, setError] = useState(null);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [isDownloadingInvoice, setIsDownloadingInvoice] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const [filters, setFilters] = useState({
     dateFrom: "",
     dateTo: "",
     status: "",
     search: "",
   });
+
+  // Pagination constants
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -58,15 +66,25 @@ export default function BookingHistory() {
     try {
       setLoading(true);
       setError(null);
+      setCurrentPage(1);
 
       const [bookingsResponse, quotesResponse] = await Promise.all([
-        bookingApi.getBookings(),
+        bookingApi.getBookingHistory(),
         bookingApi.getQuotes(),
       ]);
-      setBookings(bookingsResponse.data || []);
+
+      // Handle both array and paginated responses
+      let bookingsList = [];
+      if (Array.isArray(bookingsResponse.data)) {
+        bookingsList = bookingsResponse.data;
+        console.log("[BookingHistory] API returned array format. Total:", bookingsList.length);
+      } else if (bookingsResponse.data?.results) {
+        bookingsList = bookingsResponse.data.results;
+        console.log("[BookingHistory] API returned paginated format. Total:", bookingsResponse.data.count);
+      }
+
+      setBookings(bookingsList);
       setQuotes(quotesResponse.data || []);
-      console.log("Fetched bookings:", bookingsResponse.data);
-      console.log("Fetched quotes:", quotesResponse.data);
     } catch (err) {
       console.error("Failed to fetch data:", err);
       setError("Failed to load your booking history. Please try again.");
@@ -77,6 +95,38 @@ export default function BookingHistory() {
 
   const handleBookNow = (quote) => {
     navigate("/booking", { state: { quote } });
+  };
+
+  const handleDownloadInvoice = async (bookingId) => {
+    try {
+      setIsDownloadingInvoice(true);
+      const result = await bookingApi.downloadInvoice(bookingId);
+      if (!result.success) {
+        alert(result.message || "Failed to download invoice");
+      }
+    } catch (err) {
+      console.error("[BookingHistory] Invoice download error:", err);
+      alert("Failed to download invoice. Please try again.");
+    } finally {
+      setIsDownloadingInvoice(false);
+    }
+  };
+
+  // Calculate pagination
+  const canDownloadInvoice = (status) => {
+    if (!status) return false;
+    const statusLower = status.toLowerCase();
+    return statusLower !== "pending" && statusLower !== "cancelled";
+  };
+
+  const getPaginatedBookings = () => {
+    const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIdx = startIdx + ITEMS_PER_PAGE;
+    return filteredBookings.slice(startIdx, endIdx);
+  };
+
+  const getTotalPages = () => {
+    return Math.ceil(filteredBookings.length / ITEMS_PER_PAGE) || 1;
   };
 
   const getStatusIcon = (status) => {
@@ -347,7 +397,7 @@ export default function BookingHistory() {
                       </motion.button>
                     </motion.div>
                   ) : (
-                    filteredBookings.map((booking, idx) => (
+                    getPaginatedBookings().map((booking, idx) => (
                       <motion.div
                         key={booking.id}
                         initial={{ opacity: 0, y: 10 }}
@@ -420,22 +470,99 @@ export default function BookingHistory() {
                             </div>
                           </div>
 
-                          {/* NAVIGATION & PROFILE UPGRADE: View Details button opens modal */}
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => {
-                              setSelectedBooking(booking);
-                              setShowDetailsModal(true);
-                            }}
-                            className="lg:ml-auto bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-bold transition-colors flex items-center gap-2 whitespace-nowrap"
-                          >
-                            <Eye size={16} />
-                            View Details
-                          </motion.button>
+                          {/* Action Buttons: View Details & Download Invoice */}
+                          <div className="flex flex-col sm:flex-row gap-3 lg:ml-auto w-full sm:w-auto">
+                            <motion.button
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => {
+                                setSelectedBooking(booking);
+                                setShowDetailsModal(true);
+                              }}
+                              className="flex-1 sm:flex-none bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                            >
+                              <Eye size={16} />
+                              View Details
+                            </motion.button>
+
+                            {canDownloadInvoice(booking.status) && (
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                disabled={isDownloadingInvoice}
+                                onClick={() => handleDownloadInvoice(booking.id)}
+                                className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white px-6 py-2 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+                              >
+                                {isDownloadingInvoice ? (
+                                  <>
+                                    <Loader2 size={16} className="animate-spin" />
+                                    Downloading...
+                                  </>
+                                ) : (
+                                  <>
+                                    <FileText size={16} />
+                                    Invoice
+                                  </>
+                                )}
+                              </motion.button>
+                            )}
+                          </div>
                         </div>
                       </motion.div>
                     ))
+                  )}
+
+                  {/* Pagination Controls */}
+                  {filteredBookings.length > ITEMS_PER_PAGE && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex items-center justify-between bg-gray-900/50 border border-gray-800 rounded-xl p-4 mt-8"
+                    >
+                      <div className="text-gray-400 text-sm">
+                        Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredBookings.length)} of {filteredBookings.length} bookings
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          disabled={currentPage === 1}
+                          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                          className="p-2 rounded-lg bg-gray-800 hover:bg-orange-500/20 text-gray-400 hover:text-orange-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <ChevronLeft size={18} />
+                        </motion.button>
+
+                        <div className="flex items-center gap-2">
+                          {Array.from({ length: getTotalPages() }, (_, i) => i + 1).map((page) => (
+                            <motion.button
+                              key={page}
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => setCurrentPage(page)}
+                              className={`w-10 h-10 rounded-lg font-semibold transition-all ${
+                                currentPage === page
+                                  ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/30"
+                                  : "bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700"
+                              }`}
+                            >
+                              {page}
+                            </motion.button>
+                          ))}
+                        </div>
+
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          disabled={currentPage === getTotalPages()}
+                          onClick={() => setCurrentPage((p) => Math.min(getTotalPages(), p + 1))}
+                          className="p-2 rounded-lg bg-gray-800 hover:bg-orange-500/20 text-gray-400 hover:text-orange-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <ChevronRight size={18} />
+                        </motion.button>
+                      </div>
+                    </motion.div>
                   )}
                 </motion.div>
               )}
@@ -598,7 +725,28 @@ export default function BookingHistory() {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex gap-3 pt-4 border-t border-gray-800">
+                  <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-800">
+                    {canDownloadInvoice(selectedBooking.status) && (
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        disabled={isDownloadingInvoice}
+                        onClick={() => handleDownloadInvoice(selectedBooking.id)}
+                        className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white font-bold rounded-lg transition-all flex items-center justify-center gap-2"
+                      >
+                        {isDownloadingInvoice ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            Downloading...
+                          </>
+                        ) : (
+                          <>
+                            <FileText size={16} />
+                            Download Invoice
+                          </>
+                        )}
+                      </motion.button>
+                    )}
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}

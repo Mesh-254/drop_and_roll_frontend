@@ -829,6 +829,87 @@ class DriverAPI extends ApiBase {
     }, intervalMs);
   }
 
+
+   // { success: boolean, data?: object, message?: string }
+  async recordFailure(jobId, payload) {
+    if (!jobId || typeof jobId !== "string") {
+      console.error("[DriverAPI] recordFailure: invalid jobId", jobId);
+      return {
+        success: false,
+        code: "INVALID_INPUT",
+        message: "Job ID must be a non-empty string.",
+      };
+    }
+ 
+    const { failure_type = "delivery", reason, notes = "", return_to_hub = true } = payload;
+ 
+    // Translate failure_type → is_pickup_failure bool for the backend
+    const is_pickup_failure = failure_type === "pickup";
+ 
+    // Map any frontend-only reason values to their backend canonical equivalents.
+    // The backend FailedDeliveryReason now includes ALL these values (migration
+    // 0022), so this mapping is belt-and-suspenders for older deployments.
+    const REASON_MAP = {
+      customer_not_available: "customer_not_available",
+      refused_by_recipient: "refused_by_recipient",
+      incorrect_address: "incorrect_address",
+      business_closed: "business_closed",
+      items_not_ready: "items_not_ready",
+      unable_to_locate: "unable_to_locate",
+      vehicle_size_mismatch: "vehicle_size_mismatch",
+      // pass-through (already canonical)
+      recipient_unavailable: "recipient_unavailable",
+      wrong_address: "wrong_address",
+      access_denied: "access_denied",
+      refused: "refused",
+      other: "other",
+    };
+    const mappedReason = REASON_MAP[reason] ?? "other";
+ 
+    console.log(
+      `[DriverAPI] recordFailure — job=${jobId} failure_type=${failure_type}`,
+      `is_pickup_failure=${is_pickup_failure} reason=${mappedReason}`,
+    );
+ 
+    try {
+      const response = await super.request(
+        `/api/booking/bookings/${jobId}/report-failed/`,
+        {
+          method: "POST",
+          data: {
+            reason: mappedReason,
+            notes,
+            return_to_hub,
+            is_pickup_failure,  // explicit override — backend won't need to auto-detect
+          },
+        },
+      );
+ 
+      console.log("[DriverAPI] recordFailure success:", response.data);
+      return { success: true, data: response.data };
+    } catch (error) {
+      const msg =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to record failure.";
+ 
+      console.error("[DriverAPI] recordFailure error:", {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+      });
+ 
+      return {
+        success: false,
+        code: error.response?.data?.code || "RECORD_FAILURE_ERROR",
+        message: msg,
+        status: error.response?.status,
+      };
+    }
+  }
+ 
+
   // NEW: Stop location tracking (call when no active jobs)
   stopLocationTracking() {
     if (this.locationWatcher) {

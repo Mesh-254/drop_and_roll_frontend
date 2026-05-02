@@ -2,6 +2,136 @@
 import { ApiBase } from "./ApiBase";
 
 export class BookingApi extends ApiBase {
+
+
+  /**
+   * Download invoice PDF for a specific booking.
+   * Triggers a browser download using blob response handling.
+   * @param {string} bookingId - The UUID of the booking
+   * @returns {Promise<{success: boolean, message?: string}>}
+   */
+  async downloadInvoice(bookingId) {
+    if (!bookingId || typeof bookingId !== "string") {
+      console.error("[BookingAPI] Invalid bookingId provided:", bookingId);
+      return {
+        success: false,
+        code: "INVALID_INPUT",
+        message: "Booking ID must be a non-empty string",
+      };
+    }
+
+    try {
+      console.log(`[BookingAPI] Downloading invoice for booking: ${bookingId}`);
+      
+      // Make request with blob response type for PDF download
+      const response = await super.request(
+        `/api/booking/bookings/${bookingId}/invoice/`,
+        {
+          method: "GET",
+          responseType: "blob", // Specify blob response type for file download
+        }
+      );
+
+      // Create blob URL and trigger download
+      const blob = response.data || response;
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `invoice-${bookingId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      console.log("[BookingAPI] Invoice downloaded successfully");
+      return {
+        success: true,
+        message: "Invoice downloaded successfully",
+      };
+    } catch (error) {
+      console.error("[BookingAPI] Error downloading invoice:", error);
+      return {
+        success: false,
+        code: error.code || "DOWNLOAD_ERROR",
+        message:
+          error.response?.data?.detail ||
+          error.response?.data?.error ||
+          error.message ||
+          "Failed to download invoice",
+        status: error.response?.status,
+      };
+    }
+  }
+
+  // /**
+  //  * Record a failed delivery attempt for a booking.
+  //  * Sends reason, notes, and return_to_hub status to backend.
+  //  * @param {string} bookingId - The UUID of the booking
+  //  * @param {Object} data - Failure data { reason, notes, return_to_hub }
+  //  * @returns {Promise<Object>} - { success: boolean, data?: Object, message?: string, status?: number }
+  //  */
+  // async recordFailure(bookingId, data) {
+  //   if (!bookingId || typeof bookingId !== "string") {
+  //     console.error("[BookingAPI] Invalid bookingId provided:", bookingId);
+  //     return {
+  //       success: false,
+  //       code: "INVALID_INPUT",
+  //       message: "Booking ID must be a non-empty string",
+  //     };
+  //   }
+
+  //   if (!data || typeof data !== "object") {
+  //     console.error("[BookingAPI] Invalid failure data provided:", data);
+  //     return {
+  //       success: false,
+  //       code: "INVALID_INPUT",
+  //       message: "Failure data must be a non-empty object",
+  //     };
+  //   }
+
+  //   try {
+  //     console.log(`[BookingAPI] Recording failure for booking: ${bookingId}`, {
+  //       reason: data.reason,
+  //       notes: data.notes?.substring(0, 50) + "...",
+  //       return_to_hub: data.return_to_hub,
+  //     });
+
+  //     const response = await super.request(
+  //       `/api/booking/bookings/${bookingId}/report-failed/`,
+  //       {
+  //         method: "POST",
+  //         data: {
+  //           reason: data.reason,
+  //           notes: data.notes || "",
+  //           return_to_hub: data.return_to_hub !== false, // Default to true
+  //         },
+  //       }
+  //     );
+
+  //     console.log("[BookingAPI] Failure recorded successfully:", response.data);
+  //     return {
+  //       success: true,
+  //       data: response.data,
+  //       message: "Failure recorded successfully",
+  //     };
+  //   } catch (error) {
+  //     console.error("[BookingAPI] Error recording failure:", error);
+  //     return {
+  //       success: false,
+  //       code: error.code || "REQUEST_ERROR",
+  //       message:
+  //         error.response?.data?.detail ||
+  //         error.response?.data?.error ||
+  //         error.message ||
+  //         "Failed to record failure",
+  //       status: error.response?.status,
+  //       details: error.response?.data,
+  //     };
+  //   }
+  // }
+
+  // Fetch shipping types and service types for quote creation form
+
   async getShippingTypes() {
     try {
       const response = await this.request("/api/booking/shipping-types/", {
@@ -342,18 +472,33 @@ async createQuote(quoteData) {
     }
   }
 
-  async getBookings() {
+  /**
+   * Get booking history/list for customer
+   * @param {number} page - Page number (default 1)
+   * @param {number} pageSize - Items per page (default 10)
+   * @returns {Promise<Object>}
+   */
+  async getBookingHistory(page = 1, pageSize = 10) {
     try {
-      const response = await this.request("/api/booking/bookings/", {
-        method: "GET",
-        includeAuth: true,
-      });
+      console.log(`[BookingAPI] Fetching booking history (page: ${page})`);
+      const response = await super.request(
+        `/api/booking/bookings/?page=${page}&page_size=${pageSize}`,
+        {
+          method: "GET",
+        }
+      );
+      console.log("[BookingAPI] Booking history fetched successfully:", response.data);
       return { success: true, data: response.data };
     } catch (error) {
+      console.error("[BookingAPI] Error fetching booking history:", error);
       return {
         success: false,
         code: error.code || "FETCH_ERROR",
-        message: error.message || "Failed to fetch bookings",
+        message:
+          error.response?.data?.detail ||
+          error.message ||
+          "Failed to fetch booking history",
+        status: error.response?.status,
       };
     }
   }
@@ -387,17 +532,40 @@ async createQuote(quoteData) {
     }
   }
 
+  /**
+   * Get booking details
+   * @param {string} bookingId - The UUID of the booking
+   * @returns {Promise<Object>}
+   */
   async getBooking(bookingId) {
+    if (!bookingId || typeof bookingId !== "string") {
+      console.error("[BookingAPI] Invalid bookingId provided:", bookingId);
+      return {
+        success: false,
+        code: "INVALID_INPUT",
+        message: "Booking ID must be a non-empty string",
+      };
+    }
+
     try {
-      const response = await this.request(
+      console.log(`[BookingAPI] Fetching booking details: ${bookingId}`);
+      const response = await super.request(
         `/api/booking/bookings/${bookingId}/`,
-      ); // Fixed URL
+        {
+          method: "GET",
+        }
+      );
       return { success: true, data: response.data };
     } catch (error) {
+      console.error("[BookingAPI] Error fetching booking:", error);
       return {
         success: false,
         code: error.code || "FETCH_ERROR",
-        message: error.message || "Failed to fetch booking",
+        message:
+          error.response?.data?.detail ||
+          error.message ||
+          "Failed to fetch booking",
+        status: error.response?.status,
       };
     }
   }

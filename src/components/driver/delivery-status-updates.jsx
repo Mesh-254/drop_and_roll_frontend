@@ -23,6 +23,7 @@ import {
 import { driverApi } from "../../api/driver-api";
 import { QRScannerModal } from "./QRScannerModal"; // NEW: QR Scanner component
 import { ProofOfDelivery } from "./proof-of-delivery"; // NEW: Proof of Delivery component
+import { FailureReportModal } from "./FailureReportModal"; // NEW: Failure Report Modal
 
 export function DeliveryStatusUpdates({
   jobs: initialJobs = [],
@@ -46,6 +47,10 @@ export function DeliveryStatusUpdates({
   const [showProofModal, setShowProofModal] = useState(false);
   const [pendingDeliveryJob, setPendingDeliveryJob] = useState(null);
   const [pendingDeliveryJobs, setPendingDeliveryJobs] = useState([]); // For bulk
+  const [showFailureModal, setShowFailureModal] = useState(false);
+  const [failureJobId, setFailureJobId] = useState(null);
+  const [failureJobTitle, setFailureJobTitle] = useState("");
+  const [failureType, setFailureType] = useState("delivery"); // 'pickup' or 'delivery'
   const observerTarget = useRef(null);
 
   // NEW: Auto-refresh interval ref (for cleanup)
@@ -546,30 +551,63 @@ export function DeliveryStatusUpdates({
                   <ChevronDown className="h-4 w-4" />
                 </button>
                 {bulkActionOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow-lg py-2 z-10">
+                  <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg py-2 z-10">
+                    {/* Warning Section */}
                     {skippedCount > 0 && (
-                      <div className="px-4 py-2 text-xs text-amber-700 bg-amber-50 border-b border-amber-100">
+                      <div className="px-4 py-3 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-800 font-medium">
                         ⓘ Skipping {skippedCount} locked job{skippedCount > 1 ? "s" : ""}
                       </div>
                     )}
-                    <button
+
+                    {/* Picked Up Option */}
+                    {/* <button
                       onClick={() => handleBulkStatusUpdate("picked_up")}
-                      className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition-colors text-slate-900 border-b border-slate-100 text-sm"
+                      className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-700 text-sm font-medium"
                     >
                       ► Mark as Picked Up
-                    </button>
-                    <button
-                      onClick={() => handleBulkStatusUpdate("at_hub")}
-                      className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition-colors text-slate-900 border-b border-slate-100 text-sm"
-                    >
-                      ◆ Mark as At Hub
-                    </button>
-                    <button
+                    </button> */}
+
+                    {/* At Hub - RESTRICTED */}
+                    {(() => {
+                      const allSelectedPickedUp = selectedJobs.every((id) => {
+                        const j = jobs.find((job) => job.id === id);
+                        return j?.status === "picked_up";
+                      });
+                      return (
+                        <>
+                          {allSelectedPickedUp ? (
+                            <button
+                              onClick={() => handleBulkStatusUpdate("at_hub")}
+                              className="w-full text-left px-4 py-3 hover:bg-purple-50 dark:hover:bg-purple-900/30 transition-colors text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-700 text-sm font-medium"
+                            >
+                              ◆ Mark as At Hub
+                            </button>
+                          ) : (
+                            <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+                              <div className="flex items-start gap-2">
+                                <Lock className="h-4 w-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                                <div>
+                                  <p className="text-xs font-bold text-red-700 dark:text-red-300">
+                                    ◆ At Hub Disabled
+                                  </p>
+                                  <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
+                                    Only available when ALL are "Picked Up"
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+
+                    {/* In Transit Option */}
+                    {/* <button
                       onClick={() => handleBulkStatusUpdate("in_transit")}
-                      className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition-colors text-slate-900 text-sm"
+                      className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-900 dark:text-white text-sm font-medium"
                     >
                       ↗ Mark as In Transit
-                    </button>
+                    </button> */}
                   </div>
                 )}
               </div>
@@ -611,130 +649,242 @@ export function DeliveryStatusUpdates({
         </div>
       </div>
 
-      {/* Jobs List */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {/* Jobs List - Modern Card Design */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Select All Row */}
         {filteredJobs.length > 0 && (
-          <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-lg border border-slate-200">
+          <div className="mb-6 flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
             <button
               onClick={handleSelectAll}
-              className="p-1 hover:bg-slate-200 rounded transition-colors"
+              className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors flex-shrink-0"
               aria-label="Select all jobs"
             >
               {selectedJobs.length === filteredJobs.length && filteredJobs.length > 0 ? (
-                <CheckSquare className="h-5 w-5 text-blue-600" />
+                <CheckSquare className="h-5 w-5 text-orange-600" />
               ) : (
                 <Square className="h-5 w-5 text-slate-400" />
               )}
             </button>
-            <span className="text-sm font-medium text-slate-700">
+            <span className="text-sm font-semibold text-slate-900 dark:text-white">
               {selectedJobs.length > 0
                 ? `${selectedJobs.length} selected`
-                : `Select all (${filteredJobs.length})`}
+                : `Select jobs (${filteredJobs.length} total)`}
             </span>
             {isCheckingImmutable && (
-              <Loader2 className="h-4 w-4 animate-spin text-blue-600 ml-auto" />
+              <Loader2 className="h-4 w-4 animate-spin text-orange-600 ml-auto" />
             )}
+          </div>
+        )}
+
+        {/* Bulk Action Restriction Notice */}
+        {selectedJobs.length > 0 && (
+          <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-500 rounded-lg">
+            <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
+              ℹ️ Bulk "At Hub" is only available when ALL selected bookings are "Picked Up"
+            </p>
           </div>
         )}
 
         {/* Jobs Grid */}
         {filteredJobs.length > 0 ? (
-          <div className="space-y-3">
+          <div className="space-y-6">
             {filteredJobs.map((job) => {
               const check = immutableChecks[job.id];
               const isImmutable = check?.immutable;
               const nextStatus = getNextStatus(job.status);
               const canUpdate = nextStatus && !isImmutable;
               const urgent = isUrgentPickup(job.scheduled_pickup_at);
+              const isPickedUp = job.status === "picked_up";
+              const allSelectedPickedUp = selectedJobs.length > 0 && selectedJobs.every((id) => {
+                const j = jobs.find((job) => job.id === id);
+                return j?.status === "picked_up";
+              });
 
               return (
                 <div
                   key={job.id}
                   onClick={() => onJobClick && onJobClick(job)}
-                  className="bg-white border border-slate-200 rounded-lg hover:shadow-md transition-all cursor-pointer overflow-hidden"
+                  className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:shadow-xl transition-all cursor-pointer overflow-hidden group"
                 >
-                  <div className="p-4 sm:p-5">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                      {/* Left: Checkbox + Job Info */}
+                  <div className="p-6 sm:p-7">
+                    {/* Top Row: Checkbox + Tracking Number + Status Badge + Urgent Badge */}
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-slate-200 dark:border-slate-700">
                       <div className="flex gap-4 flex-1 min-w-0">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             handleJobSelect(job.id);
                           }}
-                          className="mt-0.5 p-1 hover:bg-slate-100 rounded transition-colors flex-shrink-0"
+                          className="mt-1 p-2.5 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors flex-shrink-0"
+                          aria-label="Select job"
                         >
                           {selectedJobs.includes(job.id) ? (
-                            <CheckSquare className="h-5 w-5 text-blue-600" />
+                            <CheckSquare className="h-5 w-5 text-orange-600" />
                           ) : (
-                            <Square className="h-5 w-5 text-slate-300" />
+                            <Square className="h-5 w-5 text-slate-300 dark:text-slate-600" />
                           )}
                         </button>
-
                         <div className="min-w-0 flex-1">
-                          {/* Header Row */}
-                          <div className="flex flex-col sm:flex-row sm:items-baseline gap-2 mb-3">
-                            <div>
-                              <h3 className="text-sm font-bold text-slate-900">
-                                Job #{job.id?.slice(-8) || "N/A"}
-                              </h3>
-                              {job.tracking_number && (
-                                <p className="text-xs text-slate-500 mt-0.5">
-                                  Track: {job.tracking_number}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(
-                                  job.status
-                                )}`}
-                              >
-                                {getStatusLabel(job.status)}
-                                {isImmutable && (
-                                  <Lock className="h-3 w-3" title="Locked" />
-                                )}
-                              </span>
-                              {urgent && (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700 border border-red-200">
-                                  <AlertCircle className="h-3 w-3" />
-                                  Urgent
-                                </span>
-                              )}
-                            </div>
+                          {/* Large, bold tracking number */}
+                          <div className="mb-2">
+                            <p className="text-xs uppercase tracking-widest font-medium text-slate-500 dark:text-slate-400 mb-1">
+                              Tracking #
+                            </p>
+                            <h3 className="text-2xl sm:text-3xl font-bold font-mono text-slate-900 dark:text-white break-all">
+                              {job.tracking_number || job.id?.slice(-12) || "N/A"}
+                            </h3>
                           </div>
+                          {job.id && (
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              Job ID: {job.id.slice(-8)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Status & Urgent Badges */}
+                      <div className="flex flex-wrap items-center gap-3 sm:items-start sm:justify-end">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold uppercase tracking-wide ${getStatusBadgeClass(
+                            job.status
+                          )}`}
+                        >
+                          {getStatusLabel(job.status)}
+                          {isImmutable && (
+                            <Lock className="h-3.5 w-3.5" title="Locked" />
+                          )}
+                        </span>
+                        {urgent && (
+                          <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold uppercase tracking-wide bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700">
+                            <AlertCircle className="h-3.5 w-3.5" />
+                            URGENT
+                          </span>
+                        )}
+                      </div>
+                    </div>
 
-                          {/* Addresses */}
-                          <div className="space-y-2 text-xs">
-                            <div className="flex gap-2">
-                              <MapPin className="h-4 w-4 text-slate-400 flex-shrink-0 mt-0.5" />
-                              <div>
-                                <p className="text-slate-600 font-medium">
-                                  From: {formatAddress(job.pickup_address) || "N/A"}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <MapPin className="h-4 w-4 text-slate-400 flex-shrink-0 mt-0.5" />
-                              <div>
-                                <p className="text-slate-600 font-medium">
-                                  To: {formatAddress(job.dropoff_address) || "N/A"}
-                                </p>
-                                {job.receiver_phone && (
-                                  <p className="text-slate-600 font-medium mt-1">
-                                    Recipient: {job.receiver_phone}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
+                    {/* Route Flow: Pickup → Delivery with Dotted Line & Arrow */}
+                    <div className="mb-8">
+                      {/* Pickup Section */}
+                      <div className="mb-6 pb-6 border-b-2 border-dashed border-teal-200 dark:border-teal-800 relative">
+                        <div className="flex gap-4">
+                          <div className="flex flex-col items-center">
+                            <div className="w-4 h-4 rounded-full bg-teal-500 mb-2" />
+                            <div className="w-1 h-16 bg-gradient-to-b from-teal-300 to-teal-100 dark:from-teal-700 dark:to-teal-800" />
                           </div>
+                          <div className="flex-1 min-w-0 pt-0.5">
+                            <p className="text-xs uppercase tracking-widest font-bold text-teal-700 dark:text-teal-300 mb-1.5">
+                              📦 Pickup Location
+                            </p>
+                            <p className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white mb-2">
+                              {formatAddress(job.pickup_address) || "N/A"}
+                            </p>
+                            {job.customer?.name && (
+                              <p className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1.5 mb-1">
+                                <User className="h-3.5 w-3.5" />
+                                {job.customer.name}
+                              </p>
+                            )}
+                            {job.customer?.phone && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.location.href = `tel:${job.customer.phone.replace(/\D/g, "")}`;
+                                }}
+                                className="text-xs text-teal-600 dark:text-teal-300 hover:underline font-medium flex items-center gap-1.5"
+                              >
+                                <Phone className="h-3.5 w-3.5" />
+                                {job.customer.phone}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Down Arrow Indicator */}
+                        <div className="absolute left-1.5 top-20 text-teal-300 dark:text-teal-700 text-xl">
+                          ↓
                         </div>
                       </div>
 
-                      {/* Right: Action Buttons */}
-                      <div className="flex flex-col gap-2 sm:items-end">
-                        {/* NEW: QR Scan button for assigned jobs */}
+                      {/* Delivery Section */}
+                      <div className="flex gap-4">
+                        <div className="flex flex-col items-center">
+                          <div className="w-4 h-4 rounded-full bg-blue-500" />
+                        </div>
+                        <div className="flex-1 min-w-0 pt-0.5">
+                          <p className="text-xs uppercase tracking-widest font-bold text-blue-700 dark:text-blue-300 mb-1.5">
+                            🎯 Delivery Location
+                          </p>
+                          <p className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white mb-2">
+                            {formatAddress(job.dropoff_address) || "N/A"}
+                          </p>
+                          {job.receiver_name && (
+                            <p className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1.5 mb-1">
+                              <User className="h-3.5 w-3.5" />
+                              {job.receiver_name}
+                            </p>
+                          )}
+                          {job.receiver_phone && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.location.href = `tel:${job.receiver_phone.replace(/\D/g, "")}`;
+                              }}
+                              className="text-xs text-blue-600 dark:text-blue-300 hover:underline font-medium flex items-center gap-1.5"
+                            >
+                              <Phone className="h-3.5 w-3.5" />
+                              {job.receiver_phone}
+                            </button>
+                          )}
+                          {job.receiver_email && (
+                            <p className="text-xs text-slate-600 dark:text-slate-400 break-all">
+                              {job.receiver_email}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Route Metadata */}
+                    {(job.route_number || job.estimated_hours || job.number_of_stops) && (
+                      <div className="mb-6 pb-6 border-b border-slate-200 dark:border-slate-700 grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        {job.route_number && (
+                          <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3">
+                            <p className="text-xs uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-1">
+                              Route
+                            </p>
+                            <p className="text-lg font-bold text-slate-900 dark:text-white">
+                              #{job.route_number}
+                            </p>
+                          </div>
+                        )}
+                        {job.estimated_hours && (
+                          <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3">
+                            <p className="text-xs uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-1">
+                              Est. Time
+                            </p>
+                            <p className="text-lg font-bold text-slate-900 dark:text-white">
+                              {job.estimated_hours}h
+                            </p>
+                          </div>
+                        )}
+                        {job.number_of_stops && (
+                          <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3">
+                            <p className="text-xs uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-1">
+                              Stops
+                            </p>
+                            <p className="text-lg font-bold text-slate-900 dark:text-white">
+                              {job.number_of_stops}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Action Buttons Row */}
+                    <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+                      <div className="flex flex-col sm:flex-row gap-3 flex-1">
+                        {/* QR Scan button for assigned jobs */}
                         {job.status === "assigned" && !isImmutable && (
                           <button
                             onClick={(e) => {
@@ -742,20 +892,21 @@ export function DeliveryStatusUpdates({
                               setSelectedJobForQR(job);
                               setShowQRScanner(true);
                             }}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors shadow-sm whitespace-nowrap"
+                            className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg active:scale-95"
                           >
-                            <Camera className="h-4 w-4" />
-                            Scan Label
+                            <Camera className="h-5 w-5" />
+                            <span>Scan Label</span>
                           </button>
                         )}
 
+                        {/* Main Action Button */}
                         {canUpdate ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleSingleStatusUpdate(job.id, nextStatus);
                             }}
-                            className="px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap"
+                            className="flex-1 px-6 py-3 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg active:scale-95"
                           >
                             {nextStatus === "picked_up" && "► Pick Up"}
                             {nextStatus === "at_hub" && "◆ At Hub"}
@@ -763,27 +914,50 @@ export function DeliveryStatusUpdates({
                             {nextStatus === "delivered" && "✓ Deliver"}
                           </button>
                         ) : isImmutable ? (
-                          <div className="px-4 py-2.5 bg-slate-100 text-slate-600 text-xs font-medium rounded-lg text-center">
-                            <Lock className="h-4 w-4 inline mr-1" />
-                            Locked
+                          <div className="px-6 py-3 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 font-bold rounded-xl text-center flex items-center justify-center gap-2">
+                            <Lock className="h-5 w-5" />
+                            <span>Locked</span>
                           </div>
                         ) : (
-                          <div className="px-4 py-2.5 bg-slate-100 text-slate-500 text-xs font-medium rounded-lg text-center">
-                            Completed
+                          <div className="px-6 py-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-bold rounded-xl text-center">
+                            ✓ Completed
                           </div>
                         )}
-                        {job.customer?.phone && (
+                      </div>
+
+                      {/* Secondary Actions */}
+                      <div className="flex gap-2 sm:flex-col">
+                        {/* Report Issue - Contextual */}
+                        {job.status === "assigned" && !isImmutable && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              window.location.href = `tel:${job.customer.phone.replace(
-                                /\D/g,
-                                ""
-                              )}`;
+                              setFailureJobId(job.id);
+                              setFailureJobTitle(job.tracking_number || "Unknown");
+                              setFailureType("pickup");
+                              setShowFailureModal(true);
                             }}
-                            className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                            className="p-3 sm:px-4 sm:py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg transition-colors shadow-sm text-sm flex items-center justify-center gap-1"
+                            title="Report Pickup Issue"
                           >
-                            Call Customer
+                            <AlertTriangle className="h-4 w-4" />
+                            <span className="hidden sm:inline">Pickup Issue</span>
+                          </button>
+                        )}
+                        {job.status === "in_transit" && !isImmutable && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFailureJobId(job.id);
+                              setFailureJobTitle(job.tracking_number || "Unknown");
+                              setFailureType("delivery");
+                              setShowFailureModal(true);
+                            }}
+                            className="p-3 sm:px-4 sm:py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-colors shadow-sm text-sm flex items-center justify-center gap-1"
+                            title="Report Delivery Issue"
+                          >
+                            <AlertTriangle className="h-4 w-4" />
+                            <span className="hidden sm:inline">Delivery Issue</span>
                           </button>
                         )}
                       </div>
@@ -794,11 +968,11 @@ export function DeliveryStatusUpdates({
             })}
           </div>
         ) : (
-          <div className="text-center py-12">
-            <Package className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-600 font-medium">No jobs found</p>
-            <p className="text-sm text-slate-500">
-              {searchTerm ? "Try adjusting your search" : "No deliveries assigned yet"}
+          <div className="text-center py-16">
+            <Package className="h-16 w-16 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
+            <p className="text-lg font-bold text-slate-900 dark:text-white">No jobs found</p>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
+              {searchTerm ? "Try adjusting your search filters" : "No deliveries assigned yet"}
             </p>
           </div>
         )}
@@ -865,6 +1039,26 @@ export function DeliveryStatusUpdates({
           onSubmit={handleProofOfDeliverySubmit}
         />
       )}
+
+      {/* NEW: Failure Report Modal - with contextual failure type */}
+      <FailureReportModal
+        isOpen={showFailureModal}
+        jobId={failureJobId}
+        jobTitle={failureJobTitle}
+        failureType={failureType}
+        onClose={() => {
+          setShowFailureModal(false);
+          setFailureJobId(null);
+          setFailureJobTitle("");
+          setFailureType("delivery"); // Reset to default
+        }}
+        onSuccess={(result) => {
+          console.log("[DeliveryStatusUpdates] Failure reported successfully:", result);
+          // Refresh jobs list to reflect status change
+          fetchJobs(1, false);
+          if (onStatusUpdate) onStatusUpdate();
+        }}
+      />
     </div>
   );
 }
