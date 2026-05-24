@@ -2,10 +2,12 @@
 
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import { Moon, Sun, Save, X, Loader } from "lucide-react";
-import { authApi } from "../../api/AuthApi";   // ← make sure this import exists
+import { Moon, Sun, Save, X, Loader, Building2, CheckCircle, Clock, XCircle, CreditCard, ArrowRight } from "lucide-react";
+import { authApi } from "../../api/AuthApi";
+import { useBusinessProfile } from "../../hooks/useBusinessProfile";
+import BusinessProfileOnboarding from "../business/BusinessProfileOnboarding";
 
 // NAVIGATION & PROFILE UPGRADE: New /profile page with editable name fields and theme toggle
 export default function ProfilePage() {
@@ -20,7 +22,12 @@ export default function ProfilePage() {
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  
+  // Business profile state — useBusinessProfile exports `businessProfile`, not `profile`
+  const { businessProfile, loading: businessLoading, refetch: refetchBusiness, hasProfile, isApproved, isPending } = useBusinessProfile();
+  const [showBusinessOnboarding, setShowBusinessOnboarding] = useState(false);
 
+  console.log("Rendering ProfilePage with user:", user, "and business profile:", businessProfile);
   // Split full_name when user data is available
   useEffect(() => {
     if (user?.full_name) {
@@ -335,6 +342,131 @@ export default function ProfilePage() {
           </motion.div>
         </div>
 
+        {/* Business Account Section - Only show for customers */}
+        {user?.role === 'customer' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mt-8"
+          >
+            <div className="bg-gradient-to-br from-gray-900 to-black border-2 border-orange-500/20 rounded-2xl p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-orange-400" />
+                </div>
+                <h3 className="text-2xl font-bold text-white">Business Account</h3>
+              </div>
+
+              {businessLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader className="w-6 h-6 animate-spin text-orange-400" />
+                  <span className="ml-2 text-gray-400">Loading business profile...</span>
+                </div>
+              ) : hasProfile ? (
+                // Business profile exists - show summary
+                <div className="space-y-6">
+                  {/* Company Info */}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      {/* <p className="text-lg font-semibold text-white">{businessProfile.company_name}</p> */}
+                      <p className="text-sm text-gray-400 mt-1">{businessProfile.contact_email}</p>
+                    </div>
+                    {/* Status Badge */}
+                    <div>
+                      {isApproved ? (
+                        <div className="flex items-center gap-2 bg-green-500/20 text-green-400 px-3 py-1.5 rounded-full text-sm font-bold border border-green-500/30">
+                          <CheckCircle className="w-4 h-4" />
+                          Approved
+                        </div>
+                      ) : isPending ? (
+                        <div className="flex items-center gap-2 bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-full text-sm font-bold border border-amber-500/30">
+                          <Clock className="w-4 h-4" />
+                          Pending Review
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 bg-red-500/20 text-red-400 px-3 py-1.5 rounded-full text-sm font-bold border border-red-500/30">
+                          <XCircle className="w-4 h-4" />
+                          Rejected
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Approved profile - show NET terms and credit info */}
+                  {isApproved && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-700/30">
+                      <div className="bg-gray-800/30 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <CreditCard className="w-4 h-4 text-gray-400" />
+                          <p className="text-xs text-gray-400 uppercase tracking-wider">Payment Terms</p>
+                        </div>
+                        <p className="text-white font-semibold">
+                          {businessProfile.payment_terms === 'prepaid' ? 'Prepaid' : 
+                           businessProfile.payment_terms === 'net_7' ? 'NET 7 Days' :
+                           businessProfile.payment_terms === 'net_30' ? 'NET 30 Days' :
+                           businessProfile.payment_terms === 'net_60' ? 'NET 60 Days' : 'Prepaid'}
+                        </p>
+                      </div>
+                      {businessProfile.credit_limit > 0 && (
+                        <div className="bg-gray-800/30 rounded-lg p-4">
+                          <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Available Credit</p>
+                          <p className="text-white font-semibold">
+                            £{Number(businessProfile.available_credit || businessProfile.credit_limit).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Pending profile - info message */}
+                  {isPending && (
+                    <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                      <p className="text-sm text-amber-400">
+                        Your business profile is currently under review. You&apos;ll receive an email once approved.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* View/Manage Business Profile link */}
+                  <Link
+                    to="/business/profile"
+                    className="flex items-center justify-between px-4 py-3 bg-gray-800/50 hover:bg-gray-800 rounded-lg transition-all group"
+                  >
+                    <span className="text-gray-300 group-hover:text-white transition-colors">
+                      Manage Business Profile
+                    </span>
+                    <ArrowRight className="w-4 h-4 text-gray-500 group-hover:text-orange-400 transition-colors" />
+                  </Link>
+                </div>
+              ) : (
+                // No business profile - show CTA to create one
+                <div className="text-center py-6">
+                  <div className="w-16 h-16 rounded-full bg-gray-800/50 flex items-center justify-center mx-auto mb-4">
+                    <Building2 className="w-8 h-8 text-gray-500" />
+                  </div>
+                  <h4 className="text-lg font-semibold text-white mb-2">Upgrade to Business Account</h4>
+                  <p className="text-gray-400 text-sm mb-6 max-w-md mx-auto">
+                    Unlock bulk uploads, NET payment terms, volume discounts, and dedicated support for your business.
+                  </p>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowBusinessOnboarding(true)}
+                    className="px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold rounded-lg transition-all inline-flex items-center gap-2"
+                  >
+                    <Building2 className="w-5 h-5" />
+                    Create Business Profile
+                  </motion.button>
+                  <p className="text-xs text-gray-500 mt-4">
+                    Or <Link to="/business/register" className="text-orange-400 hover:text-orange-300 underline">register as a new business</Link>
+                  </p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
         {/* Account Actions */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -389,6 +521,17 @@ export default function ProfilePage() {
           </motion.button>
         </motion.div>
       </div>
+
+      {/* Business Profile Onboarding Modal */}
+      {showBusinessOnboarding && (
+        <BusinessProfileOnboarding
+          onClose={() => setShowBusinessOnboarding(false)}
+          onSuccess={() => {
+            setShowBusinessOnboarding(false);
+            refetchBusiness();
+          }}
+        />
+      )}
     </div>
   );
 }

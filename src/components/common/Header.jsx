@@ -1,7 +1,7 @@
 "use client";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Upload } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import TrackParcelModal from "../track/TrackParcelModal";
 import GetQuoteBook from "../quote/GetQuoteBook";
@@ -64,6 +64,7 @@ export default function Header() {
       onClick: handleTracking,
     },
     ...(isAuthenticated ? [{ name: "History", href: "/history" }] : []),
+    ...(isAuthenticated ? [{ name: "Bulk Upload", href: "/bulk-upload", badge: "New" }] : []),
     { name: "Support", onClick: () => handleSmoothScroll("contact"), href: "#" },
     { name: "FAQ", href: "/faqs" },
   ];
@@ -102,23 +103,29 @@ export default function Header() {
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center space-x-8">
               {navItems.map((item) => (
-                <NavLink
-                  key={item.name}
-                  to={item.href}
-                  onClick={item.onClick}
-                  className={({ isActive }) =>
-                    `font-medium transition-all duration-300 relative group ${
-                      isActive && !item.onClick
-                        ? "text-orange-500 font-bold"
-                        : isScrolled
-                        ? "text-white/90 hover:text-orange-500"
-                        : "text-white/90 hover:text-orange-500"
-                    }`
-                  }
-                >
-                  {item.name}
+                <div key={item.name} className="relative group">
+                  <NavLink
+                    to={item.href}
+                    onClick={item.onClick}
+                    className={({ isActive }) =>
+                      `font-medium transition-all duration-300 relative flex items-center gap-2 ${
+                        isActive && !item.onClick
+                          ? "text-orange-500 font-bold"
+                          : isScrolled
+                          ? "text-white/90 hover:text-orange-500"
+                          : "text-white/90 hover:text-orange-500"
+                      }`
+                    }
+                  >
+                    {item.name}
+                    {item.badge && (
+                      <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded-full font-semibold ml-1">
+                        {item.badge}
+                      </span>
+                    )}
+                  </NavLink>
                   <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-orange-500 transition-all duration-300 group-hover:w-full"></span>
-                </NavLink>
+                </div>
               ))}
             </nav>
 

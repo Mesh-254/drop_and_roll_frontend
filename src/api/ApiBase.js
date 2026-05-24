@@ -66,11 +66,19 @@ export class ApiBase {
             return Promise.reject(refreshError);
           }
         }
-        console.error("[ApiBase] Response error:", {
-          status: error.response?.status,
-          message: error.message,
-          url: originalRequest?.url,
-        });
+        // Suppress 404 logs for the business profile endpoint —
+        // a 404 there is expected for users who haven't created a profile yet.
+        const isSilent404 =
+          error?.response?.status === 404 &&
+          originalRequest?.url?.includes("/api/business/profiles/current/");
+
+        if (!isSilent404) {
+          console.error("[ApiBase] Response error:", {
+            status: error.response?.status,
+            message: error.message,
+            url: originalRequest?.url,
+          });
+        }
         return Promise.reject(error);
       }
     );

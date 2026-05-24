@@ -38,6 +38,7 @@ import PaymentCancel from "./components/payments/PaymentCancel";
 
 import DriverDashboard from "./components/driver/driver-dashboard";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import { BulkUploadDashboard, BulkUploadDetail, BusinessProfileOnboarding, BusinessProfilePage } from "./components/business";
 
 const backendUrl = import.meta.env.VITE_NEXT_PUBLIC_BACKEND_URL;
 
@@ -206,6 +207,48 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["driver"]}>
                 <DriverDashboard />
+              </ProtectedRoute>
+            }
+          />
+          {/* Bulk Upload routes for business accounts */}
+          <Route
+            path="/bulk-upload"
+            element={
+              <ProtectedRoute allowedRoles={["customer"]}>
+                <MainLayout>
+                  <BulkUploadDashboard />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/bulk-upload/:id"
+            element={
+              <ProtectedRoute allowedRoles={["customer"]}>
+                <MainLayout>
+                  <BulkUploadDetail />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          {/* Business Profile routes */}
+          <Route
+            path="/business/register"
+            element={
+              <ProtectedRoute allowedRoles={["customer"]}>
+                <MainLayout>
+                  <BusinessProfileOnboarding isPage={true} onClose={() => window.history.back()} onSuccess={() => window.location.href = '/profile'} />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/business/profile"
+            element={
+              <ProtectedRoute allowedRoles={["customer"]}>
+                <MainLayout>
+                  <BusinessProfilePage />
+                </MainLayout>
               </ProtectedRoute>
             }
           />

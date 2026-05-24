@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect } from "react";
 import { authApi } from "../api/AuthApi";
+import BusinessApi from "../api/BusinessApi";
 
 const AuthContext = createContext();
 
@@ -17,6 +18,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [businessProfile, setBusinessProfile] = useState(null);
 
   useEffect(() => {
     checkAuthStatus();
@@ -29,9 +31,20 @@ export const AuthProvider = ({ children }) => {
         const userData = await authApi.getCurrentUser();
         setUser(userData);
         setIsAuthenticated(true);
+
+        // Also refresh the business profile so page reloads don't lose it.
+        // BusinessApi.getProfile() returns null on 404 — never throws for new users.
+        try {
+          const profile = await BusinessApi.getProfile();
+          setBusinessProfile(profile);
+        } catch (profileError) {
+          console.warn('[AuthContext] checkAuthStatus: could not load business profile:', profileError);
+          setBusinessProfile(null);
+        }
       } else {
         setUser(null);
         setIsAuthenticated(false);
+        setBusinessProfile(null);
       }
     } catch (error) {
       console.error("Auth check failed:", error);
@@ -77,6 +90,20 @@ export const AuthProvider = ({ children }) => {
         } else {
           await checkAuthStatus(); // Fallback to refresh user data
         }
+
+        // Fetch business profile after successful login.
+        // A 404 is expected for users who haven't created one yet — BusinessApi.getProfile()
+        // already returns null on 404, so this try/catch is purely a safety net for
+        // unexpected errors (network blip, 500, etc.) that should never abort login.
+        try {
+          const profile = await BusinessApi.getProfile();
+          setBusinessProfile(profile); // null when no profile exists — that's fine
+        } catch (profileError) {
+          // Only warn on truly unexpected errors; 404 is already swallowed by BusinessApi
+          console.warn("[AuthContext] Could not load business profile:", profileError);
+          setBusinessProfile(null);
+        }
+
         return { success: true, data: response.data };
       }
       return {
@@ -140,6 +167,15 @@ export const AuthProvider = ({ children }) => {
         setUser(userData);
         setIsAuthenticated(true);
       }
+
+      // Same graceful pattern as login() — 404 → null, errors → warn, never throw
+      try {
+        const profile = await BusinessApi.getProfile();
+        setBusinessProfile(profile);
+      } catch (profileError) {
+        console.warn("[AuthContext] Could not load business profile:", profileError);
+        setBusinessProfile(null);
+      }
     }
     return result;
   };
@@ -163,6 +199,8 @@ export const AuthProvider = ({ children }) => {
         return "/driver-dashboard";
       case "customer":
         return "/";
+      case "admin":
+        return "/admin";
       default:
         return "/";
     }
@@ -172,6 +210,8 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     isAuthenticated,
+    businessProfile,
+    setBusinessProfile,
     login,
     register,
     confirmEmail,
