@@ -1,8 +1,29 @@
-"use client";
+/**
+ * PaymentSuccess.jsx
+ *
+ * Shown at /pay/success — a dedicated success landing page kept for backwards
+ * compatibility with any redirect-based flow that navigates here with
+ * location.state.transaction.
+ *
+ * NOTE: The primary post-payment success UI is now the SuccessScreen component
+ * inside PaymentPage.jsx (shown inline after Stripe/PayPal confirmation).
+ * This page is only reached if something explicitly navigates to /pay/success.
+ *
+ * ── Fix changelog ────────────────────────────────────────────────────────────
+ * FIX-A  paymentApi.getTransaction(txId, isAuthenticated, guestEmail) was called
+ *        with 3 arguments. The method signature is getTransaction(txId, guestEmail).
+ *        Passing isAuthenticated as guestEmail caused every guest transaction fetch
+ *        to send "true"/"false" as the guest email query param.
+ *
+ * FIX-B  paymentApi.getBooking() does not exist on PaymentApi. Booking details
+ *        should be fetched via bookingApi.getBooking() from BookingApi.
+ *        Added import and corrected the call.
+ */
 
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { paymentApi } from "../../api/PaymentApi";
+import { bookingApi } from "../../api/BookingApi";   // FIX-B: import bookingApi
 import { useAuth } from "../../contexts/AuthContext";
 import { Loader2, CheckCircle, Package } from "lucide-react";
 
@@ -30,18 +51,17 @@ export default function PaymentSuccess() {
   useEffect(() => {
     const loadDetails = async () => {
       try {
-        // Fetch transaction to ensure latest status
         if (!transaction?.id) {
           setError("No transaction data available");
           setLoading(false);
           return;
         }
 
-        console.log("Fetching transaction for txId:", transaction.id);
+        // FIX-A: getTransaction(txId, guestEmail) — only 2 args.
+        // Previously passed isAuthenticated as the second arg (guestEmail slot).
         const transactionResult = await paymentApi.getTransaction(
           transaction.id,
-          isAuthenticated,
-          guestEmail
+          isAuthenticated ? null : guestEmail  // pass guestEmail only for guests
         );
 
         if (!transactionResult.success) {
@@ -51,16 +71,16 @@ export default function PaymentSuccess() {
         const updatedTransaction = transactionResult.data;
         setTransaction(updatedTransaction);
 
-        // Handle possibly nested booking field
-        const bookingId = updatedTransaction?.booking?.id || updatedTransaction?.booking;
+        const bookingId =
+          updatedTransaction?.booking?.id || updatedTransaction?.booking;
 
         if (!bookingId) {
-          setError("No booking associated with this transaction");
+          // Bulk upload transactions don't have a booking — show generic success
           setLoading(false);
           return;
         }
 
-        let effectiveGuestEmail = guestEmail.toLowerCase();
+        let effectiveGuestEmail = guestEmail;
 
         if (!isAuthenticated && !effectiveGuestEmail) {
           effectiveGuestEmail =
@@ -75,12 +95,8 @@ export default function PaymentSuccess() {
           return;
         }
 
-        console.log("Fetching booking for bookingId:", bookingId);
-        const result = await paymentApi.getBooking(
-          bookingId,
-          isAuthenticated,
-          effectiveGuestEmail
-        );
+        // FIX-B: use bookingApi.getBooking — paymentApi has no getBooking method.
+        const result = await bookingApi.getBooking(bookingId);
 
         if (result.success) {
           setBooking(result.data);
@@ -88,7 +104,7 @@ export default function PaymentSuccess() {
           throw new Error(result.message);
         }
       } catch (err) {
-        console.error("Error loading details:", err);
+        console.error("PaymentSuccess: error loading details:", err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -205,12 +221,6 @@ export default function PaymentSuccess() {
                   {booking.dropoff_address?.city}
                 </span>
               </div>
-              {/* <div className="flex justify-between items-center py-2">
-                <span className="text-gray-600">Scheduled Pickup:</span>
-                <span className="text-sm text-gray-900">
-                  {new Date(booking.scheduled_pickup_at).toLocaleString()}
-                </span>
-              </div> */}
             </div>
           </div>
         )}

@@ -40,15 +40,54 @@ class ReceivableApi extends ApiBase {
 
   /**
    * Get a single receivable by UUID.
+   * Wraps response in { success, data } format for consistency.
    *
    * @param {string} id
-   * @returns {Promise<Receivable>}
+   * @returns {Promise<{ success: boolean, data: Receivable }>}
+   */
+  async getReceivable(id) {
+    try {
+      const resp = await this.axiosInstance.get(
+        `/api/payments/receivables/${id}/`,
+      );
+      return { success: true, data: resp.data };
+    } catch (err) {
+      return this._err("GET_RECEIVABLE_ERROR", err);
+    }
+  }
+
+  /**
+   * Alias for backward compatibility — raw response (no wrapping).
+   * @deprecated Use getReceivable() instead
    */
   async get(id) {
     const response = await this.axiosInstance.get(
       `/api/payments/receivables/${id}/`,
     );
     return response.data;
+  }
+
+  /**
+   * List receivables (wrapped response for consistency).
+   *
+   * @param {Object} params - { page, pageSize, status }
+   * @returns {Promise<{ success: boolean, data: { count, page, results } }>}
+   */
+  async listReceivables(params = {}) {
+    try {
+      const mapped = {};
+      if (params.page) mapped.page = params.page;
+      if (params.pageSize) mapped.page_size = params.pageSize;
+      if (params.status) mapped.status = params.status;
+
+      const response = await this.axiosInstance.get(
+        "/api/payments/receivables/",
+        { params: mapped },
+      );
+      return { success: true, data: response.data };
+    } catch (err) {
+      return this._err("LIST_RECEIVABLES_ERROR", err);
+    }
   }
 
   /**
@@ -102,6 +141,18 @@ class ReceivableApi extends ApiBase {
       "/api/payments/receivables/aging/",
     );
     return response.data;
+  }
+
+  // ── Error handler ─────────────────────────────────────────────────────────
+
+  _err(code, error) {
+    const message =
+      error.response?.data?.error ||
+      error.response?.data?.detail ||
+      error.message ||
+      "An unexpected error occurred.";
+    console.error(`[ReceivableApi] ${code}:`, error.response?.data || error.message);
+    return { success: false, code, message };
   }
 }
 

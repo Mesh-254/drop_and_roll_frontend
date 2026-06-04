@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   X,
   Clock,
+  FileText,
 } from 'lucide-react';
 import { useBulkUpload } from '../../hooks/useBulkUpload';
 import FileUploadZone from './FileUploadZone';
@@ -66,6 +67,7 @@ export default function BulkUploadFlow({ onSuccess = () => {}, onClose = () => {
     uploadResult,
     processingStatus,
     latestUpload,
+    paymentPath,
     errorRows,
     errorMeta,
     errorPage,
@@ -77,10 +79,17 @@ export default function BulkUploadFlow({ onSuccess = () => {}, onClose = () => {
     handleRetryFailed,
     handleDownloadTemplate,
     handleDownloadErrorReport,
+    handleInitiatePayment,
+    isInitiatingPayment,
     fetchErrors,
     reset,
     setUploadError,
+    gatewayPreference,
+    setGatewayPreference,
   } = bulkUploadHook;
+
+  // FIX-BUG-05: Local gateway selector state for the Done step
+  const [selectedGateway, setSelectedGateway] = useState("stripe");
 
   const {
     register,
@@ -462,6 +471,75 @@ export default function BulkUploadFlow({ onSuccess = () => {}, onClose = () => {
                       )}
                     </div>
                   </div>
+
+                  {/* FIX-BUG-05: PREPAID payment with gateway selector */}
+                  {paymentPath === "prepaid" && (
+                    <div className="space-y-4">
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => setSelectedGateway("stripe")}
+                          className={`flex-1 py-2 rounded-lg border text-sm font-medium transition
+                            ${selectedGateway === "stripe"
+                              ? "border-orange-500 bg-orange-500/10 text-orange-400"
+                              : "border-slate-600 text-slate-400 hover:border-slate-500"}`}
+                        >
+                          💳 Pay by Card (Stripe)
+                        </button>
+                        <button
+                          onClick={() => setSelectedGateway("paypal")}
+                          className={`flex-1 py-2 rounded-lg border text-sm font-medium transition
+                            ${selectedGateway === "paypal"
+                              ? "border-blue-500 bg-blue-500/10 text-blue-400"
+                              : "border-slate-600 text-slate-400 hover:border-slate-500"}`}
+                        >
+                          🔵 Pay via PayPal
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() => handleInitiatePayment(selectedGateway)}
+                        disabled={isInitiatingPayment}
+                        className="w-full py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-slate-600
+                                   text-white rounded-xl font-semibold transition flex items-center justify-center gap-2"
+                      >
+                        {isInitiatingPayment ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Preparing payment…
+                          </>
+                        ) : (
+                          `Pay £${latestUpload?.effective_total || latestUpload?.total_spend_gbp?.toFixed(2) || "0.00"}`
+                        )}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* FIX-BUG-09: NET terms confirmation with invoice link */}
+                  {paymentPath === "net" && latestUpload?.receivable_id && (
+                    <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <FileText className="w-5 h-5 text-blue-400" />
+                        <span className="font-semibold text-white">Invoice Raised</span>
+                      </div>
+                      <p className="text-sm text-slate-400 mb-1">
+                        An invoice has been emailed to your registered address.
+                      </p>
+                      <p className="text-sm text-slate-400 mb-4">
+                        Due in {latestUpload.net_days || 30} days.
+                      </p>
+                      <button
+                        onClick={() => {
+                          reset();
+                          onSuccess();
+                          onClose();
+                        }}
+                        className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white
+                                   rounded-lg font-medium text-sm transition"
+                      >
+                        View Invoice
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 

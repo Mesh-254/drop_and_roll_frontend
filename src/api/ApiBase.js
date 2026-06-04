@@ -10,7 +10,10 @@ export class ApiBase {
     this.axiosInstance = axios.create({
       baseURL: this.baseURL,
       headers: { "Content-Type": "application/json" },
-      timeout: 10000,
+      // BUG-6: PayPal sandbox can take 8-12 s for token + order creation
+      // combined.  The old 10 s default was too tight.  Payment endpoints
+      // get a longer per-request override applied in the request interceptor.
+      timeout: 30000,
     });
 
     this.axiosInstance.interceptors.request.use(
@@ -25,10 +28,26 @@ export class ApiBase {
           config.headers["Authorization"] = `Bearer ${this.token}`;
         }
 
-        // Do not set Content-Type for FormData; let Axios handle it
-        if (!(config.data instanceof FormData)) {
+        // For FormData (file uploads), DELETE the Content-Type header entirely
+        if (config.data instanceof FormData) {
+          delete config.headers["Content-Type"];
+        } else {
           config.headers["Content-Type"] = "application/json";
         }
+
+        // BUG-6: Payment/PayPal endpoints get a generous 45 s timeout to
+        // absorb slow PayPal sandbox responses (token round-trip + order
+        // creation can exceed 20 s under load).
+        const isPaymentPath =
+          config.url?.includes("/payments/") ||
+          config.url?.includes("/initiate/") ||
+          config.url?.includes("/paypal-return/") ||
+          config.url?.includes("/paypal-cancel/");
+        if (isPaymentPath && !config._timeoutOverridden) {
+          config.timeout = 45000;
+          config._timeoutOverridden = true;
+        }
+
         return config;
       },
       (error) => {
@@ -41,10 +60,16 @@ export class ApiBase {
       (response) => response,
       async (error) => {
         const originalRequest = error.config;
+        const isPaymentPath = originalRequest?.url?.includes("/payments/") ||
+                              originalRequest?.url?.includes("/transactions/") ||
+                              originalRequest?.url?.includes("/initiate/") ||
+                              originalRequest?.url?.includes("/paypal-return/");
+
         if (
           error.response?.status === 401 &&
           !originalRequest._retry &&
-          originalRequest.url !== "/api/users/auth/jwt/refresh/" &&
+          originalRequest.url !== "/api/auth/jwt/refresh/" &&
+          !isPaymentPath &&
           originalRequest.includeAuth !== false
         ) {
           originalRequest._retry = true;
@@ -66,8 +91,7 @@ export class ApiBase {
             return Promise.reject(refreshError);
           }
         }
-        // Suppress 404 logs for the business profile endpoint —
-        // a 404 there is expected for users who haven't created a profile yet.
+
         const isSilent404 =
           error?.response?.status === 404 &&
           originalRequest?.url?.includes("/api/business/profiles/current/");
@@ -118,8 +142,9 @@ export class ApiBase {
       throw new Error("No refresh token available");
     }
     try {
+      // Correct JWT refresh endpoint
       const response = await this.axiosInstance.post(
-        "/api/users/auth/jwt/refresh/",
+        "/api/auth/jwt/refresh/",
         {
           refresh: refreshToken,
         }
@@ -148,5 +173,6 @@ export class ApiBase {
       localStorage.removeItem("refresh_token");
       localStorage.removeItem("user_data");
     }
+    console.log("[ApiBase] Logged out");
   }
 }

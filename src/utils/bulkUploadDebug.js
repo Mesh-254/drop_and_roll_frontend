@@ -46,7 +46,7 @@ export function validateUploadResponseShape(data) {
  * Logs upload state for debugging (dev only)
  */
 export function logUploadState(context, state) {
-  if (process.env.NODE_ENV !== "development") return;
+  if (import.meta.env.NODE_ENV !== "development") return;
 
   console.group(`[BULK_UPLOAD] ${context}`);
   console.log("uploadResult:", state.uploadResult);
@@ -110,7 +110,7 @@ export function validateUploadSession(uploadResult) {
  *   }, [uploadResult]);
  */
 export function diagnoseStateMismatch(context, data) {
-  if (process.env.NODE_ENV !== "development") return;
+  if (import.meta.env.NODE_ENV !== "development") return;
 
   const mismatch = data.returnValue === true && !data.uploadResultId;
   if (mismatch) {

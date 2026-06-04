@@ -1,20 +1,33 @@
 // App.jsx
+//
+// ── Fix changelog ────────────────────────────────────────────────────────────
+// FIX-C  Route order: /pay/success and /pay/cancel appeared AFTER /pay/:txId
+//        in the route list. React Router v6 matches by specificity, but when
+//        routes are peers under the same <Routes>, a literal path like
+//        /pay/success IS more specific than a dynamic :txId param. However
+//        keeping the literal routes declared first makes the intent explicit
+//        and prevents any future regression if route nesting changes.
+//        Moved /pay/success and /pay/cancel ABOVE /pay/:txId.
+//
+// FIX-D  Missing routes: /invoices/:id (InvoiceDetailPage) and /billing
+//        (BillingPage) were navigated to by useBulkUpload, BulkPaymentPage,
+//        and InvoiceDetailPage but never registered, causing blank-page 404s.
+//        Both routes added under ProtectedRoute allowedRoles=["customer"].
+
 import { Routes, Route } from "react-router-dom";
 import { useEffect } from "react";
 import { GoogleOAuthProvider } from "@react-oauth/google";
-import { QuoteProvider } from "./contexts/QuoteContext";   // ← import this
+import { QuoteProvider } from "./contexts/QuoteContext";
 import Header from "./components/common/Header";
 import Hero from "./components/landingPage/Hero";
 import Services from "./components/landingPage/Services";
 import About from "./components/about/About";
 import ContactForm from "./components/contact/ContactForm";
 import Footer from "./components/common/Footer";
-// import AdminDashboard from "./components/admin/AdminDashboard";
 import AdminLiveTrackingDashboard from "./components/admin/admin-live-tracking-dashboard";
 import FAQ from "./components/contact/faq";
 import "./App.css";
 import "./globals.css";
-// import LoginPage from "./components/auth/login-register";
 import ForgotPassword from "./components/auth/forgot-password";
 import ResetPassword from "./components/auth/reset-password";
 
@@ -29,20 +42,26 @@ import QuotePage from "./components/quote/QuotePage";
 import BookingPage from "./components/bookings/BookingPage";
 import BookingHistory from "./components/bookings/BookingHistory";
 
-// NAVIGATION & PROFILE UPGRADE: Import new ProfilePage component
 import ProfilePage from "./components/profile/ProfilePage";
 
 import PaymentPage from "./components/payments/PaymentPage";
 import PaymentSuccess from "./components/payments/PaymentSuccess";
 import PaymentCancel from "./components/payments/PaymentCancel";
+// FIX-D: import the invoice/billing pages that were missing from the router
+import BillingPage from "./components/payments/BillingPage";
+import InvoiceDetailPage from "./components/payments/InvoiceDetailPage";
 
 import DriverDashboard from "./components/driver/driver-dashboard";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
-import { BulkUploadDashboard, BulkUploadDetail, BusinessProfileOnboarding, BusinessProfilePage } from "./components/business";
+import {
+  BulkUploadDashboard,
+  BulkUploadDetail,
+  BusinessProfileOnboarding,
+  BusinessProfilePage,
+} from "./components/business";
 
 const backendUrl = import.meta.env.VITE_NEXT_PUBLIC_BACKEND_URL;
 
-// Layout for pages with Header and Footer
 function MainLayout({ children }) {
   return (
     <>
@@ -53,7 +72,6 @@ function MainLayout({ children }) {
   );
 }
 
-// HomePage now only includes content, no Header/Footer
 function HomePage() {
   return (
     <QuoteProvider>
@@ -64,17 +82,17 @@ function HomePage() {
     </QuoteProvider>
   );
 }
-// function to handle admin redirect (before the return)
+
 function AdminRedirect() {
   useEffect(() => {
-    console.log("🔄 AdminRedirect →", `${backendUrl}/admin/`);
+    console.log("AdminRedirect →", `${backendUrl}/admin/`);
     window.location.replace(`${backendUrl}/admin/`);
   }, []);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-8">
       <div className="text-center max-w-md mx-auto">
-        <h1 className="text-2xl font-bold mb-4">👨‍💼 Admin Dashboard</h1>
+        <h1 className="text-2xl font-bold mb-4">Admin Dashboard</h1>
         <p className="text-gray-400 mb-8">Redirecting to your dashboard...</p>
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
       </div>
@@ -83,13 +101,13 @@ function AdminRedirect() {
 }
 
 function App() {
-  // Ensure VITE_APP_GOOGLE_CLIENT_ID is set in your .env file
   const googleClientId = import.meta.env.VITE_PUBLIC_GOOGLE_CLIENT_ID;
 
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
       <div className="min-h-screen bg-black text-white">
         <Routes>
+          {/* ── Public ──────────────────────────────────────────────── */}
           <Route
             path="/"
             element={
@@ -113,10 +131,7 @@ function App() {
             element={<ResetPassword />}
           />
           <Route path="/check-email" element={<CheckEmail />} />
-
-          {/* login and register  */}
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
           <Route
             path="/email-confirmation"
             element={<EmailConfirmationPage />}
@@ -126,7 +141,8 @@ function App() {
             path="/resend-confirmation"
             element={<ResendConfirmationPage />}
           />
-          {/* ✅ ADMIN: PROTECTED + AUTO-REDIRECT */}
+
+          {/* ── Admin ────────────────────────────────────────────────── */}
           <Route
             path="/admin"
             element={
@@ -135,7 +151,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/admin-live-tracking"
             element={
@@ -145,6 +160,7 @@ function App() {
             }
           />
 
+          {/* ── Booking & quote ──────────────────────────────────────── */}
           <Route path="/quote" element={<QuotePage />} />
           <Route path="/booking" element={<BookingPage />} />
           <Route
@@ -157,7 +173,8 @@ function App() {
               </ProtectedRoute>
             }
           />
-          {/* NAVIGATION & PROFILE UPGRADE: New /profile route with editable profile and theme toggle */}
+
+          {/* ── Profile ─────────────────────────────────────────────── */}
           <Route
             path="/profile"
             element={
@@ -178,30 +195,48 @@ function App() {
               </ProtectedRoute>
             }
           />
-          {/* Payment routes */}
-          <Route path="/pay/:txId" element={<PaymentPage />} />
+
+          {/* ── Payment routes ───────────────────────────────────────── */}
+          {/*
+            FIX-C: Literal paths MUST come before the dynamic /pay/:txId route.
+            /pay/success and /pay/cancel are more specific, but declaring them
+            first makes the intent explicit and prevents future regressions.
+          */}
           <Route
             path="/pay/success"
             element={
               <MainLayout>
-                {" "}
-                <PaymentSuccess />{" "}
+                <PaymentSuccess />
               </MainLayout>
             }
           />
           <Route path="/pay/cancel" element={<PaymentCancel />} />
-          {/* Protected routes for customers */}
+          {/* Dynamic route last — catches /pay/:txId (any UUID) */}
+          <Route path="/pay/:txId" element={<PaymentPage />} />
+
+          {/* ── Invoice / billing routes (FIX-D: were missing) ──────── */}
           <Route
-            path="/"
+            path="/billing"
             element={
               <ProtectedRoute allowedRoles={["customer"]}>
                 <MainLayout>
-                  <HomePage />
+                  <BillingPage />
                 </MainLayout>
               </ProtectedRoute>
             }
           />
-          {/* Protected routes for drivers */}
+          <Route
+            path="/invoices/:id"
+            element={
+              <ProtectedRoute allowedRoles={["customer"]}>
+                <MainLayout>
+                  <InvoiceDetailPage />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* ── Driver ──────────────────────────────────────────────── */}
           <Route
             path="/driver-dashboard"
             element={
@@ -210,7 +245,8 @@ function App() {
               </ProtectedRoute>
             }
           />
-          {/* Bulk Upload routes for business accounts */}
+
+          {/* ── Bulk Upload (business accounts) ─────────────────────── */}
           <Route
             path="/bulk-upload"
             element={
@@ -231,13 +267,18 @@ function App() {
               </ProtectedRoute>
             }
           />
-          {/* Business Profile routes */}
+
+          {/* ── Business profile ────────────────────────────────────── */}
           <Route
             path="/business/register"
             element={
               <ProtectedRoute allowedRoles={["customer"]}>
                 <MainLayout>
-                  <BusinessProfileOnboarding isPage={true} onClose={() => window.history.back()} onSuccess={() => window.location.href = '/profile'} />
+                  <BusinessProfileOnboarding
+                    isPage={true}
+                    onClose={() => window.history.back()}
+                    onSuccess={() => (window.location.href = "/profile")}
+                  />
                 </MainLayout>
               </ProtectedRoute>
             }

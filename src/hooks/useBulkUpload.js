@@ -47,6 +47,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import BulkUploadApi from "../api/BulkUploadApi";
+import paymentApi from "../api/PaymentApi";
 
 export function useBulkUpload() {
   const navigate = useNavigate();
@@ -57,6 +58,7 @@ export function useBulkUpload() {
   const [notes, setNotes] = useState("");
   const [currentStep, setCurrentStep] = useState(0);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [gatewayPreference, setGatewayPreference] = useState("stripe");
 
   // Phase flags
   const [isUploading, setIsUploading] = useState(false); // POST /validate/
@@ -93,7 +95,8 @@ export function useBulkUpload() {
   const [isFetchingUploads, setIsFetchingUploads] = useState(false);
 
   // ── PHASE 3 STEP 7: BusinessProfile detection & auto-retry ────────────────
-  const [isBusinessProfileRequired, setIsBusinessProfileRequired] = useState(false);
+  const [isBusinessProfileRequired, setIsBusinessProfileRequired] =
+    useState(false);
   const [isProfileCreating, setIsProfileCreating] = useState(false);
   // Store the action (validate/submit) to retry after profile creation
   const pendingActionRef = useRef(null);
@@ -151,7 +154,8 @@ export function useBulkUpload() {
         uploadResultRef.current = null;
         setUploadError({
           title: "Upload failed",
-          message: "Server validation succeeded but response is incomplete. Please try again.",
+          message:
+            "Server validation succeeded but response is incomplete. Please try again.",
         });
         return false;
       }
@@ -166,7 +170,10 @@ export function useBulkUpload() {
       setAvailableCredit(data.available_credit || null);
       setIsBusinessProfileRequired(false);
 
-      console.log("[v0] handleValidateAndUpload SUCCESS - uploadResult set to:", data);
+      console.log(
+        "[v0] handleValidateAndUpload SUCCESS - uploadResult set to:",
+        data,
+      );
 
       // Return true — let the wizard component advance the step
       // This ensures all async state updates have flushed before re-render
@@ -185,7 +192,9 @@ export function useBulkUpload() {
           actionUrl: errData.business_setup_url || "/business/register",
           actionLabel: "Set Up Business Profile",
         });
-        console.log("[v0] BUSINESS_PROFILE_REQUIRED detected during validation");
+        console.log(
+          "[v0] BUSINESS_PROFILE_REQUIRED detected during validation",
+        );
         return false;
       }
 
@@ -222,7 +231,7 @@ export function useBulkUpload() {
   const handleSubmit = useCallback(async () => {
     // Use state first, fall back to ref if state hasn't flushed yet
     const result = uploadResult || uploadResultRef.current;
-    
+
     console.log("[v0] handleSubmit called", {
       uploadResultState: uploadResult,
       uploadResultRef: uploadResultRef.current,
@@ -230,13 +239,16 @@ export function useBulkUpload() {
       currentStep,
       isSubmitting,
     });
-    
+
     if (!result?.id) {
-      console.error("[v0] handleSubmit FAILED: No valid uploadResult. Check if validation completed.", {
-        uploadResult,
-        uploadResultRef: uploadResultRef.current,
-        validationComplete: validationCompleteRef.current,
-      });
+      console.error(
+        "[v0] handleSubmit FAILED: No valid uploadResult. Check if validation completed.",
+        {
+          uploadResult,
+          uploadResultRef: uploadResultRef.current,
+          validationComplete: validationCompleteRef.current,
+        },
+      );
       setUploadError({
         title: "Error",
         message: "No upload to submit. Please start again.",
@@ -251,7 +263,7 @@ export function useBulkUpload() {
 
     try {
       const data = await BulkUploadApi.submitBulkUpload(result.id);
-      
+
       if (!data?.id) {
         console.error("[v0] submitBulkUpload response missing id:", data);
         setUploadError({
@@ -263,7 +275,7 @@ export function useBulkUpload() {
 
       setLatestUpload(data);
       setIsBusinessProfileRequired(false);
-      
+
       // Start polling immediately (synced version — updates ref state directly)
       // The wizard will advance the step on the next render cycle
       startPolling(data.id);
@@ -305,14 +317,17 @@ export function useBulkUpload() {
   // with onSuccess. Automatically retries the pending action (validate/submit).
   //
   const retryPendingAction = useCallback(async () => {
-    console.log("[v0] retryPendingAction: pendingAction =", pendingActionRef.current);
-    
+    console.log(
+      "[v0] retryPendingAction: pendingAction =",
+      pendingActionRef.current,
+    );
+
     setIsProfileCreating(true);
     setIsBusinessProfileRequired(false);
 
     try {
       const action = pendingActionRef.current;
-      
+
       if (action === "validate") {
         console.log("[v0] Retrying validation after profile creation...");
         const success = await handleValidateAndUpload();
@@ -401,15 +416,61 @@ export function useBulkUpload() {
   //
   const [isInitiatingPayment, setIsInitiatingPayment] = useState(false);
 
-  const handleInitiatePayment = useCallback(async () => {
+  const handleInitiatePayment = async (gatewayOverride) => {
     if (!latestUpload?.id) return;
+
+    // NET-terms uploads do not go through payment initiation — they already
+    // have a receivable created at submit time.
+    if (paymentPath === "net") {
+      const receivableId = latestUpload?.receivable_id;
+      if (receivableId) {
+        navigate(`/invoices/${receivableId}`);
+      }
+      return;
+    }
+
+    const gateway = gatewayOverride || gatewayPreference || "stripe";
 
     setIsInitiatingPayment(true);
     setUploadError(null);
 
     try {
-      const tx = await BulkUploadApi.initiatePayment(latestUpload.id);
-      navigate(`/payment/${tx.id}`);
+      // FIX-HOOK-01: use the correct endpoint via PaymentApi
+      const result = await paymentApi.initiateBulkPayment({
+        bulkUploadId: latestUpload.id,
+        gateway,
+        idempotencyKey: `bulk-${latestUpload.id}`,
+      });
+
+      if (!result.success) {
+        if (result.code === "ALREADY_PAID") {
+          // Already paid — navigate directly to bulk upload dashboard
+          navigate("/bulk-upload");
+          return;
+        }
+        throw new Error(result.message || "Could not start payment.");
+      }
+
+      const data = result.data;
+
+      // NET flow: if business terms changed between submit and pay, handle it
+      if (data.flow === "net") {
+        navigate(`/invoices/${data.invoice_id}`);
+        return;
+      }
+
+      // FIX-HOOK-02: store gateway credentials in navigation state so
+      // PaymentPage can read them without a separate API call.
+      navigate(`/payment/${data.transaction_id}`, {
+        state: {
+          clientSecret: data.client_secret || null, // Stripe
+          approvalUrl: data.approval_url || null, // PayPal
+          orderId: data.order_id || null, // PayPal
+          amount: data.amount,
+          currency: data.currency || "GBP",
+          isBulk: true,
+        },
+      });
     } catch (err) {
       setUploadError({
         title: "Payment initiation failed",
@@ -418,7 +479,7 @@ export function useBulkUpload() {
     } finally {
       setIsInitiatingPayment(false);
     }
-  }, [latestUpload, navigate]);
+  };
 
   // ── Error rows ────────────────────────────────────────────────────────────
 
@@ -552,6 +613,10 @@ export function useBulkUpload() {
     isBusinessProfileRequired,
     isProfileCreating,
     retryPendingAction,
+
+    // Payment gateway preference
+    gatewayPreference,
+    setGatewayPreference,
 
     // Handlers
     handleFileSelect,

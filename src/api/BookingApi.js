@@ -442,7 +442,7 @@ async createQuote(quoteData) {
           ),
         },
         quote_id: bookingData.quoteId,
-        scheduled_pickup_at: bookingData.scheduledPickupAt,
+        scheduled_pickup_at: bookingData.scheduledPickupAt || null,
         scheduled_dropoff_at: bookingData.scheduledDropoffAt || null,
         promo_code: bookingData.promoCode || null,
         notes: bookingData.notes || null,
@@ -450,20 +450,28 @@ async createQuote(quoteData) {
         receiver_phone: bookingData.receiverPhone || null,
       };
 
+      // FIX-BUG-03: Include guest email for unauthenticated users
       if (bookingData.guestEmail) {
         backendData.guest_email = bookingData.guestEmail.trim();
+        console.log("[BookingApi] Creating booking with guest email:", bookingData.guestEmail);
+        // Store guest email in localStorage for later use in payment flow
+        localStorage.setItem("guestEmail", bookingData.guestEmail.trim());
       }
 
-      console.log("Booking payload:", backendData);
+      console.log("[BookingApi] Booking payload:", backendData);
 
+      // includeAuth defaults to true so authenticated users send their JWT.
+      // Unauthenticated (guest) users have no token so the header is simply absent.
+      // Setting includeAuth: false was WRONG — it stripped the token even for
+      // logged-in users, causing the backend to see every booking as anonymous
+      // and demand guest_email even from authenticated customers.
       const response = await this.request("/api/booking/bookings/", {
         method: "POST",
         data: backendData,
-        includeAuth: true,
       });
       return { success: true, data: response.data };
     } catch (error) {
-      console.log(error);
+      console.error("[BookingApi] createBooking error:", error);
       return {
         success: false,
         code: error.code || "BOOKING_ERROR",

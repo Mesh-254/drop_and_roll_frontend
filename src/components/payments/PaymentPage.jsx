@@ -1,788 +1,1026 @@
-"use client";
+/**
+ * PaymentPage.jsx  ── COMPLETE UNIFIED IMPLEMENTATION
+ * ══════════════════════════════════════════════════════════════════════════════
+ * Route: /pay/:txId   (single booking & bulk prepaid)
+ *
+ * Handles:
+ *  • Single booking — Stripe card payment
+ *  • Single booking — PayPal redirect + capture
+ *  • Bulk upload PREPAID — Stripe card payment
+ *  • Bulk upload PREPAID — PayPal redirect + capture
+ *
+ * Flow
+ * ────
+ *  1. Mount: load tx via GET /api/payments/transactions/:txId/
+ *     Determine: gateway from tx.gateway, flow from tx.metadata.source
+ *  2. Stripe: render <Elements> + card form → confirmCardPayment → show success
+ *  3. PayPal: show "Pay with PayPal" button → redirect to approval_url
+ *             On return: /pay/:txId?paypal_return=1&token=ORDER_ID
+ *             capturePaypalOrder → show success
+ *  4. NET terms: this page is NOT used (redirect to /invoices/:invoiceId)
+ *
+ * The webhook is the source of truth for booking status.
+ * This page only shows the user confirmation — it does NOT mark the tx.
+ *
+ * ── Fix changelog ────────────────────────────────────────────────────────────
+ * FIX-1  JSX parse error: inline comment after a prop value is illegal
+ *        JSX — Babel treats it as a second attribute. Moved all inline comments
+ *        to their own line inside the element or above the prop.
+ *
+ * FIX-2  useCallback hoisting: handleConfirmSuccess referenced handlePaymentSucceeded
+ *        in its body AND dependency array before handlePaymentSucceeded was declared.
+ *        useCallback is NOT hoisted like function declarations — this caused a
+ *        ReferenceError on every Stripe payment. Fixed by declaring
+ *        handlePaymentSucceeded FIRST.
+ *
+ * FIX-3  PayPal capture: onSuccess={handleSuccess} was an undefined reference.
+ *        Now correctly passes onSuccess={handlePaymentSucceeded}.
+ */
 
-import { useState, useEffect } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useEffect, useState, useCallback } from "react";
+import {
+  useParams,
+  useNavigate,
+  useSearchParams,
+  useLocation,
+} from "react-router-dom";
 import { loadStripe } from "@stripe/stripe-js";
 import {
   Elements,
   CardElement,
-  PaymentRequestButtonElement,
   useStripe,
   useElements,
-  PaymentElement,
 } from "@stripe/react-stripe-js";
-import { paymentApi } from "../../api/PaymentApi";
-import { useAuth } from "../../contexts/AuthContext";
+import paymentApi from "../../api/PaymentApi";
 import {
   Loader2,
   CreditCard,
+  CheckCircle,
   AlertCircle,
   ArrowLeft,
   Shield,
-  CheckCircle,
+  Package,
+  ExternalLink,
+  Lock,
+  Zap,
 } from "lucide-react";
 
-// Initialize Stripe
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
-// Payment Method Radio Button Component
-function PaymentMethodOption({
-  id,
-  selected,
-  onSelect,
-  icon,
-  label,
-  description,
-  color,
-}) {
-  return (
-    <label
-      className={`relative flex items-center p-6 rounded-2xl border-2 cursor-pointer transition-all duration-200 ${
-        selected
-          ? `border-${color}-500 bg-${color}-50 shadow-lg scale-[1.02]`
-          : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-md"
-      }`}
-      onClick={() => onSelect(id)}
-    >
-      <input
-        type="radio"
-        name="payment-method"
-        value={id}
-        checked={selected}
-        onChange={() => onSelect(id)}
-        className="sr-only"
-      />
-      <div className="flex items-center flex-1">
-        <div
-          className={`flex items-center justify-center w-12 h-12 rounded-full ${
-            color === "orange"
-              ? "bg-orange-500"
-              : color === "blue"
-              ? "bg-blue-500"
-              : color === "gray"
-              ? "bg-gray-900"
-              : color === "green"
-              ? "bg-green-500"
-              : "bg-yellow-500"
-          } text-white mr-4`}
-        >
-          {icon}
-        </div>
-        <div className="flex-1">
-          <div className="font-bold text-gray-900 text-lg">{label}</div>
-          <div className="text-sm text-gray-600">{description}</div>
-        </div>
-        {selected && <CheckCircle className="h-6 w-6 text-orange-500 ml-4" />}
-      </div>
-    </label>
-  );
-}
+// ─── Card element styles ─────────────────────────────────────────────────────
 
-// Stripe Credit Card Component
-function StripeCreditCard({
+const CARD_STYLE = {
+  style: {
+    base: {
+      color: "#f1f5f9",
+      fontFamily: "Inter, system-ui, sans-serif",
+      fontSize: "16px",
+      "::placeholder": { color: "#94a3b8" },
+      iconColor: "#94a3b8",
+    },
+    invalid: { color: "#f87171" },
+  },
+};
+
+// ─── Stripe checkout form ─────────────────────────────────────────────────────
+
+function StripeCheckoutForm({
+  clientSecret,
   txId,
   amount,
-  guestEmail,
-  isAuthenticated,
-  onSuccess,
+  currency,
+  onConfirmSuccess,
   onError,
 }) {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
-  const [error, setError] = useState(null);
+  const [cardError, setCardError] = useState(null);
 
-  const handleSubmit = async () => {
-    if (!stripe || !elements) {
-      setError("Payment system not ready. Please try again.");
-      return;
-    }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
 
     setProcessing(true);
-    setError(null);
+    setCardError(null);
 
     try {
-      const result = await paymentApi.initiateStripeTransaction(
-        txId,
-        isAuthenticated,
-        guestEmail,
-        "card"
+      const { error, paymentIntent } = await stripe.confirmCardPayment(
+        clientSecret,
+        {
+          payment_method: { card: elements.getElement(CardElement) },
+        },
       );
-      if (!result.success) {
-        throw new Error(result.message || "Failed to initialize payment");
-      }
 
-      const { client_secret } = result;
-
-      const { error: confirmError, paymentIntent } =
-        await stripe.confirmCardPayment(client_secret, {
-          payment_method: {
-            card: elements.getElement(CardElement),
-            billing_details: { email: guestEmail || undefined },
-          },
-        });
-
-      if (confirmError) {
-        throw confirmError;
-      }
-
-      if (paymentIntent.status === "succeeded") {
-        onSuccess();
+      if (error) {
+        setCardError(error.message);
+        onError(error.message);
+      } else if (paymentIntent.status === "succeeded") {
+        // Tell the backend to finalise immediately — don't wait for the webhook.
+        // onConfirmSuccess shows a "Confirming..." spinner while the call is in flight.
+        await onConfirmSuccess(paymentIntent.id);
       } else {
-        throw new Error("Payment did not succeed. Please try again.");
+        setCardError(`Unexpected payment state: ${paymentIntent.status}`);
+        onError("Unexpected payment state.");
       }
     } catch (err) {
-      setError(err.message || "An unexpected error occurred.");
-      onError(err.message || "An unexpected error occurred.");
+      const msg = err.message || "An unexpected error occurred.";
+      setCardError(msg);
+      onError(msg);
     } finally {
       setProcessing(false);
     }
   };
 
   return (
-    <div className="space-y-4">
-      <CardElement
-        options={{
-          style: {
-            base: {
-              fontSize: "16px",
-              color: "#1F2937",
-              "::placeholder": { color: "#6B7280" },
-            },
-            invalid: { color: "#EF4444" },
-          },
-        }}
-        className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white"
-      />
-      {error && (
-        <div className="flex items-center text-red-500 text-sm">
-          <AlertCircle size={16} className="mr-2" />
-          {error}
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-5">
+        <p className="text-sm text-slate-400 mb-1">Amount due</p>
+        <p className="text-3xl font-bold text-white">
+          {currency} {parseFloat(amount).toFixed(2)}
+        </p>
+      </div>
+
+      <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-4">
+        <label className="block text-sm font-medium text-slate-300 mb-3">
+          Card details
+        </label>
+        <CardElement options={CARD_STYLE} />
+      </div>
+
+      {cardError && (
+        <div className="flex items-start gap-2 bg-red-900/30 border border-red-700 rounded-lg p-3 text-red-300 text-sm">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          {cardError}
         </div>
       )}
+
       <button
-        onClick={handleSubmit}
-        disabled={processing}
-        className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center justify-center"
-        aria-label="Pay with Credit Card"
+        type="submit"
+        disabled={!stripe || processing}
+        className="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600
+                   disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-semibold
+                   rounded-xl py-4 px-6 transition-colors"
       >
         {processing ? (
           <>
-            <Loader2 size={20} className="mr-2 animate-spin" />
-            Processing...
+            <Loader2 className="w-5 h-5 animate-spin" /> Processing…
           </>
         ) : (
-          "Pay with Credit Card"
+          <>
+            <CreditCard className="w-5 h-5" /> Pay {currency}{" "}
+            {parseFloat(amount).toFixed(2)}
+          </>
         )}
+      </button>
+
+      <p className="flex items-center justify-center gap-2 text-xs text-slate-500">
+        <Shield className="w-4 h-4" /> Secured by Stripe
+      </p>
+    </form>
+  );
+}
+
+// ─── Gateway selection screen ─────────────────────────────────────────────────
+
+function GatewaySelectionScreen({
+  tx,
+  amount,
+  currency,
+  onSelectGateway,
+  loading,
+}) {
+  const [selectedGateway, setSelectedGateway] = useState("stripe");
+
+  const handleProceed = async () => {
+    await onSelectGateway(selectedGateway);
+  };
+
+  const isBulk = !!tx?.bulk_upload;
+  const bookingRef = tx?.id?.slice(0, 8)?.toUpperCase();
+
+  return (
+    <div className="space-y-6">
+      {/* Header with progress indicator */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium text-slate-400">Payment Step</h3>
+          <span className="text-xs font-semibold text-orange-400">3 of 3</span>
+        </div>
+        <h2 className="text-2xl font-bold text-white">Select Payment Method</h2>
+        <p className="text-sm text-slate-400">
+          Choose how you'd like to pay for your{" "}
+          {isBulk ? "bulk upload" : "booking"}
+        </p>
+      </div>
+
+      {/* Amount summary card */}
+      <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/50 border border-slate-600 rounded-xl p-5">
+        <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">
+          Total Amount Due
+        </p>
+        <p className="text-3xl font-bold text-white">
+          {currency}
+          {parseFloat(amount).toFixed(2)}
+        </p>
+        {bookingRef && (
+          <p className="text-xs text-slate-400 mt-3">
+            Reference:{" "}
+            <span className="font-mono text-orange-300">{bookingRef}</span>
+          </p>
+        )}
+      </div>
+
+      {/* Gateway selection cards */}
+      <div className="space-y-3">
+        {/* Stripe Card */}
+        <button
+          onClick={() => setSelectedGateway("stripe")}
+          className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+            selectedGateway === "stripe"
+              ? "border-orange-500 bg-orange-500/5 shadow-lg shadow-orange-500/20"
+              : "border-slate-600 bg-slate-700/30 hover:border-slate-500"
+          }`}
+        >
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <CreditCard className="w-5 h-5 text-orange-400" />
+                <h3 className="font-semibold text-white">Pay with Card</h3>
+              </div>
+              <p className="text-sm text-slate-400">
+                Visa, Mastercard, American Express • Instant processing
+              </p>
+            </div>
+            <div
+              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                selectedGateway === "stripe"
+                  ? "border-orange-500 bg-orange-500"
+                  : "border-slate-500 bg-transparent"
+              }`}
+            >
+              {selectedGateway === "stripe" && (
+                <div className="w-2 h-2 bg-white rounded-full" />
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1 mt-3 text-xs text-slate-400">
+            <Zap className="w-3 h-3" />
+            Powered by Stripe
+          </div>
+        </button>
+
+        {/* PayPal Card */}
+        <button
+          onClick={() => setSelectedGateway("paypal")}
+          className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+            selectedGateway === "paypal"
+              ? "border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/20"
+              : "border-slate-600 bg-slate-700/30 hover:border-slate-500"
+          }`}
+        >
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center">
+                  <span className="text-xs font-bold text-white">P</span>
+                </div>
+                <h3 className="font-semibold text-white">Pay with PayPal</h3>
+              </div>
+              <p className="text-sm text-slate-400">
+                PayPal balance, linked cards, or bank account
+              </p>
+            </div>
+            <div
+              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                selectedGateway === "paypal"
+                  ? "border-blue-500 bg-blue-500"
+                  : "border-slate-500 bg-transparent"
+              }`}
+            >
+              {selectedGateway === "paypal" && (
+                <div className="w-2 h-2 bg-white rounded-full" />
+              )}
+            </div>
+          </div>
+        </button>
+      </div>
+
+      {/* Security info */}
+      <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
+        <Lock className="w-3.5 h-3.5 text-green-500" />
+        <span>PCI DSS Level 1 Certified • 256-bit SSL Encryption</span>
+      </div>
+
+      {/* Action buttons */}
+      <div className="pt-2 space-y-2">
+        <button
+          onClick={handleProceed}
+          disabled={loading}
+          className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-slate-600
+                     text-white font-semibold rounded-xl py-4 px-6 transition-colors
+                     flex items-center justify-center gap-2"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Preparing {selectedGateway === "stripe" ? "Stripe" : "PayPal"}…
+            </>
+          ) : (
+            <>
+              <ExternalLink className="w-5 h-5" />
+              Continue to{" "}
+              {selectedGateway === "stripe" ? "Secure Checkout" : "PayPal"}
+            </>
+          )}
+        </button>
+        <p className="text-center text-xs text-slate-500">
+          Your payment information is secure and encrypted
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── PayPalRedirectScreen ─────────────────────────────────────────────────────
+// Auto-redirect fires in a useEffect in the parent. This screen shows a spinner
+// and a fallback button while the browser navigates away.
+
+function PayPalRedirectScreen({ approvalUrl, amount, currency }) {
+  return (
+    <div className="space-y-6 text-center">
+      <div className="flex flex-col items-center gap-3 py-4">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+        <p className="text-slate-300 font-medium">Redirecting to PayPal…</p>
+        <p className="text-slate-500 text-sm">
+          You will be taken to PayPal to complete your payment securely.
+        </p>
+      </div>
+
+      <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-5">
+        <p className="text-sm text-slate-400 mb-1">Amount due</p>
+        <p className="text-3xl font-bold text-white">
+          {currency} {parseFloat(amount).toFixed(2)}
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs text-slate-500">Not redirected automatically?</p>
+        <button
+          onClick={() => { window.location.href = approvalUrl; }}
+          className="w-full flex items-center justify-center gap-2 bg-[#0070ba] hover:bg-[#005ea6]
+                     text-white font-semibold rounded-xl py-4 px-6 transition-colors"
+        >
+          <ExternalLink className="w-5 h-5" />
+          Continue to PayPal
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── PayPal capture handler ───────────────────────────────────────────────────
+// Rendered on the PayPal return URL: /pay/:txId?paypal_return=1&token=ORDER_ID
+// Immediately fires capturePaypalOrder and delegates success/failure upward.
+
+function PayPalCapturePage({ txId, token, onSuccess, onError }) {
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const result = await paymentApi.capturePaypalOrder(txId, token);
+        if (!mounted) return;
+        if (result.success || result.data?.success) {
+          onSuccess();
+        } else {
+          // PayPal capture returned but payment not yet complete (rare edge case)
+          const msg = result.message || result.data?.message || "Payment could not be confirmed. Please contact support.";
+          onError(msg);
+        }
+      } catch (err) {
+        if (mounted) {
+          onError(err?.message || "An error occurred confirming your payment.");
+        }
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [txId, token, onSuccess, onError]);
+
+  return (
+    <div className="flex flex-col items-center gap-4 py-12">
+      <Loader2 className="w-10 h-10 animate-spin text-orange-400" />
+      <p className="text-slate-300">Confirming your payment…</p>
+    </div>
+  );
+}
+
+// ─── Success screen ───────────────────────────────────────────────────────────
+
+function SuccessScreen({ isBulk, guestEmail, tx }) {
+  const navigate = useNavigate();
+  const trackingNumber = tx?.booking?.tracking_number;
+
+  return (
+    <div className="flex flex-col items-center gap-6 py-12 text-center max-w-md mx-auto">
+      <div
+        className="w-20 h-20 bg-green-900/40 border-2 border-green-500 rounded-full
+                      flex items-center justify-center"
+      >
+        <CheckCircle className="w-10 h-10 text-green-400" />
+      </div>
+      <div>
+        <h2 className="text-2xl font-bold text-white mb-2">
+          Payment Successful!
+        </h2>
+
+        {guestEmail ? (
+          <div className="space-y-2">
+            <p className="text-slate-400">
+              Your booking has been confirmed. A confirmation email has been
+              sent to:
+            </p>
+            <p className="text-orange-400 font-semibold">{guestEmail}</p>
+            {trackingNumber && (
+              <div className="mt-4 p-3 bg-slate-700/50 rounded-lg border border-slate-600">
+                <p className="text-xs text-slate-400 mb-1">Tracking Number</p>
+                <p className="text-lg font-mono text-orange-400">
+                  {trackingNumber}
+                </p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-slate-400">
+            {isBulk
+              ? "Your bookings have been confirmed and will be scheduled shortly."
+              : "Your booking is confirmed. You'll receive a confirmation email."}
+          </p>
+        )}
+      </div>
+
+      <div className="flex gap-3">
+        {!guestEmail && (
+          <button
+            onClick={() => navigate(isBulk ? "/bulk-upload" : "/bookings")}
+            className="bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-xl
+                       px-6 py-3 transition-colors"
+          >
+            {isBulk ? "View Uploads" : "My Bookings"}
+          </button>
+        )}
+        <button
+          onClick={() => navigate("/")}
+          className="bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl
+                     px-6 py-3 transition-colors"
+        >
+          Home
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export default function PaymentPage() {
+  const { txId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+
+  const [state, setState] = useState({
+    loading: true,
+    error: null,
+    succeeded: false,
+    confirming: false,   // true while POST /confirm-success/ is in flight
+    tx: null,
+    clientSecret: null,
+    approvalUrl: null,
+    guestEmail: null,
+    selectedGateway: null,      // set when user clicks "Continue"
+    initiatingPayment: false,   // loading during /initiate/ call
+  });
+
+  // PayPal return flow detection.
+  // PayPal redirects to PAYPAL_RETURN_URL/{tx_id}?token=ORDER_ID&PayerID=XYZ
+  // It does NOT add ?paypal_return=1 — we detect by the presence of ?token=
+  // and the absence of a paypal_cancelled flag.
+  // The old ?paypal_return=1 check is kept as a backwards-compat fallback.
+  const paypalToken = searchParams.get("token");
+  const isPaypalCancelled = searchParams.get("cancelled") === "true";
+  const isPaypalReturn = (
+    (searchParams.get("paypal_return") === "1" || !!paypalToken) &&
+    !isPaypalCancelled
+  );
+
+  // Guest email: prefer router state (set by BookingPage), fall back to localStorage
+  const guestEmail =
+    location.state?.guestEmail || localStorage.getItem("guestEmail");
+
+  // ── FIX-2: declare handlePaymentSucceeded FIRST ───────────────────────────
+  // handleConfirmSuccess depends on this via its body and dependency array.
+  // useCallback is NOT hoisted — declaring it after the dependent function
+  // caused a ReferenceError on every Stripe payment completion.
+
+  /**
+   * Shared terminal success handler for BOTH payment paths.
+   *   • Stripe:  called at the end of handleConfirmSuccess (after safety-net POST)
+   *   • PayPal:  called directly by PayPalCapturePage via onSuccess prop
+   *
+   * FIX-3: PayPalCapturePage was receiving onSuccess={handleSuccess} which was
+   * never defined anywhere — an immediate ReferenceError on every PayPal return.
+   * Now correctly wired to handlePaymentSucceeded.
+   */
+  const handlePaymentSucceeded = useCallback(() => {
+    setState((s) => ({ ...s, confirming: false, succeeded: true }));
+  }, []);
+
+  const handleError = useCallback((msg) => {
+    setState((s) => ({ ...s, confirming: false, error: msg }));
+  }, []);
+
+  /**
+   * Called after stripe.confirmCardPayment() succeeds.
+   * Calls POST /api/payments/confirm-success/ to finalise the booking
+   * immediately without waiting for the Stripe webhook.
+   * Always shows success screen even if the call fails (webhook handles it).
+   */
+  const handleConfirmSuccess = useCallback(
+    async (paymentIntentId) => {
+      setState((s) => ({ ...s, confirming: true, error: null }));
+      try {
+        const result = await paymentApi.confirmPaymentSuccess({
+          paymentIntentId,
+          transactionId: txId,
+        });
+        if (result.success) {
+          // Refresh tx so success screen shows updated booking / tracking data
+          const txResult = await paymentApi.getTransaction(txId, guestEmail);
+          const updatedTx = txResult.success ? txResult.data : state.tx;
+          setState((s) => ({ ...s, tx: updatedTx }));
+        } else {
+          // confirm-success failed — the webhook handles finalisation.
+          // Never block the user from seeing the success screen.
+          console.warn(
+            "[PaymentPage] confirm-success failed (webhook will handle):",
+            result.message,
+          );
+        }
+      } catch (err) {
+        console.warn("[PaymentPage] confirm-success network error:", err);
+      } finally {
+        // Always mark succeeded — Stripe JS already confirmed the payment.
+        handlePaymentSucceeded();
+      }
+    },
+    // FIX-2: handlePaymentSucceeded is now declared above, so this dep is valid.
+    [txId, guestEmail, handlePaymentSucceeded],
+  );
+
+  // Notify backend when PayPal cancelled (can't do this inside a conditional return)
+  useEffect(() => {
+    if (isPaypalCancelled && txId) {
+      paymentApi.cancelPaypalOrder(txId).catch(() => {});
+    }
+  }, [isPaypalCancelled, txId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load transaction details on mount
+  useEffect(() => {
+    if (isPaypalReturn || isPaypalCancelled) return; // handled separately
+
+    let mounted = true;
+    (async () => {
+      const result = await paymentApi.getTransaction(txId, guestEmail);
+      if (!mounted) return;
+
+      if (!result.success) {
+        setState((s) => ({ ...s, loading: false, error: result.message }));
+        return;
+      }
+
+      const tx = result.data;
+
+      if (tx.status === "success") {
+        setState((s) => ({ ...s, loading: false, tx, succeeded: true }));
+        return;
+      }
+
+      if (tx.status !== "pending") {
+        setState((s) => ({
+          ...s,
+          loading: false,
+          error: `This transaction is ${tx.status} and cannot be paid.`,
+        }));
+        return;
+      }
+
+      // Gateway credentials are passed via React Router location.state when
+      // the user is navigated here from useBulkUpload / BookingPage.
+      // If absent, the gateway selection screen lets them re-initiate.
+      const navState = location.state || {};
+      const clientSecret = navState.clientSecret || null;
+      const approvalUrl  = navState.approvalUrl  || null;
+
+      setState((s) => ({
+        ...s,
+        loading: false,
+        tx,
+        clientSecret,
+        approvalUrl,
+        guestEmail,
+      }));
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [txId, isPaypalReturn]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handle gateway selection and payment initiation
+  const handleSelectGateway = useCallback(
+    async (gateway) => {
+      setState((s) => ({
+        ...s,
+        initiatingPayment: true,
+        error: null,
+        selectedGateway: gateway,
+      }));
+
+      let result;
+      try {
+        if (state.tx?.bulk_upload) {
+          result = await paymentApi.initiateBulkPayment({
+            bulkUploadId: state.tx.bulk_upload,
+            gateway,
+            // Stable idempotency key — no Date.now() to avoid duplicate transactions on retry
+            idempotencyKey: `payment-${state.tx.id}-${gateway}`,
+          });
+        } else if (state.tx?.booking) {
+          result = await paymentApi.initiateBookingPayment({
+            bookingId: state.tx.booking,
+            guestEmail: state.guestEmail,
+            gateway,
+            idempotencyKey: `payment-${state.tx.id}-${gateway}`,
+          });
+        } else {
+          setState((s) => ({
+            ...s,
+            initiatingPayment: false,
+            selectedGateway: null,
+            error: "No valid transaction to initiate payment for.",
+          }));
+          return;
+        }
+
+        if (!result.success) {
+          setState((s) => ({
+            ...s,
+            initiatingPayment: false,
+            selectedGateway: null,
+            error: result.message || "Failed to initiate payment.",
+          }));
+          return;
+        }
+
+        setState((s) => ({
+          ...s,
+          initiatingPayment: false,
+          clientSecret: result.data.client_secret || null,
+          approvalUrl:  result.data.approval_url  || null,
+        }));
+      } catch (err) {
+        setState((s) => ({
+          ...s,
+          initiatingPayment: false,
+          selectedGateway: null,
+          error: err.message || "Failed to initiate payment.",
+        }));
+      }
+    },
+    [state.tx, state.guestEmail],
+  );
+
+  const handleRetry = useCallback(() => {
+    setState((s) => ({
+      ...s,
+      selectedGateway: null,
+      clientSecret: null,
+      approvalUrl: null,
+      error: null,
+    }));
+  }, []);
+
+  // Auto-redirect to PayPal approval URL (300 ms delay gives React time to
+  // render the redirect spinner before the browser navigates away).
+  useEffect(() => {
+    if (state.approvalUrl && state.selectedGateway === "paypal") {
+      const timer = setTimeout(() => {
+        window.location.href = state.approvalUrl;
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [state.approvalUrl, state.selectedGateway]);
+
+  // ── PayPal cancelled flow ──────────────────────────────────────────────────
+  // User clicked "Cancel" on PayPal site — PayPal redirects with ?cancelled=true
+  // Note: the backend notify call is in the main useEffect below (can't use
+  // hooks inside conditional early returns — Rules of Hooks).
+
+  // ── PayPal return flow ──────────────────────────────────────────────────────
+  if (isPaypalReturn && paypalToken) {
+    if (state.succeeded) {
+      return (
+        <Layout>
+          <SuccessScreen isBulk={false} guestEmail={guestEmail} tx={state.tx} />
+        </Layout>
+      );
+    }
+    if (state.error) {
+      return (
+        <Layout>
+          <ErrorScreen message={state.error} navigate={navigate} />
+        </Layout>
+      );
+    }
+    return (
+      <Layout>
+        <PayPalCapturePage
+          txId={txId}
+          token={paypalToken}
+          onSuccess={handlePaymentSucceeded}
+          onError={handleError}
+        />
+      </Layout>
+    );
+  }
+
+  // ── PayPal cancelled ───────────────────────────────────────────────────────
+  if (isPaypalCancelled) {
+    return (
+      <Layout>
+        <div className="text-center py-8">
+          <AlertCircle className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-white mb-2">Payment Cancelled</h2>
+          <p className="text-slate-400 mb-6">
+            You cancelled the PayPal payment. No money has been taken.
+          </p>
+          <button
+            onClick={() => navigate(-1)}
+            className="bg-orange-500 hover:bg-orange-600 text-white font-semibold
+                       rounded-xl px-6 py-3 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </Layout>
+    );
+  }
+
+  // ── Confirming — safety-net POST /confirm-success/ in flight ───────────────
+  if (state.confirming) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center gap-4 py-16">
+          <Loader2 className="w-10 h-10 animate-spin text-green-400" />
+          <p className="text-slate-300 font-medium">Confirming your booking…</p>
+          <p className="text-slate-500 text-sm">This takes just a moment</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  // ── Loading ─────────────────────────────────────────────────────────────────
+  if (state.loading) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center gap-4 py-16">
+          <Loader2 className="w-10 h-10 animate-spin text-orange-400" />
+          <p className="text-slate-400">Loading payment details…</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  // ── Error ───────────────────────────────────────────────────────────────────
+  if (state.error) {
+    return (
+      <Layout>
+        <ErrorScreen message={state.error} navigate={navigate} />
+      </Layout>
+    );
+  }
+
+  // ── Success ─────────────────────────────────────────────────────────────────
+  if (state.succeeded) {
+    const isBulk = !!state.tx?.bulk_upload;
+    return (
+      <Layout>
+        <SuccessScreen
+          isBulk={isBulk}
+          guestEmail={state.guestEmail}
+          tx={state.tx}
+        />
+      </Layout>
+    );
+  }
+
+  const { tx, clientSecret, approvalUrl } = state;
+  const isBulk      = !!tx?.bulk_upload;
+  const amount      = tx?.amount   || "0.00";
+  const currency    = tx?.currency || "GBP";
+  // Use state.selectedGateway (user-chosen), NOT tx.gateway (stale placeholder).
+  const activeGateway = state.selectedGateway;
+
+  // ── Gateway selection — shown until credentials arrive ──────────────────────
+  // Guard: show selection when credentials are absent AND initiation is not in
+  // flight. handleSelectGateway resets selectedGateway to null on failure, so
+  // the screen reappears correctly after an error.
+  if (!clientSecret && !approvalUrl && !state.initiatingPayment) {
+    return (
+      <Layout
+        heading="Secure Payment"
+        guestEmail={state.guestEmail}
+        isBulk={isBulk}
+      >
+        <GatewaySelectionScreen
+          tx={tx}
+          amount={amount}
+          currency={currency}
+          onSelectGateway={handleSelectGateway}
+          loading={state.initiatingPayment}
+        />
+      </Layout>
+    );
+  }
+
+  // ── Initiation in progress ──────────────────────────────────────────────────
+  if (state.initiatingPayment) {
+    return (
+      <Layout>
+        <div className="flex flex-col items-center gap-4 py-16">
+          <Loader2 className="w-10 h-10 animate-spin text-orange-400" />
+          <p className="text-slate-400">
+            Setting up{" "}
+            {state.selectedGateway === "stripe" ? "Stripe" : "PayPal"} payment…
+          </p>
+        </div>
+      </Layout>
+    );
+  }
+
+  // ── Payment initiation failed — show retry ──────────────────────────────────
+  if (state.error && !clientSecret && !approvalUrl) {
+    return (
+      <Layout>
+        <div className="space-y-4">
+          <div className="text-center">
+            <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-white mb-2">
+              Payment Setup Failed
+            </h2>
+            <p className="text-slate-400 mb-6">{state.error}</p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={handleRetry}
+              className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold
+                         rounded-xl px-6 py-3 transition-colors"
+            >
+              Try Again
+            </button>
+            <button
+              onClick={() => navigate(isBulk ? "/bulk-upload" : "/bookings")}
+              className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-semibold
+                         rounded-xl px-6 py-3 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // ── Stripe ─────────────────────────────────────────────────────────────────
+  if (activeGateway === "stripe" && clientSecret) {
+    return (
+      <Layout heading="Complete Payment" guestEmail={state.guestEmail}>
+        <Elements stripe={stripePromise} options={{ clientSecret }}>
+          <StripeCheckoutForm
+            clientSecret={clientSecret}
+            txId={txId}
+            amount={amount}
+            currency={currency}
+            onConfirmSuccess={handleConfirmSuccess}
+            onError={handleError}
+          />
+        </Elements>
+      </Layout>
+    );
+  }
+
+  // ── PayPal — auto-redirect fires in useEffect; this renders the spinner ────
+  if (activeGateway === "paypal" && approvalUrl) {
+    return (
+      <Layout heading="Redirecting to PayPal…" guestEmail={state.guestEmail}>
+        <PayPalRedirectScreen
+          approvalUrl={approvalUrl}
+          amount={amount}
+          currency={currency}
+        />
+      </Layout>
+    );
+  }
+
+  // Fallback — should not normally be reached
+  return (
+    <Layout>
+      <ErrorScreen
+        message="Unable to determine payment method. Please try again."
+        navigate={navigate}
+      />
+    </Layout>
+  );
+}
+
+// ─── Layout wrapper ───────────────────────────────────────────────────────────
+
+function Layout({
+  heading = "Complete Your Payment",
+  guestEmail,
+  isBulk = false,
+  children,
+}) {
+  const navigate = useNavigate();
+  return (
+    <div className="min-h-screen bg-slate-900 py-12 px-4">
+      <div className="max-w-lg mx-auto">
+        {/* Guest context badge */}
+        {guestEmail && (
+          <div className="mb-6 p-3 bg-slate-700/50 border border-slate-600 rounded-lg text-sm text-slate-300">
+            Paying as guest:{" "}
+            <span className="text-orange-400 font-semibold">{guestEmail}</span>
+          </div>
+        )}
+
+        {/* Header with back button */}
+        <div className="flex items-center gap-3 mb-8">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300
+                       transition-colors"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-2">
+            <Package className="w-6 h-6 text-orange-400" />
+            <div>
+              <span className="text-lg font-semibold text-white block">
+                {heading}
+              </span>
+              <p className="text-xs text-slate-500">
+                {isBulk ? "Bulk Upload" : "Booking"} Payment
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Main content card */}
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
+          {children}
+        </div>
+
+        {/* Help text footer */}
+        <div className="mt-6 text-center">
+          <p className="text-xs text-slate-500 mb-2">Need help?</p>
+          <a
+            href="mailto:support@dropnroll.com"
+            className="text-orange-400 hover:text-orange-300 text-xs font-medium transition-colors"
+          >
+            Contact our support team
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ErrorScreen({ message, navigate }) {
+  return (
+    <div className="text-center py-8">
+      <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+      <h2 className="text-xl font-semibold text-white mb-2">Payment Error</h2>
+      <p className="text-slate-400 mb-6">{message}</p>
+      <button
+        onClick={() => navigate(-1)}
+        className="bg-slate-700 hover:bg-slate-600 text-white font-medium
+                   rounded-xl px-6 py-3 transition-colors"
+      >
+        Go Back
       </button>
     </div>
   );
 }
 
-// Stripe Apple Pay Component
-function StripeApplePay({
-  txId,
-  amount,
-  guestEmail,
-  isAuthenticated,
-  onSuccess,
-  onError,
-}) {
-  const stripe = useStripe();
-  const [paymentRequest, setPaymentRequest] = useState(null);
-  const [error, setError] = useState(null);
-  const [canMakePayment, setCanMakePayment] = useState(false);
-
-  useEffect(() => {
-    if (!stripe) return;
-
-    const pr = stripe.paymentRequest({
-      country: "GB",
-      currency: "gbp",
-      total: { label: "Total", amount: Math.round(amount * 100) },
-      requestPayerName: true,
-      requestPayerEmail: true,
-    });
-
-    pr.canMakePayment().then((result) => {
-      if (result?.applePay) {
-        setPaymentRequest(pr);
-        setCanMakePayment(true);
-      }
-    });
-
-    pr.on("paymentmethod", async (ev) => {
-      try {
-        const result = await paymentApi.initiateStripeTransaction(
-          txId,
-          isAuthenticated,
-          guestEmail,
-          "apple_pay"
-        );
-        if (!result.success) {
-          throw new Error(result.message || "Failed to initialize payment");
-        }
-
-        const { client_secret } = result;
-
-        const { error: confirmError, paymentIntent } =
-          await stripe.confirmCardPayment(client_secret, {
-            payment_method: ev.paymentMethod.id,
-          });
-
-        if (confirmError) {
-          ev.complete("fail");
-          throw confirmError;
-        }
-
-        ev.complete("success");
-        if (paymentIntent.status === "succeeded") {
-          onSuccess();
-        } else {
-          throw new Error("Payment did not succeed. Please try again.");
-        }
-      } catch (err) {
-        ev.complete("fail");
-        setError(err.message || "An unexpected error occurred.");
-        onError(err.message || "An unexpected error occurred.");
-      }
-    });
-  }, [stripe, txId, amount, guestEmail, isAuthenticated, onSuccess, onError]);
-
-  if (!canMakePayment) {
-    return (
-      <p className="text-gray-600 text-sm">
-        Apple Pay not available on this device.
-      </p>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {error && (
-        <div className="flex items-center text-red-500 text-sm">
-          <AlertCircle size={16} className="mr-2" />
-          {error}
-        </div>
-      )}
-      {paymentRequest && (
-        <PaymentRequestButtonElement options={{ paymentRequest }} />
-      )}
-    </div>
-  );
-}
-
-// Stripe Google Pay Component
-function StripeGooglePay({
-  txId,
-  amount,
-  guestEmail,
-  isAuthenticated,
-  onSuccess,
-  onError,
-}) {
-  const stripe = useStripe();
-  const [paymentRequest, setPaymentRequest] = useState(null);
-  const [error, setError] = useState(null);
-  const [canMakePayment, setCanMakePayment] = useState(false);
-
-  useEffect(() => {
-    if (!stripe) return;
-
-    const pr = stripe.paymentRequest({
-      country: "GB",
-      currency: "gbp",
-      total: { label: "Total", amount: Math.round(amount * 100) },
-      requestPayerName: true,
-      requestPayerEmail: true,
-    });
-
-    pr.canMakePayment().then((result) => {
-      if (result?.googlePay) {
-        setPaymentRequest(pr);
-        setCanMakePayment(true);
-      }
-    });
-
-    pr.on("paymentmethod", async (ev) => {
-      try {
-        const result = await paymentApi.initiateStripeTransaction(
-          txId,
-          isAuthenticated,
-          guestEmail,
-          "google_pay"
-        );
-        if (!result.success) {
-          throw new Error(result.message || "Failed to initialize payment");
-        }
-
-        const { client_secret } = result;
-
-        const { error: confirmError, paymentIntent } =
-          await stripe.confirmCardPayment(client_secret, {
-            payment_method: ev.paymentMethod.id,
-          });
-
-        if (confirmError) {
-          ev.complete("fail");
-          throw confirmError;
-        }
-
-        ev.complete("success");
-        if (paymentIntent.status === "succeeded") {
-          onSuccess();
-        } else {
-          throw new Error("Payment did not succeed. Please try again.");
-        }
-      } catch (err) {
-        ev.complete("fail");
-        setError(err.message || "An unexpected error occurred.");
-        onError(err.message || "An unexpected error occurred.");
-      }
-    });
-  }, [stripe, txId, amount, guestEmail, isAuthenticated, onSuccess, onError]);
-
-  if (!canMakePayment) {
-    return (
-      <p className="text-gray-600 text-sm">
-        Google Pay not available on this device.
-      </p>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {error && (
-        <div className="flex items-center text-red-500 text-sm">
-          <AlertCircle size={16} className="mr-2" />
-          {error}
-        </div>
-      )}
-      {paymentRequest && (
-        <PaymentRequestButtonElement options={{ paymentRequest }} />
-      )}
-    </div>
-  );
-}
-
-// StripeCashApp Component (outer wrapper)
-// Main Payment Page Content
-function PaymentPageContent() {
-  const { txId } = useParams();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { isAuthenticated } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [transaction, setTransaction] = useState(null);
-  const [amount, setAmount] = useState(0);
-  const [guestEmail, setGuestEmail] = useState("");
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("card");
-  const [processing, setProcessing] = useState(false);
-  const [applePayAvailable, setApplePayAvailable] = useState(false);
-  const [googlePayAvailable, setGooglePayAvailable] = useState(false);
-  const [hasCaptured, setHasCaptured] = useState(false);
-
-  const queryParams = new URLSearchParams(location.search);
-  const paypalToken = queryParams.get("token");
-  const payerId = queryParams.get("PayerID");
-  const isCancelled = queryParams.get("cancelled");
-
-  useEffect(() => {
-    const checkWallets = async () => {
-      const stripe = await stripePromise;
-      const pr = stripe.paymentRequest({
-        country: "GB",
-        currency: "gbp",
-        total: { label: "Test", amount: 1000 },
-        requestPayerEmail: true,
-      });
-      const result = await pr.canMakePayment();
-      setApplePayAvailable(!!result?.applePay);
-      setGooglePayAvailable(!!result?.googlePay);
-    };
-    checkWallets();
-  }, []);
-
-  useEffect(() => {
-    const loadTransaction = async () => {
-      setLoading(true);
-      try {
-        const stateGuestEmail = location.state?.guestEmail;
-        let effectiveGuestEmail = guestEmail;
-        if (!isAuthenticated && stateGuestEmail) {
-          effectiveGuestEmail = stateGuestEmail.toLowerCase();
-          setGuestEmail(effectiveGuestEmail);
-        }
-
-        if (!isAuthenticated && !effectiveGuestEmail) {
-          const storedGuestEmail = localStorage.getItem("guestEmail");
-          if (storedGuestEmail) {
-            effectiveGuestEmail = storedGuestEmail.toLowerCase();
-            setGuestEmail(effectiveGuestEmail);
-          }
-        }
-
-        if (!isAuthenticated && !effectiveGuestEmail) {
-          setError("Guest email required for non-authenticated users");
-          return;
-        }
-
-        const result = await paymentApi.getTransaction(
-          txId,
-          isAuthenticated,
-          effectiveGuestEmail
-        );
-        if (result.success) {
-          setTransaction(result.data);
-          setAmount(Number.parseFloat(result.data.amount || 0));
-          if (!isAuthenticated && result.data.guest_email && !guestEmail) {
-            setGuestEmail(result.data.guest_email.toLowerCase());
-          }
-        } else {
-          setError(result.message || "Failed to load transaction");
-        }
-      } catch (err) {
-        setError(err.message || "Failed to load transaction");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadTransaction();
-  }, [txId, isAuthenticated, location.state, guestEmail]);
-
-  useEffect(() => {
-    if (paypalToken && payerId && transaction && !hasCaptured) {
-      handleCapture();
-    } else if (isCancelled && transaction) {
-      handleCancel();
-    }
-  }, [paypalToken, payerId, isCancelled, transaction, hasCaptured]);
-
-  const handleInitiatePayment = async () => {
-    setProcessing(true);
-    setError(null);
-    try {
-      if (!isAuthenticated && guestEmail) {
-        localStorage.setItem("guestEmail", guestEmail.toLowerCase());
-      }
-
-      const result = await paymentApi.initiateTransaction(
-        txId,
-        isAuthenticated,
-        guestEmail
-      );
-      if (result.approval_url) {
-        window.location.href = result.approval_url;
-      } else {
-        setError(result.message || "Failed to initiate payment");
-      }
-    } catch (err) {
-      setError(err.message || "Failed to initiate payment");
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  const handleCapture = async () => {
-    if (hasCaptured) return;
-    setHasCaptured(true);
-    setProcessing(true);
-    setError(null);
-    try {
-      const result = await paymentApi.captureTransaction(
-        txId,
-        isAuthenticated,
-        guestEmail
-      );
-      if (result.success) {
-        navigate("/pay/success", {
-          state: { transaction: result.data, guestEmail },
-        });
-      } else {
-        setError(result.message || "Failed to capture payment");
-      }
-    } catch (err) {
-      setError(err.message || "Failed to capture payment");
-    } finally {
-      setProcessing(false);
-      if (!isAuthenticated) {
-        localStorage.removeItem("guestEmail");
-      }
-    }
-  };
-
-  const handleCancel = async () => {
-    setProcessing(true);
-    try {
-      const result = await paymentApi.cancelTransaction(
-        txId,
-        isAuthenticated,
-        guestEmail
-      );
-      if (result.success) {
-        navigate("/pay/cancel", {
-          state: { transaction: result.data, guestEmail },
-        });
-      } else {
-        setError(result.message);
-      }
-    } catch (err) {
-      setError("Failed to cancel payment");
-    } finally {
-      setProcessing(false);
-      if (!isAuthenticated) {
-        localStorage.removeItem("guestEmail");
-      }
-    }
-  };
-
-  const handleStripeSuccess = () => {
-    if (!isAuthenticated) {
-      localStorage.removeItem("guestEmail");
-    }
-    navigate("/pay/success", { state: { transaction, guestEmail } });
-  };
-
-  const handleStripeError = (message) => {
-    setError(message);
-  };
-
-  const handleSelectMethod = (method) => {
-    setSelectedPaymentMethod(method);
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="h-12 w-12 text-orange-500 animate-spin" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-          <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Payment Error
-          </h2>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <button
-            onClick={() => navigate("/history")}
-            className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg transition-colors w-full"
-          >
-            Back to Bookings
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!transaction) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-          <AlertCircle className="h-16 w-16 text-orange-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            No Transaction Found
-          </h2>
-          <p className="text-gray-600 mb-6">
-            Please start a new booking or check your history.
-          </p>
-          <button
-            onClick={() => navigate("/history")}
-            className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg transition-colors w-full"
-          >
-            View Bookings
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-3xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            Back
-          </button>
-          <div className="text-sm text-gray-500">
-            Transaction #{transaction.reference}
-          </div>
-        </div>
-
-        {/* Transaction Summary Card */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-6">
-            Complete Your Payment
-          </h1>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <div className="text-sm text-gray-600 mb-2">Amount Due</div>
-              <div className="text-4xl font-bold text-gray-900">
-                £{amount.toFixed(2)}
-              </div>
-            </div>
-            <div>
-              <div className="text-sm text-gray-600 mb-2">Status</div>
-              <div className="inline-flex items-center px-4 py-2 bg-orange-100 text-orange-700 rounded-full font-medium">
-                {transaction.status.charAt(0).toUpperCase() +
-                  transaction.status.slice(1)}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Payment Methods Card */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">
-            Choose Payment Method
-          </h2>
-          <div className="space-y-4 mb-8">
-            <PaymentMethodOption
-              id="paypal"
-              selected={selectedPaymentMethod === "paypal"}
-              onSelect={handleSelectMethod}
-              icon={<CreditCard className="h-6 w-6" />}
-              label="PayPal"
-              description="Pay securely with your PayPal account"
-              color="blue"
-            />
-            <PaymentMethodOption
-              id="card"
-              selected={selectedPaymentMethod === "card"}
-              onSelect={handleSelectMethod}
-              icon={<CreditCard className="h-6 w-6" />}
-              label="Credit/Debit Card"
-              description="Visa, MasterCard, Amex accepted"
-              color="orange"
-            />
-            {applePayAvailable && (
-              <PaymentMethodOption
-                id="apple"
-                selected={selectedPaymentMethod === "apple"}
-                onSelect={handleSelectMethod}
-                icon={<CheckCircle className="h-6 w-6" />}
-                label="Apple Pay"
-                description="Quick payment with Apple Wallet"
-                color="gray"
-              />
-            )}
-            {googlePayAvailable && (
-              <PaymentMethodOption
-                id="google"
-                selected={selectedPaymentMethod === "google"}
-                onSelect={handleSelectMethod}
-                icon={<CheckCircle className="h-6 w-6" />}
-                label="Google Pay"
-                description="Pay with your Google account"
-                color="blue"
-              />
-            )}
-
-          </div>
-
-          {/* Payment Form */}
-          <div className="bg-gray-50 rounded-2xl p-6 mb-6">
-            {selectedPaymentMethod === "paypal" && (
-              <button
-                onClick={handleInitiatePayment}
-                disabled={processing}
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 rounded-lg transition-colors flex items-center justify-center text-lg"
-              >
-                <CreditCard className="h-6 w-6 mr-3" />
-                Continue to PayPal
-              </button>
-            )}
-
-            {selectedPaymentMethod === "card" && (
-              <StripeCreditCard
-                txId={txId}
-                amount={amount}
-                guestEmail={guestEmail}
-                isAuthenticated={isAuthenticated}
-                onSuccess={handleStripeSuccess}
-                onError={handleStripeError}
-              />
-            )}
-
-            {selectedPaymentMethod === "apple" && applePayAvailable && (
-              <StripeApplePay
-                txId={txId}
-                amount={amount}
-                guestEmail={guestEmail}
-                isAuthenticated={isAuthenticated}
-                onSuccess={handleStripeSuccess}
-                onError={handleStripeError}
-              />
-            )}
-
-            {selectedPaymentMethod === "google" && googlePayAvailable && (
-              <StripeGooglePay
-                txId={txId}
-                amount={amount}
-                guestEmail={guestEmail}
-                isAuthenticated={isAuthenticated}
-                onSuccess={handleStripeSuccess}
-                onError={handleStripeError}
-              />
-            )}
-
-
-          </div>
-
-          {/* Cancel Button */}
-          <button
-            onClick={handleCancel}
-            disabled={processing}
-            className="w-full bg-white hover:bg-gray-50 text-gray-700 font-bold py-4 rounded-lg border border-gray-300 transition-colors text-lg"
-          >
-            Cancel Payment
-          </button>
-        </div>
-
-        {/* Security Footer */}
-        <div className="bg-gray-100 rounded-2xl p-6">
-          <div className="flex items-center justify-center text-gray-700">
-            <Shield className="h-5 w-5 text-green-500 mr-2" />
-            <span className="font-medium">
-              Secure Payment • Your data is encrypted and protected
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Processing Overlay */}
-      {processing && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-8 text-center">
-            <Loader2 className="h-12 w-12 text-orange-500 animate-spin mx-auto mb-4" />
-            <p className="text-gray-900 font-bold text-xl">
-              Processing your payment...
-            </p>
-            <p className="text-gray-600 mt-2">
-              Please do not close this window
-            </p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Main Export with Elements Provider
-export default function PaymentPage() {
-  return (
-    <Elements stripe={stripePromise}>
-      <PaymentPageContent />
-    </Elements>
-  );
-}

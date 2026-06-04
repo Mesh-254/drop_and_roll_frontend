@@ -186,7 +186,9 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
     localStorage.removeItem("remember_me");
     localStorage.removeItem("user_data");
-    localStorage.removeItem("guestEmail"); // Clear guest email
+    // FIX-BUG-03: Don't automatically clear guest email on logout — it's needed for guest payment flows
+    // Only clear explicitly after successful payment or user request
+    console.log("[AuthContext] User logged out");
   };
 
   const isCustomer = () => user?.role === "customer";

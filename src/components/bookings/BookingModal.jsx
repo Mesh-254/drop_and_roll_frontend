@@ -67,7 +67,9 @@ export default function BookingModal({
   const [formData, setFormData] = useState({
     promoCode: "",
     notes: "",
-    guestEmail: user?.email || "",
+    // Only pre-fill guestEmail for unauthenticated users.
+    // Authenticated users don't send guest_email — their identity comes from JWT.
+    guestEmail: isAuthenticated ? "" : user?.email || "",
     pickupAddress: initialFormData.pickupAddress || {},
     dropoffAddress: initialFormData.dropoffAddress || {},
     ...initialFormData,
