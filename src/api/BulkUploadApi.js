@@ -250,6 +250,82 @@ class BulkUploadApi extends ApiBase {
     this._triggerDownload(response.data, `bulk-errors-${id}.csv`);
   }
 
+  // ── Aliases ───────────────────────────────────────────────────────────────
+  // useBulkUpload.js and BulkPaymentPage.jsx reference shorter method names.
+  // These thin wrappers keep the original implementations intact while
+  // satisfying both callers without a global rename.
+
+  /**
+   * alias for validateFile() — called by useBulkUpload.validateFile
+   * Signature differs: hook passes a FormData directly (not file + metadata),
+   * because it builds FormData itself.  The hook passes `(formData)` but
+   * our validateFile() expects `(file, metadata)`.
+   *
+   * Rather than changing the hook, we accept FormData here and forward it
+   * directly via axiosInstance (bypassing the file/metadata decomposition).
+   */
+  async validate(formData) {
+    // [observability] Log in dev so we can confirm alias routing is live
+    if (import.meta.env.DEV) {
+      console.debug("[BulkUploadApi] validate() alias called");
+    }
+    const response = await this.axiosInstance.post(
+      "/api/booking/bulk-uploads/validate/",
+      formData,
+    );
+    return response.data;
+  }
+
+  /**
+   * create(uploadId) — STEP 2 of the two-step flow.
+   *
+   * Patches the PENDING BulkUpload to `submitted`, which triggers the
+   * Celery task.  The hook must supply the uploadId returned by validate().
+   *
+   * Previously this alias POSTed to the one-shot endpoint with FormData,
+   * which re-validated from scratch and could reject a second upload of the
+   * same content.  The correct two-step flow is:
+   *   validate()    → creates BulkUpload in PENDING status, returns { id, ... }
+   *   create(id)    → PATCH status=submitted → queues Celery
+   *
+   * @param {string} uploadId  UUID from validate() response
+   */
+  async create(uploadId) {
+    if (import.meta.env.DEV) {
+      console.debug(`[BulkUploadApi] create() — submitting upload ${uploadId}`);
+    }
+    const response = await this.axiosInstance.patch(
+      `/api/booking/bulk-uploads/${uploadId}/`,
+      { status: "submitted" },
+    );
+    return response.data;
+  }
+
+  /**
+   * alias for getUploadStatus() — called by useBulkUpload polling loop
+   */
+  async getStatus(id) {
+    return this.getUploadStatus(id);
+  }
+
+  /**
+   * alias for getUpload() — called by BulkPaymentPage.loadPaymentData
+   */
+  async getDetail(id) {
+    return this.getUpload(id);
+  }
+
+  /**
+   * getReceivable — called by useBulkUpload._pollForReceivable (NET flow)
+   * GET /api/booking/bulk-uploads/:id/receivable/
+   */
+  async getReceivable(id) {
+    const response = await this.axiosInstance.get(
+      `/api/booking/bulk-uploads/${id}/receivable/`,
+    );
+    return response.data;
+  }
+
   // ── private ──────────────────────────────────────────────────────────────
 
   _triggerDownload(blob, filename) {
