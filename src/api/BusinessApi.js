@@ -81,6 +81,34 @@ class BusinessApi extends ApiBase {
       throw error;
     }
   }
+
+  /**
+   * Submit a new NET terms request.
+   * POST /api/business/net-requests/
+   * @param {{ requested_package: string, justification: string, expected_monthly_volume?: number }} data
+   */
+  async submitNetTermsRequest(data) {
+    const response = await this.axiosInstance.post('/api/business/net-requests/', data);
+    return response.data;
+  }
+
+  /**
+   * Fetch the current user's NET terms requests (list).
+   * GET /api/business/net-requests/
+   */
+  async getNetTermsRequests() {
+    const response = await this.axiosInstance.get('/api/business/net-requests/');
+    return response.data;
+  }
+
+  /**
+   * Fetch a single NET terms request by ID.
+   * GET /api/business/net-requests/:id/
+   */
+  async getNetTermsRequest(id) {
+    const response = await this.axiosInstance.get(`/api/business/net-requests/${id}/`);
+    return response.data;
+  }
 }
 
 export default new BusinessApi();
