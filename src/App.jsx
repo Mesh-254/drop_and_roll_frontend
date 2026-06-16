@@ -45,11 +45,16 @@ import BookingHistory from "./components/bookings/BookingHistory";
 import ProfilePage from "./components/profile/ProfilePage";
 
 import PaymentPage from "./components/payments/PaymentPage";
+import BulkPaymentPage from "./components/payments/BulkPaymentPage";
 import PaymentSuccess from "./components/payments/PaymentSuccess";
 import PaymentCancel from "./components/payments/PaymentCancel";
 // FIX-D: import the invoice/billing pages that were missing from the router
 import BillingPage from "./components/payments/BillingPage";
 import InvoiceDetailPage from "./components/payments/InvoiceDetailPage";
+// FIX-E: import the missing bulk payment success page
+import BulkPaymentSuccessPage from "./components/payments/BulkPaymentSuccessPage";
+
+
 
 import DriverDashboard from "./components/driver/driver-dashboard";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -211,6 +216,30 @@ function App() {
             }
           />
           <Route path="/pay/cancel" element={<PaymentCancel />} />
+          
+          {/* Bulk-upload Checkout redirect — /pay/bulk/:uploadId (MUST be before /pay/:txId) */}
+          <Route
+            path="/pay/bulk/:uploadId"
+            element={
+              <ProtectedRoute allowedRoles={["customer"]}>
+                <BulkPaymentPage />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* FIX-E: /bulk-uploads/:uploadId/success — navigated to by BulkPaymentPage
+              after Stripe Checkout completes. This route was MISSING, causing a blank
+              page after every successful bulk payment. */}
+          <Route
+            path="/bulk-uploads/:uploadId/success"
+            element={
+              <ProtectedRoute allowedRoles={["customer"]}>
+                <BulkPaymentSuccessPage />
+              </ProtectedRoute>
+            }
+          />
+
           {/* Dynamic route last — catches /pay/:txId (any UUID) */}
           <Route path="/pay/:txId" element={<PaymentPage />} />
 
