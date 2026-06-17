@@ -51,6 +51,18 @@ export default function PaymentSuccess() {
   useEffect(() => {
     const loadDetails = async () => {
       try {
+        // FIX-E: If this page was reached via a Stripe bulk Checkout return
+        // (e.g. ?session_id=cs_xxx without a transaction in location.state),
+        // redirect gracefully instead of showing "No transaction data available".
+        // Bulk payments are handled by BulkPaymentPage → BulkPaymentSuccessPage.
+        const params = new URLSearchParams(window.location.search);
+        const sessionId = params.get("session_id");
+        if (!transaction?.id && sessionId) {
+          // We don't have the uploadId here, so just send to the dashboard
+          navigate("/bulk-upload", { replace: true });
+          return;
+        }
+
         if (!transaction?.id) {
           setError("No transaction data available");
           setLoading(false);
