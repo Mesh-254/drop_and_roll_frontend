@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -14,11 +14,14 @@ import {
   Mail,
   Phone,
   MapPin,
-  FileText
+  FileText,
+  Zap
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBusinessProfile } from '../../hooks/useBusinessProfile';
+import BusinessApi from '../../api/BusinessApi';
 import BusinessProfileOnboarding from './BusinessProfileOnboarding';
+import NetTermsRequestForm from './NetTermsRequestForm';
 
 /**
  * BusinessProfilePage — Full page view of business profile with edit capability
@@ -28,6 +31,19 @@ export default function BusinessProfilePage() {
   const { user } = useAuth();
   const { businessProfile, loading, refetch, hasProfile, isApproved, isPending, isRejected } = useBusinessProfile();
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showNetTermsForm, setShowNetTermsForm] = useState(false);
+  const [netTermsRequest, setNetTermsRequest] = useState(null);
+
+  // Fetch latest NET terms request on mount
+  useEffect(() => {
+    if (!businessProfile) return;
+    BusinessApi.getNetTermsRequests()
+      .then(data => {
+        const results = Array.isArray(data) ? data : (data.results ?? []);
+        if (results.length > 0) setNetTermsRequest(results[0]);
+      })
+      .catch(() => {}); // non-critical
+  }, [businessProfile]);
 
   // Status badge configuration
   const getStatusConfig = () => {
@@ -287,63 +303,122 @@ export default function BusinessProfilePage() {
               <h3 className="text-lg font-bold text-white">Payment Terms</h3>
             </div>
 
-            {businessProfile.net_terms_requested ? (
+            {/* Approved NET Terms */}
+            {netTermsRequest?.status === 'approved' || businessProfile.payment_terms !== 'prepaid' ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                    businessProfile.net_terms_approved
-                      ? 'bg-green-500/20 text-green-400'
-                      : 'bg-yellow-500/20 text-yellow-400'
-                  }`}>
-                    {businessProfile.net_terms_approved ? 'NET Terms Approved' : 'NET Terms Requested'}
+                  <CheckCircle className="w-5 h-5 text-green-400" />
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-500/20 text-green-400">
+                    NET Terms Approved
                   </span>
                 </div>
 
-                {businessProfile.net_terms_approved && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                    <div className="bg-gray-800/50 rounded-xl p-4">
-                      <label className="text-xs text-gray-500 uppercase tracking-wider">Credit Limit</label>
-                      <p className="text-2xl font-bold text-white mt-1">
-                        £{businessProfile.credit_limit?.toLocaleString() || '0'}
-                      </p>
-                    </div>
-                    <div className="bg-gray-800/50 rounded-xl p-4">
-                      <label className="text-xs text-gray-500 uppercase tracking-wider">Available Credit</label>
-                      <p className="text-2xl font-bold text-green-400 mt-1">
-                        £{businessProfile.available_credit?.toLocaleString() || businessProfile.credit_limit?.toLocaleString() || '0'}
-                      </p>
-                    </div>
-                    <div className="bg-gray-800/50 rounded-xl p-4">
-                      <label className="text-xs text-gray-500 uppercase tracking-wider">Payment Terms</label>
-                      <p className="text-2xl font-bold text-white mt-1">
-                        NET {businessProfile.net_terms_days || 30}
-                      </p>
-                    </div>
-                    <div className="bg-gray-800/50 rounded-xl p-4">
-                      <label className="text-xs text-gray-500 uppercase tracking-wider">Outstanding</label>
-                      <p className="text-2xl font-bold text-orange-400 mt-1">
-                        £{businessProfile.outstanding_balance?.toLocaleString() || '0'}
-                      </p>
-                    </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                  <div className="bg-gray-800/50 rounded-xl p-4">
+                    <label className="text-xs text-gray-500 uppercase tracking-wider">Credit Limit</label>
+                    <p className="text-2xl font-bold text-white mt-1">
+                      £{businessProfile.credit_limit?.toLocaleString() || '0'}
+                    </p>
+                  </div>
+                  <div className="bg-gray-800/50 rounded-xl p-4">
+                    <label className="text-xs text-gray-500 uppercase tracking-wider">Available Credit</label>
+                    <p className="text-2xl font-bold text-green-400 mt-1">
+                      £{businessProfile.available_credit?.toLocaleString() || businessProfile.credit_limit?.toLocaleString() || '0'}
+                    </p>
+                  </div>
+                  <div className="bg-gray-800/50 rounded-xl p-4">
+                    <label className="text-xs text-gray-500 uppercase tracking-wider">Payment Terms</label>
+                    <p className="text-2xl font-bold text-white mt-1">
+                      NET {businessProfile.net_terms_days || 30}
+                    </p>
+                  </div>
+                  <div className="bg-gray-800/50 rounded-xl p-4">
+                    <label className="text-xs text-gray-500 uppercase tracking-wider">Outstanding</label>
+                    <p className="text-2xl font-bold text-orange-400 mt-1">
+                      £{businessProfile.outstanding_balance?.toLocaleString() || '0'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : netTermsRequest?.status === 'pending' ? (
+              /* Pending Review */
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-yellow-400" />
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-400">
+                    Under Review
+                  </span>
+                </div>
+                <div className="bg-gray-800/50 rounded-xl p-4">
+                  <p className="text-sm text-gray-400">
+                    Your application for <strong className="text-white">{netTermsRequest.requested_package}</strong> package is being reviewed.
+                  </p>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Expected decision: 1–2 business days
+                  </p>
+                </div>
+              </div>
+            ) : netTermsRequest?.status === 'rejected' ? (
+              /* Rejected */
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <XCircle className="w-5 h-5 text-red-400" />
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-400">
+                    Application Rejected
+                  </span>
+                </div>
+                {netTermsRequest.rejection_reason && (
+                  <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4">
+                    <p className="text-sm text-red-300">{netTermsRequest.rejection_reason}</p>
                   </div>
                 )}
-
-                {businessProfile.net_terms_justification && (
-                  <div className="mt-4">
-                    <label className="text-xs text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                      <FileText className="w-3 h-3" /> Justification
-                    </label>
-                    <p className="text-gray-300 mt-1 text-sm">{businessProfile.net_terms_justification}</p>
-                  </div>
+                {isApproved && (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setShowNetTermsForm(true)}
+                    className="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
+                  >
+                    Re-apply
+                  </motion.button>
                 )}
               </div>
             ) : (
-              <div className="text-center py-4">
-                <p className="text-gray-400">No NET payment terms requested.</p>
-                <p className="text-sm text-gray-500 mt-1">
-                  You&apos;re using standard payment terms (pay per booking).
-                </p>
-              </div>
+              /* No NET terms requested — show CTA */
+              isApproved && (
+                <div className="space-y-4">
+                  <div className="bg-gradient-to-br from-orange-900/20 to-transparent border border-orange-500/20 rounded-xl p-6 text-center">
+                    <div className="flex justify-center mb-4">
+                      <div className="p-3 bg-orange-500/20 rounded-full">
+                        <Zap className="w-6 h-6 text-orange-400" />
+                      </div>
+                    </div>
+                    <h4 className="text-lg font-bold text-white mb-2">Unlock NET Payment Terms</h4>
+                    <ul className="text-sm text-gray-300 space-y-2 mb-6 text-left">
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
+                        Defer your payment up to 60 days
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
+                        Increase your cash flow
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
+                        Get a dedicated account manager
+                      </li>
+                    </ul>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setShowNetTermsForm(true)}
+                      className="w-full py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold rounded-lg transition-all"
+                    >
+                      Apply for NET Terms
+                    </motion.button>
+                  </div>
+                </div>
+              )
             )}
           </motion.div>
         </div>
@@ -385,6 +460,18 @@ export default function BusinessProfilePage() {
             refetch();
             setShowOnboarding(false);
           }}
+        />
+      )}
+
+      {/* NET Terms Request Form Modal */}
+      {showNetTermsForm && (
+        <NetTermsRequestForm
+          onClose={() => setShowNetTermsForm(false)}
+          onSuccess={(req) => {
+            setNetTermsRequest(req);
+            setShowNetTermsForm(false);
+          }}
+          existingRequest={netTermsRequest}
         />
       )}
     </div>
