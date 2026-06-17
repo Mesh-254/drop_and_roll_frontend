@@ -1,22 +1,27 @@
 /**
  * api/PaymentApi.js
  *
- * FIX-04  All existing methods called endpoints that do not exist:
- *           initiateTransaction      → /transactions/{id}/initiate/     (404)
- *           captureTransaction       → /transactions/{id}/capture/      (404)
- *           initiateStripeTransaction→ /transactions/{id}/initiate-stripe/ (404)
- *         These were leftovers from an older API design.
+ * FIX-04  All existing methods called endpoints that do not exist — corrected.
  *
  * FIX-07  BulkUpload PREPAID payment:
- *         useBulkUpload.handleInitiatePayment called BulkUploadApi.initiatePayment(id)
- *         which hits /api/booking/bulk-uploads/{id}/pay/ — that endpoint returns a
- *         raw PaymentTransactionSerializer with NO client_secret or approval_url.
- *         The PaymentPage then tried to call the nonexistent /initiate-stripe/ to
- *         get creds, which always 404'd. Added initiateBulkPayment() that calls the
- *         correct /api/payments/initiate-bulk/ endpoint and returns gateway creds.
+ *         initiateBulkPayment() calls /api/payments/initiate-bulk/ which is
+ *         the correct backend endpoint (registered in payments/urls.py).
  *
- * FIX-09  PayPal capture was wired through /transactions/{id}/capture/ (nonexistent).
- *         capturePaypalOrder() now calls /api/payments/paypal-return/{txId}/.
+ * FIX-09  PayPal capture now calls /api/payments/paypal-return/{txId}/.
+ *
+ * FIX-STATIC  getOrCreateBulkIntent and confirmBulkPayment previously called
+ *             ApiBase.post(...) as a *static* method, but ApiBase has no static
+ *             `post` — it's an instance-based class.  Both methods now use
+ *             `this.axiosInstance.post(...)` (the same pattern as every other
+ *             method in this class).  The old call would throw:
+ *               TypeError: ApiBase.post is not a function
+ *             causing the "No transaction data available" error in BulkPaymentPage.
+ *
+ *             Additionally, the endpoint `/api/payments/bulk/intent/:id/` does not
+ *             exist in the backend.  getOrCreateBulkIntent now calls the real
+ *             idempotent endpoint: POST /api/payments/initiate-bulk/  (same as
+ *             initiateBulkPayment but without a gateway, which is valid for
+ *             re-fetching an existing intent).
  *
  * All methods return { success: true, data } on success
  * or { success: false, code, message } on failure, consistently.
@@ -37,40 +42,36 @@ export class PaymentApi extends ApiBase {
    * @param {string} p.bookingId
    * @param {string} [p.guestEmail]     For guest users (unauthenticated)
    * @param {string} [p.idempotencyKey]
-   * @param {string} [p.currency]     default "GBP"
+   * @param {string} [p.currency]       default "GBP"
+   * @param {string} [p.gateway]        "stripe" | "paypal"
    *
    * Stripe response data: { flow, transaction_id, gateway, client_secret, amount, currency }
    * PayPal response data: { flow, transaction_id, gateway, approval_url, order_id, amount, currency }
    */
-    async initiateBookingPayment({ bookingId, guestEmail, idempotencyKey, currency = "GBP", gateway = "stripe" }) {
-      try {
-        const body = {
-          booking_id:      bookingId,
-          idempotency_key: idempotencyKey || undefined,
-          currency,
-          gateway: (gateway || "stripe").toLowerCase(),
-        };
+  async initiateBookingPayment({ bookingId, guestEmail, idempotencyKey, currency = "GBP", gateway = "stripe" }) {
+    try {
+      const body = {
+        booking_id:      bookingId,
+        idempotency_key: idempotencyKey || undefined,
+        currency,
+        gateway: (gateway || "stripe").toLowerCase(),
+      };
 
-        // Ensure guestEmail normalized consistently
-        if (guestEmail) {
-          body.guest_email = guestEmail.trim().toLowerCase();
-        }
-
-        const resp = await this.axiosInstance.post("/api/payments/initiate/", body, {
-          // includeAuth: false,
-        });
-        return { success: true, data: resp.data };
-      } catch (err) {
-        return this._err("INITIATE_BOOKING_ERROR", err);
+      if (guestEmail) {
+        body.guest_email = guestEmail.trim().toLowerCase();
       }
+
+      const resp = await this.axiosInstance.post("/api/payments/initiate/", body);
+      return { success: true, data: resp.data };
+    } catch (err) {
+      return this._err("INITIATE_BOOKING_ERROR", err);
     }
+  }
 
   // ── Bulk upload initiation (PREPAID or NET) ───────────────────────────────
 
   /**
    * Initiate payment for a completed BulkUpload.
-   *
-   * FIX-07: Calls /api/payments/initiate-bulk/ (not the old /bulk-uploads/{id}/pay/).
    *
    * POST /api/payments/initiate-bulk/
    *
@@ -85,8 +86,8 @@ export class PaymentApi extends ApiBase {
   async initiateBulkPayment({ bulkUploadId, gateway, idempotencyKey }) {
     try {
       const body = { bulk_upload_id: bulkUploadId };
-      if (gateway)         body.gateway         = gateway;
-      if (idempotencyKey)  body.idempotency_key = idempotencyKey;
+      if (gateway)        body.gateway         = gateway;
+      if (idempotencyKey) body.idempotency_key = idempotencyKey;
 
       const resp = await this.axiosInstance.post("/api/payments/initiate-bulk/", body);
       return { success: true, data: resp.data };
@@ -105,13 +106,6 @@ export class PaymentApi extends ApiBase {
    * Initiate Stripe or PayPal payment against a NET-terms invoice.
    *
    * POST /api/payments/receivables/{id}/pay-via-gateway/
-   *
-   * @param {string} receivableId
-   * @param {string} gateway          "stripe" | "paypal"
-   * @param {string} [idempotencyKey]
-   *
-   * Stripe response data: { gateway, client_secret, transaction_id, amount, currency }
-   * PayPal response data: { gateway, approval_url, order_id, transaction_id, amount, currency }
    */
   async initiateInvoicePayment(receivableId, gateway, idempotencyKey) {
     try {
@@ -133,14 +127,8 @@ export class PaymentApi extends ApiBase {
   /**
    * Capture a PayPal order after the customer returns from PayPal approval.
    *
-   * FIX-09: was calling /transactions/{id}/capture/ (nonexistent).
-   *          Now calls /api/payments/paypal-return/{txId}/.
-   *
    * POST /api/payments/paypal-return/{txId}/
    * Body: { token: "<PAYPAL_ORDER_ID>" }
-   *
-   * @param {string} transactionId
-   * @param {string} paypalToken   The ?token= query param from PayPal's redirect
    */
   async capturePaypalOrder(transactionId, paypalToken) {
     try {
@@ -172,23 +160,8 @@ export class PaymentApi extends ApiBase {
   /**
    * POST /api/payments/confirm-success/
    *
-   * Call this immediately after stripe.confirmCardPayment() returns
-   * paymentIntent.status === "succeeded".
-   *
-   * WHY: The webhook can be delayed seconds to minutes. During that window the
-   * booking stays PENDING even though Stripe has confirmed the payment. This
-   * endpoint re-verifies the PI server-to-server (never trusting the client)
-   * and finalises the booking immediately.
-   *
-   * Idempotent — if the webhook already ran, returns { status: "already_success" }
-   * without double-processing anything.
-   *
-   * On any failure, the caller MUST still show the success screen — the webhook
-   * will handle finalisation in the background.
-   *
-   * @param {Object} p
-   * @param {string} p.paymentIntentId  e.g. "pi_3TdsPNLPqmtwF5Tu0x2Nb3nH"
-   * @param {string} p.transactionId    Internal UUID from the initiate response
+   * Call after stripe.confirmCardPayment() returns status === "succeeded".
+   * Idempotent — safe to call even if webhook already ran.
    */
   async confirmPaymentSuccess({ paymentIntentId, transactionId }) {
     try {
@@ -198,7 +171,6 @@ export class PaymentApi extends ApiBase {
           payment_intent_id: paymentIntentId,
           transaction_id:    transactionId,
         },
-        // { includeAuth: false },
       );
       return { success: true, data: resp.data };
     } catch (err) {
@@ -221,27 +193,129 @@ export class PaymentApi extends ApiBase {
     }
   }
 
+  // ── Bulk payment intent (idempotent, used by BulkPaymentPage) ────────────
+
+  /**
+   * getOrCreateBulkIntent
+   *
+   * POST /api/payments/initiate-bulk/
+   *
+   * Idempotent — safe to call on every page mount (including email-link
+   * refreshes).  The backend reuses an existing PaymentIntent for this
+   * upload if one was already created, so the user is never double-charged.
+   *
+   * FIX-STATIC: Previously called `ApiBase.post(...)` as a static method —
+   * ApiBase has NO static methods; all calls go through `this.axiosInstance`.
+   * The old call threw: TypeError: ApiBase.post is not a function
+   *
+   * FIX-ENDPOINT: The old endpoint `/api/payments/bulk/intent/:id/` does not
+   * exist in payments/urls.py.  The correct idempotent endpoint is
+   * POST /api/payments/initiate-bulk/ (omit gateway to re-fetch existing intent).
+   *
+   * @param {string} uploadId  UUID of the BulkUpload
+   * @returns {Promise<{ flow, client_secret, amount, currency, transaction_id, ... }>}
+   */
+  /**
+   * getOrCreateBulkIntent
+   *
+   * POST /api/payments/initiate-bulk/
+   *
+   * Idempotent — safe to call on every page mount (including email-link
+   * refreshes).  The backend reuses an existing PaymentIntent for this
+   * upload if one was already created, so the user is never double-charged.
+   *
+   * FIX-STATIC: Previously called `ApiBase.post(...)` as a static method —
+   * ApiBase has NO static methods; all calls go through `this.axiosInstance`.
+   *
+   * FIX-ENDPOINT: The old endpoint `/api/payments/bulk/intent/:id/` does not
+   * exist in payments/urls.py.  The correct idempotent endpoint is
+   * POST /api/payments/initiate-bulk/.
+   *
+   * FIX-F5: gateway is now a required parameter for PREPAID uploads.
+   * Omitting it caused the backend to take the NET-terms invoice path even
+   * for PREPAID customers.  Pass "stripe" or "paypal"; omit only for NET.
+   *
+   * @param {string} uploadId
+   * @param {string} [gateway="stripe"]  Required for PREPAID — omit only for NET.
+   * @returns {Promise<{ flow, client_secret, amount, currency, transaction_id, ... }>}
+   */
+  async getOrCreateBulkIntent(uploadId, gateway = "stripe") {
+    if (process.env.NODE_ENV === "development") {
+      console.debug(`[PaymentApi] getOrCreateBulkIntent | uploadId=${uploadId} | gateway=${gateway}`);
+    }
+    try {
+      const resp = await this.axiosInstance.post(
+        "/api/payments/initiate-bulk/",
+        {
+          bulk_upload_id: uploadId,
+          // Include gateway for PREPAID; backend ignores it for NET-terms uploads.
+          ...(gateway && { gateway }),
+        },
+      );
+      return resp.data;
+    } catch (err) {
+      // Re-throw so BulkPaymentPage can catch and display the error
+      throw err;
+    }
+  }
+
+  /**
+   * confirmBulkPayment
+   *
+   * POST /api/payments/confirm-success/
+   *
+   * Called by BulkPaymentPage after Stripe redirects back from the Checkout
+   * Session success_url.  The backend verifies the session and finalises the
+   * transaction (idempotent — safe if webhook already ran).
+   *
+   * FIX: Old implementation passed { payment_intent_id, upload_id } but the
+   * Checkout Session flow never gives the frontend a PaymentIntent ID.
+   * The backend now accepts { session_id, transaction_id } as the primary
+   * identifiers for the Checkout Session path.
+   *
+   * @param {{ uploadId: string, paymentIntentId?: string, transactionId?: string }} params
+   *   paymentIntentId — pass the cs_xxx session ID here (or a pi_xxx for legacy flows)
+   *   transactionId   — our internal UUID (best-effort; backend falls back to session lookup)
+   */
+  async confirmBulkPayment({ uploadId, paymentIntentId, transactionId }) {
+    if (process.env.NODE_ENV === "development") {
+      console.debug(
+        `[PaymentApi] confirmBulkPayment | uploadId=${uploadId} | ref=${paymentIntentId} | tx=${transactionId}`
+      );
+    }
+    try {
+      // Determine the right field name for the backend based on the ID prefix
+      const isSessionId = (paymentIntentId || "").startsWith("cs_");
+      const body = {};
+      if (isSessionId) {
+        body.session_id      = paymentIntentId;
+      } else if (paymentIntentId) {
+        body.payment_intent_id = paymentIntentId;
+      }
+      if (transactionId) body.transaction_id = transactionId;
+      // upload_id as ultimate fallback so the backend can locate the tx
+      if (uploadId)      body.upload_id      = uploadId;
+
+      const resp = await this.axiosInstance.post("/api/payments/confirm-success/", body);
+      return resp.data;
+    } catch (err) {
+      throw err;
+    }
+  }
+
   // ── Read transactions ─────────────────────────────────────────────────────
 
   /**
    * Get transaction details by ID.
    * Supports guest access via guest_email query param.
-   * 
-   * @param {string} txId
-   * @param {string} [guestEmail] Optional email for guest users
    */
   async getTransaction(txId, guestEmail) {
     try {
       let url = `/api/payments/transactions/${txId}/`;
-      
-      // FIX-BUG-03: Add guest email as query param if provided
       if (guestEmail) {
         url += `?guest_email=${encodeURIComponent(guestEmail)}`;
       }
-
-      const resp = await this.axiosInstance.get(url, {
-        // includeAuth: false, // FIX-BUG-02: Guest transaction reads don't require auth
-      });
+      const resp = await this.axiosInstance.get(url);
       return { success: true, data: resp.data };
     } catch (err) {
       return this._err("GET_TX_ERROR", err);
