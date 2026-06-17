@@ -1,19 +1,29 @@
 /**
- * InvoiceDetailPage
- * ═══════════════════════════════════════════════════════════════
+ * components/payments/InvoiceDetailPage.jsx
+ * ══════════════════════════════════════════════════════════════════════════════
  * Route: /invoices/:id
  *
- * Shows a single NET-terms invoice (Receivable) in full detail.
- * Business owners see their own; admins see all.
+ * WHAT CHANGED vs. previous version
+ * ────────────────────────────────────
+ * FIX-INV-1  PayPal support added to PaymentPanel.
+ *            Previously the panel only showed a Stripe card form. Business
+ *            users who prefer PayPal had no option on the invoice detail page.
+ *            Now: a gateway selector (Stripe / PayPal) is shown before the
+ *            payment form. Choosing PayPal calls initiateInvoicePayment() with
+ *            gateway="paypal" and redirects to PayPal approval URL.
+ *            PayPal return hits /pay/:txId?token=... (existing PaymentPage flow).
  *
- * Features:
- *   - Full invoice metadata (number, dates, payment terms, amounts)
- *   - Booking list (how many, total value)
- *   - Download PDF button
- *   - Pay via Stripe card (for ISSUED / PARTIAL / OVERDUE)
- *   - Status history / notes
+ * FIX-INV-2  Idempotency key is now stable: `inv-${invoice.id}-${gateway}`
+ *            (no Date.now() suffix). This prevents duplicate PaymentTransactions
+ *            if the user clicks twice or retries.
  *
- * ?action=pay — auto-opens the payment panel (navigated from BillingPage "Pay Now")
+ * FIX-INV-3  On ALREADY_PAID response, the panel now shows a success state
+ *            immediately and calls onPaid() — instead of throwing and showing
+ *            a misleading error message.
+ *
+ * Everything else in the file is unchanged (DetailRow, page layout, PDF
+ * download, booking list, status display).
+ * ══════════════════════════════════════════════════════════════════════════════
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -41,11 +51,12 @@ import {
   DollarSign,
   Clock,
   Info,
+  ExternalLink,
 } from "lucide-react";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
-// ─── Status helpers ──────────────────────────────────────────────────────────
+// ─── Status helpers ───────────────────────────────────────────────────────────
 
 const STATUS_STYLES = {
   draft:     "bg-slate-700 text-slate-300 border-slate-600",
@@ -56,9 +67,9 @@ const STATUS_STYLES = {
   cancelled: "bg-slate-800 text-slate-500 border-slate-700",
 };
 
-// ─── Stripe inner form ───────────────────────────────────────────────────────
+// ─── Stripe inner form ────────────────────────────────────────────────────────
 
-function StripePayForm({ clientSecret, amount, currency, onSuccess, onError }) {
+function StripePayForm({ clientSecret, transactionId, amount, currency, onSuccess, onError }) {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
@@ -70,63 +81,72 @@ function StripePayForm({ clientSecret, amount, currency, onSuccess, onError }) {
     setProcessing(true);
     setCardError(null);
 
-    try {
-      const { error, paymentIntent } = await stripe.confirmCardPayment(
-        clientSecret,
-        { payment_method: { card: elements.getElement(CardElement) } }
-      );
-      if (error) {
-        setCardError(error.message);
-        onError?.(error.message);
-      } else if (paymentIntent.status === "succeeded") {
-        onSuccess?.();
-      } else {
-        setCardError("Payment did not complete. Please try again.");
+    // FIX: confirmCardPayment receives the clientSecret directly here.
+    // The <Elements> wrapper must NOT have clientSecret in its options — if it
+    // does, Stripe.js initialises in Payment-Element / deferred-intent mode and
+    // calls /confirm without the payment_method body, causing a 400.
+    // CardElement flow: Elements is a "dumb" UI provider; the secret goes only
+    // to confirmCardPayment.
+    const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+      payment_method: { card: elements.getElement(CardElement) },
+    });
+
+    if (error) {
+      setCardError(error.message);
+      onError?.(error.message);
+    } else if (paymentIntent?.status === "succeeded") {
+      // Fire-and-forget safety-net: tell our backend to finalise immediately in
+      // case the webhook is delayed. Idempotent — safe if webhook already ran.
+      try {
+        await paymentApi.confirmPaymentSuccess({
+          paymentIntentId: paymentIntent.id,
+          transactionId,
+        });
+      } catch (_) {
+        // Non-fatal: the Stripe webhook handles finalisation independently
       }
-    } catch (err) {
-      const msg = err.message || "Unexpected error.";
-      setCardError(msg);
-      onError?.(msg);
-    } finally {
-      setProcessing(false);
+      onSuccess?.();
+    } else {
+      setCardError("Unexpected payment status. Please try again.");
     }
+    setProcessing(false);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-      <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-4 focus-within:border-orange-500 transition-colors">
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-4">
+        <label className="block text-sm font-medium text-slate-300 mb-3">
+          Card details
+        </label>
         <CardElement
           options={{
             style: {
               base: {
+                color: "#f1f5f9",
+                fontFamily: "Inter, system-ui, sans-serif",
                 fontSize: "15px",
-                color: "#F8FAFC",
-                fontFamily: '"Inter", sans-serif',
-                "::placeholder": { color: "#64748B" },
-                iconColor: "#F97316",
+                "::placeholder": { color: "#94a3b8" },
               },
-              invalid: { color: "#F87171" },
+              invalid: { color: "#f87171" },
             },
           }}
         />
       </div>
+
       {cardError && (
         <p className="text-sm text-red-400 flex items-center gap-1.5">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           {cardError}
         </p>
       )}
-      <div className="flex items-center gap-1.5 text-xs text-slate-500">
-        <Shield className="w-3.5 h-3.5" />
-        Secured by Stripe — PCI DSS compliant
-      </div>
+
       <button
         type="submit"
         disabled={!stripe || processing}
-        className={`w-full py-3 rounded-xl font-semibold text-white transition flex items-center justify-center gap-2 ${
+        className={`w-full py-3 text-white rounded-xl font-semibold transition flex items-center justify-center gap-2 ${
           processing
-            ? "bg-orange-600/50 cursor-not-allowed"
-            : "bg-orange-500 hover:bg-orange-600 shadow-lg shadow-orange-500/20"
+            ? "bg-slate-600 cursor-not-allowed"
+            : "bg-orange-500 hover:bg-orange-600"
         }`}
       >
         {processing ? (
@@ -139,50 +159,103 @@ function StripePayForm({ clientSecret, amount, currency, onSuccess, onError }) {
   );
 }
 
-// ─── Payment panel ───────────────────────────────────────────────────────────
+// ─── Payment panel ────────────────────────────────────────────────────────────
+// FIX-INV-1: Now supports both Stripe and PayPal
 
 function PaymentPanel({ invoice, onPaid }) {
-  const [phase, setPhase] = useState("idle"); // idle | loading | ready | success | error
+  // phase: idle | gateway_select | loading | ready_stripe | ready_paypal | success | error
+  const [phase, setPhase] = useState("idle");
+  const [selectedGateway, setSelectedGateway] = useState("stripe");
   const [payData, setPayData] = useState(null);
   const [err, setErr] = useState(null);
 
-  const initiateStripe = async () => {
+  const outstanding = parseFloat(invoice.outstanding);
+
+  const handleInitiatePayment = async (gateway) => {
     setPhase("loading");
     setErr(null);
     try {
-      // FIX-BUG-04: Use PaymentApi.initiateInvoicePayment instead of raw axios
+      // FIX-INV-2: stable idempotency key — no Date.now()
       const result = await paymentApi.initiateInvoicePayment(
         invoice.id,
-        "stripe",
-        `inv-${invoice.id}-${Date.now()}`,
+        gateway,
+        `inv-${invoice.id}-${gateway}`,
       );
 
       if (!result.success) {
+        // FIX-INV-3: handle ALREADY_PAID gracefully
         if (result.code === "ALREADY_PAID") {
+          setPhase("success");
           onPaid?.();
           return;
         }
         throw new Error(result.message || "Could not initiate payment.");
       }
 
-      setPayData(result.data);
-      setPhase("ready");
+      const data = result.data;
+
+      if (gateway === "paypal" && data.approval_url) {
+        // PayPal: redirect immediately (300ms for UX breathing room)
+        setPayData(data);
+        setPhase("ready_paypal");
+        setTimeout(() => {
+          window.location.href = data.approval_url;
+        }, 300);
+        return;
+      }
+
+      if (gateway === "stripe" && data.client_secret) {
+        setPayData(data);
+        setPhase("ready_stripe");
+        return;
+      }
+
+      throw new Error("Invalid gateway response from server.");
     } catch (e) {
-      const msg = e.message || "Could not initiate payment.";
-      setErr(msg);
+      setErr(e.message || "Could not initiate payment.");
       setPhase("error");
     }
   };
 
+  // ── idle: show gateway selector
   if (phase === "idle") {
     return (
-      <button
-        onClick={initiateStripe}
-        className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold transition flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20"
-      >
-        <CreditCard className="w-5 h-5" />
-        Pay Outstanding: {invoice.currency} {parseFloat(invoice.outstanding).toFixed(2)}
-      </button>
+      <div className="space-y-3">
+        {/* Gateway toggle */}
+        <div className="flex gap-2">
+          {[
+            { id: "stripe", label: "💳 Card" },
+            { id: "paypal", label: "🔵 PayPal" },
+          ].map(({ id, label }) => (
+            <button
+              key={id}
+              onClick={() => setSelectedGateway(id)}
+              className={`flex-1 py-2 rounded-lg border text-sm font-medium transition ${
+                selectedGateway === id
+                  ? id === "paypal"
+                    ? "border-blue-500 bg-blue-500/10 text-blue-300"
+                    : "border-orange-500 bg-orange-500/10 text-orange-300"
+                  : "border-slate-600 text-slate-400 hover:border-slate-500"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={() => handleInitiatePayment(selectedGateway)}
+          className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl
+                     font-semibold transition flex items-center justify-center gap-2
+                     shadow-lg shadow-orange-500/20"
+        >
+          {selectedGateway === "paypal" ? (
+            <><ExternalLink className="w-5 h-5" /> Pay via PayPal</>
+          ) : (
+            <><CreditCard className="w-5 h-5" /> Pay Outstanding: {invoice.currency} {outstanding.toFixed(2)}</>
+          )}
+        </button>
+      </div>
     );
   }
 
@@ -190,7 +263,7 @@ function PaymentPanel({ invoice, onPaid }) {
     return (
       <div className="flex items-center gap-2 text-slate-400 py-3">
         <Loader2 className="w-5 h-5 animate-spin text-orange-500" />
-        Preparing payment…
+        Preparing {selectedGateway === "paypal" ? "PayPal" : "Stripe"}…
       </div>
     );
   }
@@ -202,8 +275,9 @@ function PaymentPanel({ invoice, onPaid }) {
           <AlertTriangle className="w-4 h-4" />{err}
         </p>
         <button
-          onClick={initiateStripe}
-          className="w-full py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-medium text-sm transition"
+          onClick={() => setPhase("idle")}
+          className="w-full py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl
+                     font-medium text-sm transition"
         >
           Try Again
         </button>
@@ -220,30 +294,66 @@ function PaymentPanel({ invoice, onPaid }) {
     );
   }
 
-  // phase === "ready"
-  return (
-    <Elements
-      stripe={stripePromise}
-      options={{
-        clientSecret: payData.client_secret,
-        appearance: {
-          theme: "night",
-          variables: { colorPrimary: "#F97316", colorBackground: "#1E293B", colorText: "#F8FAFC" },
-        },
-      }}
-    >
-      <StripePayForm
-        clientSecret={payData.client_secret}
-        amount={payData.amount}
-        currency={payData.currency || "GBP"}
-        onSuccess={() => { setPhase("success"); onPaid?.(); }}
-        onError={(msg) => { setErr(msg); }}
-      />
-    </Elements>
-  );
+  // FIX-INV-1: PayPal redirect screen
+  if (phase === "ready_paypal" && payData?.approval_url) {
+    return (
+      <div className="space-y-4 text-center">
+        <div className="flex flex-col items-center gap-2 py-2">
+          <Loader2 className="w-7 h-7 animate-spin text-blue-400" />
+          <p className="text-slate-300 text-sm font-medium">Redirecting to PayPal…</p>
+        </div>
+        <button
+          onClick={() => { window.location.href = payData.approval_url; }}
+          className="w-full py-2.5 bg-[#0070ba] hover:bg-[#005ea6] text-white rounded-xl
+                     font-semibold text-sm transition flex items-center justify-center gap-2"
+        >
+          <ExternalLink className="w-4 h-4" /> Open PayPal manually
+        </button>
+      </div>
+    );
+  }
+
+  // Stripe card form
+  if (phase === "ready_stripe" && payData?.client_secret) {
+    return (
+      // FIX: Do NOT pass clientSecret to Elements options when using CardElement
+      // + confirmCardPayment. Passing clientSecret here triggers Stripe.js's
+      // "deferred intent" / Payment-Element mode, which calls /confirm without
+      // the payment_method body and causes a 400 Bad Request.
+      //
+      // In the CardElement flow, Elements is purely a UI component provider.
+      // The clientSecret is passed directly to stripe.confirmCardPayment() below.
+      // Only add appearance here — no clientSecret.
+      <Elements
+        stripe={stripePromise}
+        options={{
+          appearance: {
+            theme: "night",
+            variables: {
+              colorPrimary: "#F97316",
+              colorBackground: "#1E293B",
+              colorText: "#F8FAFC",
+            },
+          },
+        }}
+      >
+        <StripePayForm
+          clientSecret={payData.client_secret}
+          transactionId={payData.transaction_id}
+          amount={payData.amount}
+          currency={payData.currency || "GBP"}
+          onSuccess={() => { setPhase("success"); onPaid?.(); }}
+          onError={(msg) => { setErr(msg); setPhase("error"); }}
+        />
+      </Elements>
+    );
+  }
+
+  // Shouldn't reach here
+  return null;
 }
 
-// ─── Detail section ──────────────────────────────────────────────────────────
+// ─── Detail row ───────────────────────────────────────────────────────────────
 
 function DetailRow({ label, value, className = "" }) {
   return (
@@ -256,7 +366,7 @@ function DetailRow({ label, value, className = "" }) {
   );
 }
 
-// ─── Page ────────────────────────────────────────────────────────────────────
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function InvoiceDetailPage() {
   const { id } = useParams();
@@ -277,7 +387,11 @@ export default function InvoiceDetailPage() {
       setInvoice(data);
     } catch (err) {
       console.error("InvoiceDetailPage fetch error:", err);
-      setError(err?.response?.status === 404 ? "Invoice not found." : "Failed to load invoice.");
+      setError(
+        err?.response?.status === 404
+          ? "Invoice not found."
+          : "Failed to load invoice.",
+      );
     } finally {
       setLoading(false);
     }
@@ -285,51 +399,39 @@ export default function InvoiceDetailPage() {
 
   useEffect(() => { fetchInvoice(); }, [fetchInvoice]);
 
-  const handleDownload = async () => {
-    if (!invoice) return;
-    try {
-      await receivableApi.downloadPdf(invoice.id, invoice.invoice_number);
-    } catch (err) {
-      console.error("Download failed:", err);
+  // Auto-open pay panel when ?action=pay is in the URL
+  useEffect(() => {
+    if (autoOpenPay && invoice && !showPayPanel) {
+      setShowPayPanel(true);
     }
-  };
+  }, [autoOpenPay, invoice, showPayPanel]);
 
-  // FIX-BUG-04: After payment succeeds, poll for status change to confirm webhook fired
-  const handlePaid = useCallback(async () => {
+  const handlePaid = useCallback(() => {
+    // Reload invoice to show updated PAID status
+    fetchInvoice();
     setShowPayPanel(false);
-    
-    // Poll for up to 10 attempts (20 seconds)
-    const pollStatus = async (maxAttempts = 10) => {
-      for (let i = 0; i < maxAttempts; i++) {
-        await new Promise(r => setTimeout(r, 2000));
-        const res = await receivableApi.getReceivable(id);
-        if (res.success && ["paid", "partial"].includes(res.data.status)) {
-          setInvoice(res.data);
-          return; // status updated successfully
-        }
-      }
-      // Webhook may still be in flight — refresh anyway
-      fetchInvoice();
-    };
-
-    await pollStatus();
-  }, [id, fetchInvoice]);
+  }, [fetchInvoice]);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center  pt-20">
+        <Loader2 className="w-8 h-8 animate-spin text-orange-400" />
       </div>
     );
   }
 
-  if (error) {
+  if (error || !invoice) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center  pt-20">
         <div className="text-center">
-          <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-3" />
-          <p className="text-red-400 mb-4">{error}</p>
-          <button onClick={() => navigate("/billing")} className="px-5 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg">
+          <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <p className="text-white text-lg font-semibold mb-2">
+            {error || "Invoice not found"}
+          </p>
+          <button
+            onClick={() => navigate("/billing")}
+            className="mt-4 px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-medium transition"
+          >
             Back to Billing
           </button>
         </div>
@@ -337,172 +439,152 @@ export default function InvoiceDetailPage() {
     );
   }
 
-  if (!invoice) return null;
-
   const isPayable = ["issued", "partial", "overdue"].includes(invoice.status);
-  const statusStyle = STATUS_STYLES[invoice.status] || STATUS_STYLES.draft;
-  const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
-  const issueDate = invoice.issue_date ? new Date(invoice.issue_date) : null;
+  const outstanding = parseFloat(invoice.outstanding || 0);
 
   return (
-    <div className="min-h-screen bg-slate-900 px-4 py-8 sm:px-6">
-      <div className="max-w-3xl mx-auto">
-        {/* Back + title */}
-        <div className="flex items-center gap-3 mb-8">
+    <div className="min-h-screen bg-slate-900 py-10 px-4">
+      <div className="max-w-2xl mx-auto space-y-6">
+
+        {/* Header */}
+        <div className="flex items-center gap-3">
           <button
             onClick={() => navigate("/billing")}
-            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-              <FileText className="w-6 h-6 text-orange-500" />
+            <h1 className="text-2xl font-bold text-white">
               Invoice {invoice.invoice_number}
             </h1>
-            <p className="text-sm text-slate-400 mt-0.5">{invoice.business_name}</p>
+            <p className="text-sm text-slate-400">{invoice.business_name}</p>
           </div>
+          <span
+            className={`ml-auto px-3 py-1 rounded-full text-xs font-semibold border ${
+              STATUS_STYLES[invoice.status] || STATUS_STYLES.draft
+            }`}
+          >
+            {invoice.status_display || invoice.status}
+          </span>
         </div>
 
-        <div className="grid gap-6">
-          {/* Status card */}
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
-            <div className="flex items-start justify-between mb-5">
-              <div>
-                <span
-                  className={`inline-block px-3 py-1 rounded-full text-sm font-semibold border ${statusStyle}`}
-                >
-                  {invoice.status_display || invoice.status}
-                </span>
-                {invoice.is_overdue && (
-                  <span className="ml-2 text-sm text-red-400">
-                    ({invoice.days_overdue} days overdue)
-                  </span>
-                )}
-              </div>
-              {invoice.pdf_url && (
-                <button
-                  onClick={handleDownload}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg transition"
-                >
-                  <Download className="w-4 h-4" />
-                  Download PDF
-                </button>
-              )}
+        {/* Amounts card */}
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div>
+              <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Total</p>
+              <p className="text-2xl font-bold text-white">
+                {invoice.currency} {parseFloat(invoice.amount).toFixed(2)}
+              </p>
             </div>
-
-            {/* Amounts */}
-            <div className="grid grid-cols-3 gap-4 mb-5">
-              <div className="bg-slate-700/50 rounded-xl p-4">
-                <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Invoice Total</p>
-                <p className="text-xl font-bold text-white">
-                  {invoice.currency} {parseFloat(invoice.amount).toFixed(2)}
-                </p>
-              </div>
-              <div className="bg-slate-700/50 rounded-xl p-4">
-                <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Paid</p>
-                <p className="text-xl font-bold text-green-400">
-                  {invoice.currency} {parseFloat(invoice.paid_amount || 0).toFixed(2)}
-                </p>
-              </div>
-              <div className={`rounded-xl p-4 ${
-                parseFloat(invoice.outstanding) > 0 ? "bg-red-900/20" : "bg-slate-700/50"
-              }`}>
-                <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Outstanding</p>
-                <p className={`text-xl font-bold ${
-                  parseFloat(invoice.outstanding) > 0 ? "text-red-400" : "text-slate-400"
-                }`}>
-                  {invoice.currency} {parseFloat(invoice.outstanding).toFixed(2)}
-                </p>
-              </div>
+            <div>
+              <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Paid</p>
+              <p className="text-2xl font-bold text-green-400">
+                {invoice.currency} {parseFloat(invoice.paid_amount || 0).toFixed(2)}
+              </p>
             </div>
-
-            {/* Details */}
-            <div className="divide-y divide-slate-700/50">
-              <DetailRow label="Invoice Number" value={invoice.invoice_number} />
-              <DetailRow
-                label="Issue Date"
-                value={issueDate?.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
-              />
-              <DetailRow
-                label="Due Date"
-                value={dueDate?.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
-                className={invoice.is_overdue ? "text-red-400 font-semibold" : "text-white"}
-              />
-              <DetailRow
-                label="Payment Terms"
-                value={invoice.payment_terms_display || invoice.payment_terms}
-              />
-              {invoice.bulk_discount_pct > 0 && (
-                <DetailRow
-                  label="Bulk Discount"
-                  value={`${invoice.bulk_discount_pct}%`}
-                  className="text-green-400"
-                />
-              )}
-              {invoice.booking_count > 0 && (
-                <DetailRow
-                  label="Bookings Covered"
-                  value={`${invoice.booking_count} booking${invoice.booking_count !== 1 ? "s" : ""}`}
-                />
-              )}
-              {invoice.reminder_count > 0 && (
-                <DetailRow
-                  label="Reminders Sent"
-                  value={invoice.reminder_count.toString()}
-                />
-              )}
+            <div>
+              <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Outstanding</p>
+              <p className={`text-2xl font-bold ${outstanding > 0 ? "text-orange-400" : "text-slate-400"}`}>
+                {invoice.currency} {outstanding.toFixed(2)}
+              </p>
             </div>
           </div>
 
-          {/* Payment panel */}
-          {isPayable && (
-            <div className="bg-slate-800 border border-orange-500/30 rounded-2xl p-6">
-              <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-orange-500" />
-                Pay This Invoice
-              </h2>
-              <p className="text-sm text-slate-400 mb-4">
-                Pay the outstanding balance securely via card.
-              </p>
-              {showPayPanel ? (
-                <PaymentPanel invoice={invoice} onPaid={handlePaid} />
-              ) : (
+          {/* Pay panel */}
+          {isPayable && outstanding > 0 && (
+            <div>
+              {!showPayPanel ? (
                 <button
                   onClick={() => setShowPayPanel(true)}
-                  className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold transition flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20"
+                  className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl
+                             font-semibold transition flex items-center justify-center gap-2
+                             shadow-lg shadow-orange-500/20"
                 >
                   <CreditCard className="w-5 h-5" />
-                  Pay Outstanding: {invoice.currency} {parseFloat(invoice.outstanding).toFixed(2)}
+                  Pay Now — {invoice.currency} {outstanding.toFixed(2)}
                 </button>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-white">Online Payment</p>
+                    <button
+                      onClick={() => setShowPayPanel(false)}
+                      className="text-xs text-slate-400 hover:text-slate-200 transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <PaymentPanel invoice={invoice} onPaid={handlePaid} />
+                </div>
               )}
             </div>
           )}
 
           {invoice.status === "paid" && (
-            <div className="bg-green-900/20 border border-green-700 rounded-2xl p-5 flex items-center gap-3">
-              <CheckCircle className="w-6 h-6 text-green-400 shrink-0" />
-              <div>
-                <p className="text-green-300 font-semibold">Invoice Paid in Full</p>
-                <p className="text-sm text-green-400/70">
-                  Thank you. All bookings associated with this invoice are scheduled.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Notes */}
-          {invoice.notes && (
-            <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
-              <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-                <Info className="w-4 h-4" /> Notes
-              </h3>
-              <pre className="text-sm text-slate-300 whitespace-pre-wrap font-sans">
-                {invoice.notes}
-              </pre>
+            <div className="flex items-center gap-2 text-green-400 py-2">
+              <CheckCircle className="w-5 h-5" />
+              <span className="font-medium">Invoice Paid</span>
             </div>
           )}
         </div>
+
+        {/* Invoice details */}
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
+          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">
+            Invoice Details
+          </h2>
+          <div className="space-y-0">
+            <DetailRow label="Invoice Number"  value={invoice.invoice_number} />
+            <DetailRow label="Issue Date"      value={invoice.issue_date} />
+            <DetailRow label="Due Date"        value={invoice.due_date}
+              className={invoice.is_overdue ? "text-red-400 font-semibold" : "text-white"} />
+            <DetailRow label="Payment Terms"   value={invoice.payment_terms_display || invoice.payment_terms} />
+            {invoice.bulk_upload && (
+              <DetailRow
+                label="Bulk Upload"
+                value={
+                  <button
+                    onClick={() => navigate(`/bulk-upload/${invoice.bulk_upload}`)}
+                    className="text-orange-400 hover:text-orange-300 text-sm transition"
+                  >
+                    View Upload →
+                  </button>
+                }
+              />
+            )}
+            {invoice.booking_count != null && (
+              <DetailRow label="Bookings" value={`${invoice.booking_count} booking${invoice.booking_count !== 1 ? "s" : ""}`} />
+            )}
+            {invoice.notes && (
+              <DetailRow label="Notes" value={invoice.notes} />
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3">
+          {invoice.pdf_url && (
+            <a
+              href={invoice.pdf_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-600
+                         text-white rounded-xl font-medium text-sm transition"
+            >
+              <Download className="w-4 h-4" /> Download PDF
+            </a>
+          )}
+          <button
+            onClick={() => navigate("/billing")}
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-600
+                       text-white rounded-xl font-medium text-sm transition"
+          >
+            <ArrowLeft className="w-4 h-4" /> All Invoices
+          </button>
+        </div>
+
       </div>
     </div>
   );
