@@ -1,5 +1,5 @@
 /**
- * PaymentPage.jsx  ── COMPLETE UNIFIED IMPLEMENTATION
+ * PaymentPage.jsx  ── COMPLETE UNIFIED IMPLEMENTATION  (FIXED)
  * ══════════════════════════════════════════════════════════════════════════════
  * Route: /pay/:txId   (single booking & bulk prepaid)
  *
@@ -23,18 +23,58 @@
  * This page only shows the user confirmation — it does NOT mark the tx.
  *
  * ── Fix changelog ────────────────────────────────────────────────────────────
- * FIX-1  JSX parse error: inline comment after a prop value is illegal
- *        JSX — Babel treats it as a second attribute. Moved all inline comments
- *        to their own line inside the element or above the prop.
+ * FIX-1  JSX parse error: inline comment after a prop value is illegal in
+ *        JSX — Babel treats it as a second attribute. Moved all inline
+ *        comments to their own line inside the element or above the prop.
  *
- * FIX-2  useCallback hoisting: handleConfirmSuccess referenced handlePaymentSucceeded
- *        in its body AND dependency array before handlePaymentSucceeded was declared.
- *        useCallback is NOT hoisted like function declarations — this caused a
- *        ReferenceError on every Stripe payment. Fixed by declaring
- *        handlePaymentSucceeded FIRST.
+ * FIX-2  useCallback hoisting: handleConfirmSuccess referenced
+ *        handlePaymentSucceeded in its body AND dependency array before
+ *        handlePaymentSucceeded was declared. useCallback is NOT hoisted
+ *        like function declarations — this caused a ReferenceError on every
+ *        Stripe payment. Fixed by declaring handlePaymentSucceeded FIRST.
  *
  * FIX-3  PayPal capture: onSuccess={handleSuccess} was an undefined reference.
  *        Now correctly passes onSuccess={handlePaymentSucceeded}.
+ *
+ * FIX-B1 (INFINITE RELOAD) navState.gateway was never seeded into
+ *        state.selectedGateway. When useBulkUpload navigates with
+ *        { state: { gateway, clientSecret, approvalUrl } }, the render
+ *        branches (activeGateway === "stripe/paypal") evaluated to false
+ *        because activeGateway was always null. The component fell through
+ *        to the fallback ErrorScreen → user clicked "Go Back" → BulkUploadFlow
+ *        re-fired pendingAutoInit → re-navigated → same broken render → loop.
+ *        Fix: seed selectedGateway from navState inside the loading useEffect.
+ *
+ * FIX-B2 (PAYPAL REDIRECT NEVER FIRES) The PayPal auto-redirect useEffect
+ *        guarded on state.selectedGateway === "paypal" — which was always null
+ *        for the navState path (see FIX-B1). Even after FIX-B1, if a caller
+ *        provides approvalUrl without going through handleSelectGateway, the
+ *        guard would still block. Fix: fire whenever approvalUrl is set,
+ *        regardless of selectedGateway value.
+ *
+ * FIX-B3 (STALE CLOSURE) handleConfirmSuccess captured state.tx at
+ *        callback-creation time, not at call time. On first payment state.tx
+ *        was still null — the fallback was always null. Fix: functional
+ *        setState (s.tx) instead of closed-over state.tx.
+ *
+ * FIX-B4 (NULL TX ON GATEWAY SELECT) handleSelectGateway read state.tx which
+ *        could be null if called before getTransaction completes. Fix: guard
+ *        at function entry and surface a recoverable error.
+ *
+ * FIX-B5 (PAYPAL RETURN isBulk HARDCODED) SuccessScreen inside the PayPal
+ *        return branch passed isBulk={false} — bulk PayPal success always
+ *        showed the single-booking message. Fix: derive from tx + navState.
+ *
+ * FIX-B6 (GUEST EMAIL STALE CLOSURE) state.guestEmail was initialised to null
+ *        and only populated in the loading useEffect. handleSelectGateway
+ *        read state.guestEmail (always null during initiation) rather than
+ *        the closure variable. Fix: seed guestEmail directly into initial state
+ *        so state.guestEmail and the closure variable are always in sync.
+ *
+ * FIX-B7 (ERROR RENDER ORDER) The state.error check appeared after the gateway
+ *        render branches — a gateway error could be masked by the fallback
+ *        ErrorScreen. Fix: the state.error early-return now comes BEFORE the
+ *        gateway selection / initiation guards.
  */
 
 import { useEffect, useState, useCallback } from "react";
@@ -394,7 +434,10 @@ function PayPalCapturePage({ txId, token, onSuccess, onError }) {
           onSuccess();
         } else {
           // PayPal capture returned but payment not yet complete (rare edge case)
-          const msg = result.message || result.data?.message || "Payment could not be confirmed. Please contact support.";
+          const msg =
+            result.message ||
+            result.data?.message ||
+            "Payment could not be confirmed. Please contact support.";
           onError(msg);
         }
       } catch (err) {
@@ -490,17 +533,30 @@ export default function PaymentPage() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
+  // ── FIX-B6: Derive guestEmail once, outside state, so every callback and
+  // effect always reads the same value without needing it in state.
+  // State used to initialise state.guestEmail so both are always in sync.
+  const guestEmail =
+    location.state?.guestEmail ||
+    localStorage.getItem("guestEmail") ||
+    null;
+
   const [state, setState] = useState({
     loading: true,
     error: null,
     succeeded: false,
-    confirming: false,   // true while POST /confirm-success/ is in flight
+    // true while POST /confirm-success/ is in flight
+    confirming: false,
     tx: null,
     clientSecret: null,
     approvalUrl: null,
-    guestEmail: null,
-    selectedGateway: null,      // set when user clicks "Continue"
-    initiatingPayment: false,   // loading during /initiate/ call
+    // FIX-B6: seed guestEmail into state immediately — prevents null reads
+    // inside handleSelectGateway which accesses state.guestEmail.
+    guestEmail,
+    // set when user clicks "Continue" OR seeded from navState (FIX-B1)
+    selectedGateway: null,
+    // loading during /initiate/ call
+    initiatingPayment: false,
   });
 
   // PayPal return flow detection.
@@ -510,14 +566,9 @@ export default function PaymentPage() {
   // The old ?paypal_return=1 check is kept as a backwards-compat fallback.
   const paypalToken = searchParams.get("token");
   const isPaypalCancelled = searchParams.get("cancelled") === "true";
-  const isPaypalReturn = (
+  const isPaypalReturn =
     (searchParams.get("paypal_return") === "1" || !!paypalToken) &&
-    !isPaypalCancelled
-  );
-
-  // Guest email: prefer router state (set by BookingPage), fall back to localStorage
-  const guestEmail =
-    location.state?.guestEmail || localStorage.getItem("guestEmail");
+    !isPaypalCancelled;
 
   // ── FIX-2: declare handlePaymentSucceeded FIRST ───────────────────────────
   // handleConfirmSuccess depends on this via its body and dependency array.
@@ -558,8 +609,13 @@ export default function PaymentPage() {
         if (result.success) {
           // Refresh tx so success screen shows updated booking / tracking data
           const txResult = await paymentApi.getTransaction(txId, guestEmail);
-          const updatedTx = txResult.success ? txResult.data : state.tx;
-          setState((s) => ({ ...s, tx: updatedTx }));
+          // FIX-B3: use functional setState (s.tx) instead of closed-over
+          // state.tx — state.tx was always null on first payment because the
+          // useCallback was created before getTransaction completed.
+          setState((s) => ({
+            ...s,
+            tx: txResult.success ? txResult.data : s.tx,
+          }));
         } else {
           // confirm-success failed — the webhook handles finalisation.
           // Never block the user from seeing the success screen.
@@ -576,10 +632,11 @@ export default function PaymentPage() {
       }
     },
     // FIX-2: handlePaymentSucceeded is now declared above, so this dep is valid.
+    // FIX-B3: state.tx removed from deps — functional setState uses s.tx instead.
     [txId, guestEmail, handlePaymentSucceeded],
   );
 
-  // Notify backend when PayPal cancelled (can't do this inside a conditional return)
+  // Notify backend when PayPal cancelled
   useEffect(() => {
     if (isPaypalCancelled && txId) {
       paymentApi.cancelPaypalOrder(txId).catch(() => {});
@@ -621,7 +678,13 @@ export default function PaymentPage() {
       // If absent, the gateway selection screen lets them re-initiate.
       const navState = location.state || {};
       const clientSecret = navState.clientSecret || null;
-      const approvalUrl  = navState.approvalUrl  || null;
+      const approvalUrl = navState.approvalUrl || null;
+
+      // FIX-B1: seed selectedGateway from navState.gateway.
+      // Without this, both Stripe/PayPal render branches always evaluate false
+      // when arriving via useBulkUpload which passes gateway in location.state.
+      // That caused the fallback ErrorScreen → "Go Back" → re-fire → reload loop.
+      const selectedGateway = navState.gateway || null;
 
       setState((s) => ({
         ...s,
@@ -629,7 +692,10 @@ export default function PaymentPage() {
         tx,
         clientSecret,
         approvalUrl,
-        guestEmail,
+        // FIX-B1: persist the gateway from navState into component state
+        selectedGateway,
+        // guestEmail was already seeded into initial state (FIX-B6); keep it.
+        guestEmail: s.guestEmail,
       }));
     })();
     return () => {
@@ -640,6 +706,17 @@ export default function PaymentPage() {
   // Handle gateway selection and payment initiation
   const handleSelectGateway = useCallback(
     async (gateway) => {
+      // FIX-B4: guard against tx being null (can happen if user somehow triggers
+      // this before getTransaction completes — defensive, but avoids silent crash).
+      if (!state.tx) {
+        setState((s) => ({
+          ...s,
+          error:
+            "Payment details are still loading. Please wait a moment and try again.",
+        }));
+        return;
+      }
+
       setState((s) => ({
         ...s,
         initiatingPayment: true,
@@ -659,6 +736,7 @@ export default function PaymentPage() {
         } else if (state.tx?.booking) {
           result = await paymentApi.initiateBookingPayment({
             bookingId: state.tx.booking,
+            // FIX-B6: state.guestEmail is now always correct (seeded in initial state)
             guestEmail: state.guestEmail,
             gateway,
             idempotencyKey: `payment-${state.tx.id}-${gateway}`,
@@ -687,7 +765,7 @@ export default function PaymentPage() {
           ...s,
           initiatingPayment: false,
           clientSecret: result.data.client_secret || null,
-          approvalUrl:  result.data.approval_url  || null,
+          approvalUrl: result.data.approval_url || null,
         }));
       } catch (err) {
         setState((s) => ({
@@ -713,26 +791,35 @@ export default function PaymentPage() {
 
   // Auto-redirect to PayPal approval URL (300 ms delay gives React time to
   // render the redirect spinner before the browser navigates away).
+  //
+  // FIX-B2: removed the `state.selectedGateway === "paypal"` guard.
+  // That guard prevented redirects for the navState path where approvalUrl
+  // arrives from useBulkUpload before handleSelectGateway is called.
+  // If approvalUrl is set, we have an approval URL to redirect to — the
+  // gateway is already determined by the backend; no additional guard needed.
   useEffect(() => {
-    if (state.approvalUrl && state.selectedGateway === "paypal") {
+    if (state.approvalUrl) {
       const timer = setTimeout(() => {
         window.location.href = state.approvalUrl;
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [state.approvalUrl, state.selectedGateway]);
-
-  // ── PayPal cancelled flow ──────────────────────────────────────────────────
-  // User clicked "Cancel" on PayPal site — PayPal redirects with ?cancelled=true
-  // Note: the backend notify call is in the main useEffect below (can't use
-  // hooks inside conditional early returns — Rules of Hooks).
+  }, [state.approvalUrl]);
 
   // ── PayPal return flow ──────────────────────────────────────────────────────
   if (isPaypalReturn && paypalToken) {
     if (state.succeeded) {
+      // FIX-B5: derive isBulk from the loaded tx OR navState.isBulk (which
+      // useBulkUpload always passes). The old hardcoded isBulk={false} caused
+      // bulk PayPal payments to always show the single-booking success message.
+      const isBulkReturn = !!(state.tx?.bulk_upload || location.state?.isBulk);
       return (
         <Layout>
-          <SuccessScreen isBulk={false} guestEmail={guestEmail} tx={state.tx} />
+          <SuccessScreen
+            isBulk={isBulkReturn}
+            guestEmail={guestEmail}
+            tx={state.tx}
+          />
         </Layout>
       );
     }
@@ -745,6 +832,7 @@ export default function PaymentPage() {
     }
     return (
       <Layout>
+        {/* FIX-3: was onSuccess={handleSuccess} (undefined ref) */}
         <PayPalCapturePage
           txId={txId}
           token={paypalToken}
@@ -761,7 +849,9 @@ export default function PaymentPage() {
       <Layout>
         <div className="text-center py-8">
           <AlertCircle className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-white mb-2">Payment Cancelled</h2>
+          <h2 className="text-xl font-semibold text-white mb-2">
+            Payment Cancelled
+          </h2>
           <p className="text-slate-400 mb-6">
             You cancelled the PayPal payment. No money has been taken.
           </p>
@@ -802,15 +892,6 @@ export default function PaymentPage() {
     );
   }
 
-  // ── Error ───────────────────────────────────────────────────────────────────
-  if (state.error) {
-    return (
-      <Layout>
-        <ErrorScreen message={state.error} navigate={navigate} />
-      </Layout>
-    );
-  }
-
   // ── Success ─────────────────────────────────────────────────────────────────
   if (state.succeeded) {
     const isBulk = !!state.tx?.bulk_upload;
@@ -826,11 +907,54 @@ export default function PaymentPage() {
   }
 
   const { tx, clientSecret, approvalUrl } = state;
-  const isBulk      = !!tx?.bulk_upload;
-  const amount      = tx?.amount   || "0.00";
-  const currency    = tx?.currency || "GBP";
-  // Use state.selectedGateway (user-chosen), NOT tx.gateway (stale placeholder).
+  const isBulk = !!tx?.bulk_upload;
+  const amount = tx?.amount || "0.00";
+  const currency = tx?.currency || "GBP";
+  // Use state.selectedGateway (user-chosen or navState-seeded), NOT tx.gateway
+  // (stale placeholder that defaults to "stripe" on the backend).
   const activeGateway = state.selectedGateway;
+
+  // ── FIX-B7: Error check BEFORE gateway guards ───────────────────────────────
+  // In the old code, the state.error check appeared below the gateway selection
+  // guards. A gateway error with no credentials would silently fall through to
+  // the "Unable to determine payment method" fallback instead of showing the
+  // actual error. Moved here so every error surface comes through one path.
+  if (state.error && !state.initiatingPayment) {
+    // If we have credentials too, let the gateway screens render; the inline
+    // error display within those flows will handle it. Only short-circuit when
+    // there's genuinely nothing to show.
+    if (!clientSecret && !approvalUrl) {
+      return (
+        <Layout>
+          <div className="space-y-4">
+            <div className="text-center">
+              <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-white mb-2">
+                Payment Setup Failed
+              </h2>
+              <p className="text-slate-400 mb-6">{state.error}</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleRetry}
+                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold
+                           rounded-xl px-6 py-3 transition-colors"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={() => navigate(isBulk ? "/bulk-upload" : "/bookings")}
+                className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-semibold
+                           rounded-xl px-6 py-3 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </Layout>
+      );
+    }
+  }
 
   // ── Gateway selection — shown until credentials arrive ──────────────────────
   // Guard: show selection when credentials are absent AND initiation is not in
@@ -869,39 +993,6 @@ export default function PaymentPage() {
     );
   }
 
-  // ── Payment initiation failed — show retry ──────────────────────────────────
-  if (state.error && !clientSecret && !approvalUrl) {
-    return (
-      <Layout>
-        <div className="space-y-4">
-          <div className="text-center">
-            <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-white mb-2">
-              Payment Setup Failed
-            </h2>
-            <p className="text-slate-400 mb-6">{state.error}</p>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={handleRetry}
-              className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold
-                         rounded-xl px-6 py-3 transition-colors"
-            >
-              Try Again
-            </button>
-            <button
-              onClick={() => navigate(isBulk ? "/bulk-upload" : "/bookings")}
-              className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-semibold
-                         rounded-xl px-6 py-3 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
   // ── Stripe ─────────────────────────────────────────────────────────────────
   if (activeGateway === "stripe" && clientSecret) {
     return (
@@ -920,8 +1011,9 @@ export default function PaymentPage() {
     );
   }
 
-  // ── PayPal — auto-redirect fires in useEffect; this renders the spinner ────
-  if (activeGateway === "paypal" && approvalUrl) {
+  // ── PayPal — auto-redirect fires in useEffect (FIX-B2); this renders the
+  // spinner. Guard: approvalUrl is set (we have somewhere to redirect to).
+  if (approvalUrl) {
     return (
       <Layout heading="Redirecting to PayPal…" guestEmail={state.guestEmail}>
         <PayPalRedirectScreen
@@ -933,13 +1025,28 @@ export default function PaymentPage() {
     );
   }
 
-  // Fallback — should not normally be reached
+  // Fallback — should not normally be reached after all fixes above.
+  // If we arrive here it means we have credentials but activeGateway is an
+  // unrecognised value. Surface it as a retryable error rather than a blank
+  // "Unable to determine payment method" that sends the user into a loop.
   return (
     <Layout>
-      <ErrorScreen
-        message="Unable to determine payment method. Please try again."
-        navigate={navigate}
-      />
+      <div className="space-y-4 text-center">
+        <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-white mb-2">
+          Payment Setup Error
+        </h2>
+        <p className="text-slate-400 mb-6">
+          Unable to determine payment method. Please go back and try again.
+        </p>
+        <button
+          onClick={handleRetry}
+          className="bg-orange-500 hover:bg-orange-600 text-white font-semibold
+                     rounded-xl px-6 py-3 transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
     </Layout>
   );
 }
@@ -1023,4 +1130,3 @@ function ErrorScreen({ message, navigate }) {
     </div>
   );
 }
-
