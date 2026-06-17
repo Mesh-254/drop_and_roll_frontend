@@ -18,6 +18,7 @@ import {
   Phone,
   MapPin,
   Calendar,
+  Receipt,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -99,6 +100,7 @@ export default function ProfileDropdown() {
       submenu: [
         { label: "Booking History", icon: FileText, action: () => navigate("/history") },
         { label: "Track Delivery", icon: MapPin, action: () => navigate("/") },
+        { label: "Billing & Invoices", icon: Receipt, action: () => navigate("/billing") },
       ],
     },
     {
