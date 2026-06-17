@@ -242,8 +242,8 @@ export default function BillingPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-900 px-4 py-8 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto">
+    <div className="min-h-screen bg-slate-900 px-4 pt-20 pb-8 sm:px-6 lg:px-8">
+        <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
