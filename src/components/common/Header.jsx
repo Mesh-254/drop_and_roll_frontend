@@ -69,6 +69,11 @@ export default function Header() {
     { name: "FAQ", href: "/faqs" },
   ];
 
+  // Separate nav item for Billing — shown in mobile menu only (desktop users access via profile dropdown)
+  const billingNavItem = isAuthenticated
+    ? { name: "Billing", href: "/billing" }
+    : null;
+
   return (
     <>
       <header
@@ -101,7 +106,7 @@ export default function Header() {
             </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center space-x-8">
+            <nav className="hidden md:flex items-center space-x-5 xl:space-x-8">
               {navItems.map((item) => (
                 <div key={item.name} className="relative group">
                   <NavLink
@@ -228,6 +233,18 @@ export default function Header() {
                       >
                         Booking History
                       </button>
+
+                      {billingNavItem && (
+                        <button
+                          onClick={() => {
+                            navigate("/billing");
+                            setIsMobileMenuOpen(false);
+                          }}
+                          className="w-full text-left text-white/90 hover:text-blue-400 hover:bg-blue-500/10 font-medium px-4 py-2 rounded-lg transition-all duration-300"
+                        >
+                          Billing &amp; Invoices
+                        </button>
+                      )}
 
                       <button
                         onClick={() => {
