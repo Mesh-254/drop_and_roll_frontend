@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useBulkUpload } from '../../hooks/useBulkUpload';
 import BulkUploadFlow from './BulkUploadFlow';
 import BusinessProfileOnboarding from './BusinessProfileOnboarding';
@@ -21,32 +21,34 @@ import BusinessProfileOnboarding from './BusinessProfileOnboarding';
  */
 export default function BulkUploadWizard({ onSuccess = () => {}, onClose = () => {} }) {
   const hook = useBulkUpload();
-  const {
-    isBusinessProfileRequired,
-    isProfileCreating,
-    uploadError,
-    retryPendingAction,
-  } = hook;
 
-  // Track if BusinessProfileOnboarding modal should be visible
+  // ── New hook shape ────────────────────────────────────────────────────────
+  // uploadError is now a plain string | null.
+  // isBusinessProfileRequired, isProfileCreating, retryPendingAction no longer
+  // exist — removed from the hook during the PAYMENT_PENDING fix refactor.
+  const { uploadError } = hook;
+
   const [showProfileModal, setShowProfileModal] = useState(false);
 
-  // ── Auto-show profile modal when BUSINESS_PROFILE_REQUIRED is detected ────
+  // Detect a missing-business-profile error by inspecting the error string.
+  const isBusinessProfileRequired =
+    typeof uploadError === "string" &&
+    uploadError.toLowerCase().includes("business profile");
+
+  // ── Auto-show profile modal when error indicates missing profile ──────────
   useEffect(() => {
     if (isBusinessProfileRequired && !showProfileModal) {
-      console.log('[v0] Opening BusinessProfileOnboarding modal due to BUSINESS_PROFILE_REQUIRED error');
+      console.log('[BulkUploadWizard] Business profile required — opening onboarding modal');
       setShowProfileModal(true);
     }
   }, [isBusinessProfileRequired, showProfileModal]);
 
-  // ── Handle profile creation success ────────────────────────────────────
+  // ── Handle profile creation success ──────────────────────────────────────
   const handleProfileSuccess = async () => {
-    console.log('[v0] BusinessProfile created successfully, closing modal and retrying...');
+    console.log('[BulkUploadWizard] Business profile created — user should re-submit the upload');
     setShowProfileModal(false);
-    
-    // Auto-retry the pending action after a brief delay to allow state to settle
-    await new Promise(resolve => setTimeout(resolve, 500));
-    await retryPendingAction();
+    // retryPendingAction is not available in the new hook.
+    // The user will simply re-submit; the profile will now exist.
   };
 
   // ── Handle profile modal close ────────────────────────────────────────
@@ -73,7 +75,7 @@ export default function BulkUploadWizard({ onSuccess = () => {}, onClose = () =>
       )}
 
       {/* Business Profile Required Error Banner */}
-      {uploadError?.code === 'BUSINESS_PROFILE_REQUIRED' && !showProfileModal && (
+      {isBusinessProfileRequired && !showProfileModal && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -83,23 +85,19 @@ export default function BulkUploadWizard({ onSuccess = () => {}, onClose = () =>
             <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="font-semibold text-yellow-800 dark:text-yellow-300 text-sm">
-                {uploadError.title}
+                Business Profile Required
               </p>
               <p className="text-sm text-yellow-700 dark:text-yellow-300/80 mt-1">
-                {uploadError.message}
+                {uploadError}
               </p>
-              {uploadError.actionUrl && (
-                <motion.button
-                  onClick={() => setShowProfileModal(true)}
-                  disabled={isProfileCreating}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="mt-3 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium text-sm transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {isProfileCreating && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {uploadError.actionLabel || 'Set Up Business Profile'}
-                </motion.button>
-              )}
+              <motion.button
+                onClick={() => setShowProfileModal(true)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="mt-3 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium text-sm transition flex items-center gap-2"
+              >
+                Set Up Business Profile
+              </motion.button>
             </div>
           </div>
         </motion.div>
