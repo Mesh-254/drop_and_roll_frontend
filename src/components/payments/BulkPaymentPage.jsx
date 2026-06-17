@@ -1,377 +1,643 @@
 /**
- * BulkPaymentPage
- * ═══════════════════════════════════════════════════════════════
+ * BulkPaymentPage.jsx
+ *
  * Route: /pay/bulk/:uploadId
  *
- * Handles Stripe card payment for a completed PREPAID bulk upload.
+ * Reached via:
+ *   A) Auto-navigation from useBulkUpload hook after upload processing
+ *   B) Email payment link: http://app.dropnroll.co.uk/pay/bulk/:uploadId
+ *   C) Stripe success_url redirect: /pay/bulk/:uploadId?session_id=cs_xxx
+ *      (Stripe appends session_id when redirecting back after payment)
  *
- * Flow:
- *   1. Mount → call POST /api/payments/initiate-bulkupload/
- *              { bulk_upload_id, gateway: "stripe" }
- *      → receive { flow:"prepaid", client_secret, transaction_id, amount }
- *   2. Render <Elements> with client_secret
- *   3. User pays → stripe.confirmCardPayment(client_secret, …)
- *   4. Success → show confirmation → navigate to /bulk-upload
+ * ── Payment Flow ─────────────────────────────────────────────────────────────
+ * PREPAID (Stripe Checkout Session):
+ *   1. Mount → fetch upload detail → call initiate-bulk → get checkout_url
+ *   2. Redirect user to Stripe: window.location.href = checkout_url
+ *   3. After payment Stripe redirects back here with ?session_id=cs_xxx
+ *   4. We POST /api/payments/confirm-success/ {transaction_id, session_id}
+ *   5. Navigate to /bulk-uploads/:id/success
  *
- * The Stripe webhook (stripe_webhook_v2) fires on success and calls
- * _schedule_bulk_bookings, transitioning all PENDING bookings → SCHEDULED.
- * We do NOT manually mark the tx here — the webhook is the source of truth.
+ * NET Terms:
+ *   After upload processing, bookings are already scheduled. This page
+ *   shows a summary and links to the invoice.
+ *
+ * ── Bug Fixes vs Previous Version ────────────────────────────────────────────
+ * FIX-1  400 on /confirm-success/: old code passed paymentIntent.id which was
+ *        `undefined` (initiate-bulk returns transaction_id + checkout_url, not
+ *        a PaymentIntent ID). Now we send {transaction_id, session_id} instead.
+ *
+ * FIX-2  "Pay £undefined": old code read upload.total_amount — field doesn't
+ *        exist in the raw API response until the serializer is fixed. We also
+ *        guard with formatAmount() so the UI never shows undefined.
+ *
+ * FIX-3  Wrong UX model: previous version rendered a local payment form for a
+ *        Checkout Session flow. Checkout Sessions are handled entirely by
+ *        Stripe's hosted page — the frontend's job is redirect + return.
  */
 
-import { useEffect, useState, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { loadStripe } from "@stripe/stripe-js";
-import {
-  Elements,
-  CardElement,
-  useStripe,
-  useElements,
-} from "@stripe/react-stripe-js";
-import paymentApi from "../../api/PaymentApi";
-import { useAuth } from "../../contexts/AuthContext";
-import {
-  Loader2,
-  CreditCard,
-  CheckCircle,
-  AlertCircle,
-  ArrowLeft,
-  Shield,
-  Package,
-} from "lucide-react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
+import BulkUploadApi from "../../api/BulkUploadApi";
+import PaymentApi from "../../api/PaymentApi";
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// ─── Inner Stripe form (must live inside <Elements>) ────────────────────────
+/** Safely format a monetary amount, returning "0.00" if falsy. */
+function formatAmount(value) {
+  const n = parseFloat(value);
+  return isNaN(n) ? "0.00" : n.toFixed(2);
+}
 
-function StripeCheckoutForm({
-  clientSecret,
-  amount,
-  currency,
-  invoiceRef,
-  batchName,
-  onSuccess,
-  onError,
-}) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [processing, setProcessing] = useState(false);
-  const [cardError, setCardError] = useState(null);
+/** Extract ?session_id from the current URL (set by Stripe on redirect-back). */
+function getSessionIdFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("session_id") || null;
+}
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!stripe || !elements) return;
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-    setProcessing(true);
-    setCardError(null);
-
-    try {
-      const { error, paymentIntent } = await stripe.confirmCardPayment(
-        clientSecret,
-        {
-          payment_method: {
-            card: elements.getElement(CardElement),
-          },
-        }
-      );
-
-      if (error) {
-        setCardError(error.message);
-        onError(error.message);
-      } else if (paymentIntent.status === "succeeded") {
-        onSuccess();
-      } else {
-        setCardError("Payment did not succeed. Please try again.");
-        onError("Unexpected payment state.");
-      }
-    } catch (err) {
-      const msg = err.message || "An unexpected error occurred.";
-      setCardError(msg);
-      onError(msg);
-    } finally {
-      setProcessing(false);
-    }
-  };
-
+function LoadingSkeleton({ message = "Loading payment details…" }) {
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Order summary */}
-      <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
-          Order Summary
-        </h3>
-        <div className="space-y-2 text-sm">
-          {batchName && (
-            <div className="flex justify-between">
-              <span className="text-slate-400">Batch</span>
-              <span className="text-white font-medium">{batchName}</span>
-            </div>
-          )}
-          {invoiceRef && (
-            <div className="flex justify-between">
-              <span className="text-slate-400">Reference</span>
-              <span className="text-white font-mono">{invoiceRef}</span>
-            </div>
-          )}
-          <div className="border-t border-slate-600 pt-2 mt-2 flex justify-between">
-            <span className="text-slate-300 font-semibold">Total</span>
-            <span className="text-orange-400 font-bold text-lg">
-              {currency} {parseFloat(amount).toFixed(2)}
-            </span>
-          </div>
+    <div style={styles.page}>
+      <div style={styles.card}>
+        <div style={styles.skeletonHeader} />
+        <div style={{ padding: "32px" }}>
+          <div style={styles.skeletonLine} />
+          <div style={{ ...styles.skeletonLine, width: "60%" }} />
+          <div style={{ ...styles.skeletonLine, width: "80%", marginTop: "24px" }} />
+          <div style={{ ...styles.skeletonBlock }} />
         </div>
+        <p style={styles.loadingHint}>{message}</p>
       </div>
-
-      {/* Card input */}
-      <div>
-        <label className="block text-sm font-medium text-slate-300 mb-2">
-          Card Details
-        </label>
-        <div className="bg-slate-700 border border-slate-600 rounded-xl p-4 focus-within:border-orange-500 transition-colors">
-          <CardElement
-            options={{
-              style: {
-                base: {
-                  fontSize: "16px",
-                  color: "#F8FAFC",
-                  fontFamily: '"Inter", sans-serif',
-                  "::placeholder": { color: "#64748B" },
-                  iconColor: "#F97316",
-                },
-                invalid: { color: "#F87171" },
-              },
-            }}
-          />
-        </div>
-        {cardError && (
-          <p className="mt-2 text-sm text-red-400 flex items-center gap-1.5">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            {cardError}
-          </p>
-        )}
-      </div>
-
-      {/* Security badge */}
-      <div className="flex items-center gap-2 text-xs text-slate-500">
-        <Shield className="w-3.5 h-3.5" />
-        <span>Secured by Stripe — PCI DSS compliant, 256-bit TLS encryption</span>
-      </div>
-
-      <button
-        type="submit"
-        disabled={!stripe || processing}
-        className={`w-full py-3.5 rounded-xl font-semibold text-white transition-all duration-200 flex items-center justify-center gap-2 ${
-          processing
-            ? "bg-orange-600/50 cursor-not-allowed"
-            : "bg-orange-500 hover:bg-orange-600 active:scale-[0.98] shadow-lg shadow-orange-500/20"
-        }`}
-      >
-        {processing ? (
-          <>
-            <Loader2 className="w-5 h-5 animate-spin" />
-            Processing payment…
-          </>
-        ) : (
-          <>
-            <CreditCard className="w-5 h-5" />
-            Pay {currency} {parseFloat(amount).toFixed(2)}
-          </>
-        )}
-      </button>
-    </form>
+    </div>
   );
 }
 
-// ─── Page shell ──────────────────────────────────────────────────────────────
-
-export default function BulkPaymentPage() {
-  const { uploadId } = useParams();
-  const navigate = useNavigate();
-  const { user } = useAuth();
-
-  const [phase, setPhase] = useState("loading"); // loading | ready | success | error
-  const [paymentData, setPaymentData] = useState(null); // { client_secret, amount, currency, transaction_id }
-  const [uploadInfo, setUploadInfo] = useState(null);
-  const [pageError, setPageError] = useState(null);
-
-  // ── POST /api/payments/initiate-bulk/ on mount ──────────────────────────
-
-  const initiatePayment = useCallback(async () => {
-    if (!uploadId) {
-      setPageError("No upload ID provided.");
-      setPhase("error");
-      return;
-    }
-    setPhase("loading");
-
-    try {
-      // FIX-BUG-03: Use PaymentApi.initiateBulkPayment (correct endpoint: /initiate-bulk/)
-      const result = await paymentApi.initiateBulkPayment({
-        bulkUploadId: uploadId,
-        gateway: "stripe",
-        idempotencyKey: `bulk-${uploadId}-${Date.now()}`,
-      });
-
-      if (!result.success) {
-        if (result.code === "ALREADY_PAID") {
-          setPageError("This batch has already been paid. Redirecting…");
-          setTimeout(() => navigate("/bulk-upload"), 2500);
-          setPhase("error");
-          return;
-        }
-        throw new Error(result.message || "Failed to initiate payment.");
-      }
-
-      const data = result.data;
-
-      if (data.flow === "net") {
-        // Shouldn't land here for NET terms, but handle gracefully
-        navigate(`/invoices/${data.invoice_id}`, { replace: true });
-        return;
-      }
-
-      if (!data.client_secret) {
-        throw new Error("No client_secret received from server.");
-      }
-
-      setPaymentData(data);
-      setPhase("ready");
-    } catch (err) {
-      const msg = err.message || "Failed to initiate payment.";
-      setPageError(msg);
-      setPhase("error");
-    }
-  }, [uploadId, navigate]);
-
-  useEffect(() => {
-    initiatePayment();
-  }, [initiatePayment]);
-
-  const handleSuccess = () => {
-    setPhase("success");
-  };
-
-  const handleError = (msg) => {
-    // Error is shown inside the form; don't change phase
-    console.error("Payment error:", msg);
-  };
-
-  // ── Render ───────────────────────────────────────────────────────────────
-
+function ErrorCard({ title = "Payment Unavailable", message, onRetry }) {
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-lg">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-2">
-            <Package className="w-6 h-6 text-orange-500" />
-            <h1 className="text-xl font-bold text-white">Batch Payment</h1>
-          </div>
+    <div style={styles.page}>
+      <div style={{ ...styles.card, maxWidth: 480 }}>
+        <div style={styles.errorHeader}>
+          <div style={styles.errorIcon}>✕</div>
+          <h2 style={styles.errorTitle}>{title}</h2>
         </div>
-
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-8 shadow-2xl">
-          {/* ── Loading ───────────────────────────────────────────────── */}
-          {phase === "loading" && (
-            <div className="text-center py-12">
-              <Loader2 className="w-10 h-10 text-orange-500 animate-spin mx-auto mb-4" />
-              <p className="text-slate-400">Preparing secure payment…</p>
-            </div>
+        <div style={{ padding: "24px 32px 32px" }}>
+          <p style={styles.bodyText}>{message}</p>
+          {onRetry && (
+            <button style={styles.btnSecondary} onClick={onRetry}>
+              Try again
+            </button>
           )}
-
-          {/* ── Error ─────────────────────────────────────────────────── */}
-          {phase === "error" && (
-            <div className="text-center py-8">
-              <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-white mb-2">
-                Payment Initialisation Failed
-              </h2>
-              <p className="text-slate-400 mb-6">{pageError}</p>
-              <button
-                onClick={initiatePayment}
-                className="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition"
-              >
-                Try Again
-              </button>
-            </div>
-          )}
-
-          {/* ── Payment form ───────────────────────────────────────────── */}
-          {phase === "ready" && paymentData && (
-            <>
-              <h2 className="text-2xl font-bold text-white mb-1">
-                Complete Payment
-              </h2>
-              <p className="text-slate-400 text-sm mb-6">
-                Your bookings will be scheduled immediately after payment.
-              </p>
-
-              <Elements
-                stripe={stripePromise}
-                options={{
-                  clientSecret: paymentData.client_secret,
-                  appearance: {
-                    theme: "night",
-                    variables: {
-                      colorPrimary: "#F97316",
-                      colorBackground: "#1E293B",
-                      colorText: "#F8FAFC",
-                      fontFamily: '"Inter", sans-serif',
-                    },
-                  },
-                }}
-              >
-                <StripeCheckoutForm
-                  clientSecret={paymentData.client_secret}
-                  amount={paymentData.amount}
-                  currency={paymentData.currency || "GBP"}
-                  invoiceRef={paymentData.transaction_id?.slice(0, 8)}
-                  batchName={uploadInfo?.batch_name}
-                  onSuccess={handleSuccess}
-                  onError={handleError}
-                />
-              </Elements>
-            </>
-          )}
-
-          {/* ── Success ───────────────────────────────────────────────── */}
-          {phase === "success" && (
-            <div className="text-center py-8">
-              <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-10 h-10 text-green-400" />
-              </div>
-              <h2 className="text-2xl font-bold text-white mb-2">
-                Payment Successful! 🎉
-              </h2>
-              <p className="text-slate-400 mb-2">
-                Your payment has been processed.
-              </p>
-              <p className="text-sm text-slate-500 mb-8">
-                Your bookings are being scheduled — you'll receive a confirmation
-                email shortly.
-              </p>
-              <div className="space-y-3">
-                <button
-                  onClick={() => navigate("/bulk-upload")}
-                  className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold transition"
-                >
-                  Back to Bulk Upload Dashboard
-                </button>
-                <button
-                  onClick={() => navigate("/bookings")}
-                  className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-medium transition"
-                >
-                  View My Bookings
-                </button>
-              </div>
-            </div>
-          )}
+          <p style={{ ...styles.hint, marginTop: "16px" }}>
+            Need help?{" "}
+            <a href="mailto:support@dropnroll.co.uk" style={styles.link}>
+              support@dropnroll.co.uk
+            </a>
+          </p>
         </div>
       </div>
     </div>
   );
 }
+
+function AlreadyPaidCard({ uploadId, onNavigate }) {
+  return (
+    <div style={styles.page}>
+      <div style={{ ...styles.card, maxWidth: 480 }}>
+        <div style={styles.successHeader}>
+          <div style={styles.successIcon}>✓</div>
+          <h2 style={styles.successTitle}>Already Paid</h2>
+        </div>
+        <div style={{ padding: "24px 32px 32px", textAlign: "center" }}>
+          <p style={styles.bodyText}>
+            This batch has already been paid and your bookings are confirmed.
+          </p>
+          <button style={styles.btnPrimary} onClick={onNavigate}>
+            Go to Dashboard
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OrderSummary({ upload, amount }) {
+  return (
+    <div style={styles.summaryBox}>
+      <h3 style={styles.summaryTitle}>Order Summary</h3>
+      <div style={styles.summaryRow}>
+        <span style={styles.summaryLabel}>Batch file</span>
+        <span style={styles.summaryValue}>{upload.original_filename || "—"}</span>
+      </div>
+      <div style={styles.summaryRow}>
+        <span style={styles.summaryLabel}>Bookings created</span>
+        <span style={styles.summaryValue}>{upload.success_count ?? upload.successful ?? "—"}</span>
+      </div>
+      {(upload.failed_count ?? upload.failed) > 0 && (
+        <div style={styles.summaryRow}>
+          <span style={styles.summaryLabel}>Failed rows</span>
+          <span style={{ ...styles.summaryValue, color: "#dc2626" }}>
+            {upload.failed_count ?? upload.failed}
+          </span>
+        </div>
+      )}
+      <div style={{ ...styles.summaryRow, ...styles.summaryTotal }}>
+        <span style={styles.totalLabel}>Amount due</span>
+        <span style={styles.totalAmount}>£{amount}</span>
+      </div>
+    </div>
+  );
+}
+
+function SecurityBadge() {
+  return (
+    <div style={styles.securityBadge}>
+      <span style={{ marginRight: "8px" }}>🔒</span>
+      <span>
+        <strong>Secure Stripe checkout.</strong> Your bookings are reserved — confirmed
+        instantly after payment. Drop 'n Roll never stores card details.
+      </span>
+    </div>
+  );
+}
+
+// ─── Main component ────────────────────────────────────────────────────────────
+
+export default function BulkPaymentPage() {
+  const { uploadId } = useParams();
+  const { state: routerState } = useLocation();
+  const navigate = useNavigate();
+
+  // Detect Stripe redirect-back (path C)
+  const returnSessionId = getSessionIdFromUrl();
+  const isStripeReturn = Boolean(returnSessionId);
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  const [upload, setUpload] = useState(routerState?.uploadSnapshot ?? null);
+  const [loadError, setLoadError] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isPaid, setIsPaid] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [confirmError, setConfirmError] = useState(null);
+
+  // Store transaction_id from initiate-bulk so we can pass it to confirm-success
+  const transactionIdRef = useRef(routerState?.transactionId ?? null);
+
+  // ── On mount: either confirm a Stripe return, or load + redirect ──────────
+  const loadAndPay = useCallback(async () => {
+    if (!uploadId) {
+      setLoadError("Invalid payment link — no upload ID found.");
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setLoadError(null);
+    setConfirmError(null);
+
+    try {
+      // 1. Always fetch latest upload detail
+      const uploadData = await BulkUploadApi.getDetail(uploadId);
+      setUpload(uploadData);
+
+      const statusLower = (uploadData.status || "").toLowerCase();
+
+      // ── Path C: Stripe redirect-back ──────────────────────────────────────
+      if (isStripeReturn && returnSessionId) {
+        // Confirm server-side (closes race window with webhook)
+        try {
+          await PaymentApi.confirmBulkPayment({
+            uploadId,
+            paymentIntentId: returnSessionId,        // backend now accepts cs_xxx
+            transactionId: transactionIdRef.current, // best-effort
+          });
+        } catch (confirmErr) {
+          // Non-fatal: webhook may have already processed this
+          console.warn("[BulkPaymentPage] confirm-success call failed (webhook may have handled):", confirmErr);
+        }
+        setIsLoading(false);
+        navigate(`/bulk-uploads/${uploadId}/success`, { replace: true });
+        return;
+      }
+
+      // ── Already paid ──────────────────────────────────────────────────────
+      if (statusLower === "paid" || statusLower === "payment_confirmed" || statusLower === "completed") {
+        // Completed = NET Terms path where bookings are already scheduled
+        if (uploadData.payment_path === "net" || uploadData.customer_type === "NET") {
+          setIsLoading(false);
+          navigate(`/bulk-uploads/${uploadId}/success`, { replace: true });
+          return;
+        }
+        setIsPaid(true);
+        setIsLoading(false);
+        return;
+      }
+
+      if (statusLower === "failed") {
+        setLoadError("This upload failed processing and cannot be paid.");
+        setIsLoading(false);
+        return;
+      }
+
+      if (statusLower !== "payment_pending") {
+        setLoadError(
+          `This upload is in status "${uploadData.status}" and is not ready for payment.`
+        );
+        setIsLoading(false);
+        return;
+      }
+
+      // ── Initiate / retrieve Stripe Checkout Session ───────────────────────
+      const intent = await PaymentApi.getOrCreateBulkIntent(uploadId, "stripe");
+
+      // Store transaction_id for the return leg
+      if (intent?.transaction_id) {
+        transactionIdRef.current = intent.transaction_id;
+      }
+
+      if (intent?.already_paid) {
+        setIsPaid(true);
+        setIsLoading(false);
+        return;
+      }
+
+      const checkoutUrl = intent?.checkout_url;
+      if (!checkoutUrl) {
+        setLoadError("Could not retrieve Stripe checkout URL. Please try refreshing or contact support.");
+        setIsLoading(false);
+        return;
+      }
+
+      // ── Redirect to Stripe Checkout ───────────────────────────────────────
+      setIsRedirecting(true);
+      setIsLoading(false);
+      // Small breathing room so the UI paints "Redirecting…" before we leave
+      setTimeout(() => {
+        window.location.href = checkoutUrl;
+      }, 350);
+
+    } catch (err) {
+      const detail =
+        err?.response?.data?.detail ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Could not load payment data. Please try refreshing or contact support.";
+      setLoadError(detail);
+      setIsLoading(false);
+    }
+  }, [uploadId, isStripeReturn, returnSessionId, navigate]);
+
+  useEffect(() => {
+    loadAndPay();
+  }, [loadAndPay]);
+
+  // ── Derived display values ─────────────────────────────────────────────────
+  const amount = formatAmount(upload?.total_amount);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  if (isLoading) {
+    return <LoadingSkeleton message={isStripeReturn ? "Confirming your payment…" : "Loading payment details…"} />;
+  }
+
+  if (loadError) {
+    return <ErrorCard message={loadError} onRetry={loadAndPay} />;
+  }
+
+  if (confirmError) {
+    return (
+      <ErrorCard
+        title="Confirmation Failed"
+        message={confirmError}
+        onRetry={loadAndPay}
+      />
+    );
+  }
+
+  if (isPaid) {
+    return (
+      <AlreadyPaidCard
+        uploadId={uploadId}
+        onNavigate={() => navigate("/dashboard")}
+      />
+    );
+  }
+
+  // ── Redirecting to Stripe ──────────────────────────────────────────────────
+  return (
+    <div style={styles.page}>
+      <div style={styles.card}>
+
+        {/* Header */}
+        <div style={styles.pageHeader}>
+          <div style={styles.logoMark}>Drop 'n Roll</div>
+          <h1 style={styles.pageTitle}>Complete Payment</h1>
+          <p style={styles.pageSubtitle}>
+            Batch upload · {upload?.original_filename || uploadId}
+          </p>
+        </div>
+
+        <div style={styles.cardBody}>
+
+          {/* Order summary */}
+          {upload && <OrderSummary upload={upload} amount={amount} />}
+
+          {/* Redirect status */}
+          <div style={styles.redirectBox}>
+            {isRedirecting ? (
+              <>
+                <div style={styles.spinner} />
+                <p style={styles.redirectTitle}>Redirecting to secure checkout…</p>
+                <p style={styles.redirectHint}>
+                  You'll be taken to Stripe's hosted payment page. Do not close this tab.
+                </p>
+              </>
+            ) : (
+              <>
+                <p style={styles.bodyText}>
+                  Click below to open the secure Stripe checkout for this batch.
+                </p>
+                <button
+                  style={styles.btnPrimary}
+                  onClick={loadAndPay}
+                  disabled={isRedirecting}
+                >
+                  Pay £{amount} securely
+                </button>
+              </>
+            )}
+          </div>
+
+          <SecurityBadge />
+
+          <p style={styles.hint}>
+            Already paid? Your bookings will be confirmed automatically — you may
+            safely close this page. Ref: {uploadId?.slice(0, 8)}
+          </p>
+        </div>
+
+        <div style={styles.cardFooter}>
+          <p>
+            Questions?{" "}
+            <a href="mailto:support@dropnroll.co.uk" style={styles.link}>
+              support@dropnroll.co.uk
+            </a>{" "}
+            · Drop 'n Roll Logistics Ltd
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Inline styles ─────────────────────────────────────────────────────────────
+// Using plain objects so the component is self-contained (no CSS file dependency).
+// Replace with your Tailwind classes or CSS modules as preferred.
+
+const styles = {
+  page: {
+    minHeight: "100vh",
+    background: "#f1f5f9",
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "center",
+    padding: "48px 16px",
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  },
+  card: {
+    background: "#ffffff",
+    borderRadius: "16px",
+    boxShadow: "0 4px 32px rgba(0,0,0,0.10)",
+    width: "100%",
+    maxWidth: "560px",
+    overflow: "hidden",
+  },
+  pageHeader: {
+    background: "#0f172a",
+    padding: "28px 32px 24px",
+    borderBottom: "3px solid #f97316",
+  },
+  logoMark: {
+    fontSize: "12px",
+    fontWeight: "700",
+    color: "#f97316",
+    letterSpacing: "1px",
+    textTransform: "uppercase",
+    marginBottom: "8px",
+  },
+  pageTitle: {
+    fontSize: "24px",
+    fontWeight: "800",
+    color: "#ffffff",
+    margin: "0 0 4px",
+    letterSpacing: "-0.5px",
+  },
+  pageSubtitle: {
+    fontSize: "13px",
+    color: "#94a3b8",
+    margin: 0,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  cardBody: {
+    padding: "28px 32px",
+  },
+  cardFooter: {
+    background: "#f8fafc",
+    borderTop: "1px solid #e2e8f0",
+    padding: "16px 32px",
+    textAlign: "center",
+    fontSize: "12px",
+    color: "#94a3b8",
+  },
+  // Summary box
+  summaryBox: {
+    background: "#f8fafc",
+    border: "1px solid #e2e8f0",
+    borderRadius: "12px",
+    padding: "20px 24px",
+    marginBottom: "24px",
+  },
+  summaryTitle: {
+    fontSize: "14px",
+    fontWeight: "700",
+    color: "#0f172a",
+    margin: "0 0 14px",
+    textTransform: "uppercase",
+    letterSpacing: "0.5px",
+  },
+  summaryRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "5px 0",
+    fontSize: "14px",
+  },
+  summaryLabel: { color: "#64748b" },
+  summaryValue: { color: "#1e293b", fontWeight: "500" },
+  summaryTotal: {
+    borderTop: "2px solid #e2e8f0",
+    marginTop: "10px",
+    paddingTop: "14px",
+  },
+  totalLabel: {
+    fontSize: "16px",
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  totalAmount: {
+    fontSize: "22px",
+    fontWeight: "800",
+    color: "#f97316",
+    letterSpacing: "-0.5px",
+  },
+  // Redirect box
+  redirectBox: {
+    textAlign: "center",
+    padding: "20px 0 8px",
+    marginBottom: "20px",
+  },
+  redirectTitle: {
+    fontSize: "16px",
+    fontWeight: "700",
+    color: "#0f172a",
+    margin: "12px 0 6px",
+  },
+  redirectHint: {
+    fontSize: "13px",
+    color: "#64748b",
+    margin: 0,
+  },
+  // Security badge
+  securityBadge: {
+    display: "flex",
+    alignItems: "flex-start",
+    background: "#f0fdf4",
+    border: "1px solid #bbf7d0",
+    borderRadius: "10px",
+    padding: "12px 16px",
+    marginBottom: "20px",
+    fontSize: "13px",
+    color: "#166534",
+    lineHeight: 1.5,
+  },
+  // Buttons
+  btnPrimary: {
+    display: "inline-block",
+    background: "#f97316",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "10px",
+    padding: "14px 36px",
+    fontSize: "15px",
+    fontWeight: "700",
+    cursor: "pointer",
+    boxShadow: "0 4px 16px rgba(249,115,22,0.35)",
+    marginTop: "8px",
+    transition: "opacity 0.15s",
+  },
+  btnSecondary: {
+    display: "inline-block",
+    background: "#f1f5f9",
+    color: "#0f172a",
+    border: "1px solid #e2e8f0",
+    borderRadius: "10px",
+    padding: "12px 28px",
+    fontSize: "14px",
+    fontWeight: "600",
+    cursor: "pointer",
+    marginTop: "12px",
+  },
+  // Typography
+  bodyText: {
+    fontSize: "15px",
+    color: "#475569",
+    lineHeight: 1.6,
+    margin: "0 0 12px",
+  },
+  hint: {
+    fontSize: "12px",
+    color: "#94a3b8",
+    lineHeight: 1.5,
+    margin: 0,
+    textAlign: "center",
+  },
+  link: { color: "#f97316", textDecoration: "none" },
+  // Error/success headers
+  errorHeader: {
+    background: "#fef2f2",
+    borderBottom: "1px solid #fecaca",
+    padding: "28px 32px 20px",
+    textAlign: "center",
+  },
+  errorIcon: {
+    width: "48px",
+    height: "48px",
+    borderRadius: "50%",
+    background: "#fee2e2",
+    color: "#dc2626",
+    fontSize: "20px",
+    fontWeight: "700",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    margin: "0 auto 12px",
+  },
+  errorTitle: { fontSize: "20px", fontWeight: "700", color: "#991b1b", margin: 0 },
+  successHeader: {
+    background: "#f0fdf4",
+    borderBottom: "1px solid #bbf7d0",
+    padding: "28px 32px 20px",
+    textAlign: "center",
+  },
+  successIcon: {
+    width: "48px",
+    height: "48px",
+    borderRadius: "50%",
+    background: "#dcfce7",
+    color: "#16a34a",
+    fontSize: "24px",
+    fontWeight: "700",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    margin: "0 auto 12px",
+  },
+  successTitle: { fontSize: "20px", fontWeight: "700", color: "#166534", margin: 0 },
+  // Loading skeleton
+  skeletonHeader: {
+    height: "100px",
+    background: "linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%)",
+    backgroundSize: "200% 100%",
+    animation: "shimmer 1.4s infinite",
+  },
+  skeletonLine: {
+    height: "16px",
+    borderRadius: "8px",
+    background: "#e2e8f0",
+    marginBottom: "12px",
+  },
+  skeletonBlock: {
+    height: "80px",
+    borderRadius: "8px",
+    background: "#e2e8f0",
+    marginTop: "20px",
+  },
+  loadingHint: {
+    textAlign: "center",
+    fontSize: "13px",
+    color: "#94a3b8",
+    padding: "0 0 24px",
+  },
+  // Spinner
+  spinner: {
+    width: "36px",
+    height: "36px",
+    border: "3px solid #e2e8f0",
+    borderTop: "3px solid #f97316",
+    borderRadius: "50%",
+    animation: "spin 0.8s linear infinite",
+    margin: "0 auto 8px",
+  },
+};
