@@ -19,6 +19,7 @@ import {
   AlertCircle,
   RefreshCw,
   Camera, // NEW: For QR scan button
+  User,
 } from "lucide-react";
 import { driverApi } from "../../api/driver-api";
 import { QRScannerModal } from "./QRScannerModal"; // NEW: QR Scanner component
@@ -453,6 +454,10 @@ export function DeliveryStatusUpdates({
         setPendingDeliveryJobs([]);
         setSelectedJobs([]);
         setBulkActionOpen(false);
+        // FIX: Immediately remove the delivered job from the UI so it
+        // disappears right away, without waiting for the network refresh.
+        setJobs((prev) => prev.filter((job) => job.id !== jobId));
+        setSelectedJobs((prev) => prev.filter((id) => id !== jobId));
 
         // Refresh the jobs list to show updated status
         await fetchJobs(1, false);
