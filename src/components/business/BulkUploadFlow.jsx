@@ -1,676 +1,780 @@
-import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import {
-  Download,
-  ArrowRight,
-  ArrowLeft,
-  Loader2,
-  AlertCircle,
-  CheckCircle2,
-  X,
-  Clock,
-  FileText,
-} from 'lucide-react';
-import { useBulkUpload } from '../../hooks/useBulkUpload';
-import FileUploadZone from './FileUploadZone';
-import BulkUploadProgressBar from './BulkUploadProgressBar';
-import ErrorTable from './ErrorTable';
-
 /**
- * Step 0 metadata schema (steps 1 & 2 form)
+ * components/business/BulkUploadFlow.jsx
+ * ══════════════════════════════════════════════════════════════════════════════
+ * The 4-step wizard modal for bulk CSV uploads.
+ *
+ * Step 0 — File drop zone
+ * Step 1 — Batch name + notes form
+ * Step 2 — Review & Confirm (triggers validate → submit)
+ * Step 3 — Processing / Done
+ *
+ * ── HOOK SHAPE MIGRATION ────────────────────────────────────────────────────
+ *
+ * The OLD hook (pre-fix) exported:
+ *   file, setFile, currentStep, nextStep, prevStep, uploadProgress,
+ *   isUploading, isSubmitting, uploadError, uploadResult, paymentPath,
+ *   netDays, processingStatus, latestUpload, errorRows, errorMeta,
+ *   errorPage, setErrorPage, isFetchingErrors, isInitiatingPayment,
+ *   gatewayPreference, setGatewayPreference, handleFileSelect,
+ *   handleValidateAndUpload, handleSubmit, handleDownloadTemplate,
+ *   handleDownloadErrorReport, handleInitiatePayment, handleViewInvoice,
+ *   fetchErrors, reset, setUploadError
+ *
+ * The NEW hook (useBulkUpload.js) exports:
+ *   selectedFile, validationResult, isValidating, validateFile,
+ *   isUploading, startUpload,
+ *   latestUpload, isPolling,
+ *   isAutoNavQueued, isWaitingForReceivable,
+ *   manualContinueToPayment,
+ *   uploadError, reset
+ *
+ * This component now uses ONLY the new hook API.  Wizard step state,
+ * batch metadata, and the validate→submit pipeline live here locally,
+ * delegating file/upload/polling concerns to the hook.
+ *
+ * ── STEP 3 LOGIC ─────────────────────────────────────────────────────────────
+ *
+ * While polling (isPolling):
+ *   Animated progress bar + live success/fail counters.
+ *
+ * When status === 'payment_pending' (PREPAID terminal state):
+ *   1. isAutoNavQueued → hook fires auto-navigate within 2-3 s.
+ *   2. Manual "Continue to Payment" button always shown as escape hatch
+ *      (calls manualContinueToPayment from hook).
+ *
+ * When status === 'completed' (NET or legacy):
+ *   Invoice raised banner.
+ *
+ * When status === 'failed':
+ *   Error state with uploadError message.
+ *
+ * ── DEFENSIVE OBSERVABILITY ──────────────────────────────────────────────────
+ * useEffect watches latestUpload.status changes and logs them in dev.
+ * ══════════════════════════════════════════════════════════════════════════════
  */
+
+import React, { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom"; // FIX Bug 1: was missing — caused ReferenceError crash
+import { motion, AnimatePresence } from "framer-motion";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  Download,
+  Loader2,
+  X,
+} from "lucide-react";
+import { useBulkUpload } from "../../hooks/useBulkUpload";
+import FileUploadZone from "./FileUploadZone";
+import BulkUploadProgressBar from "./BulkUploadProgressBar";
+import ErrorTable from "./ErrorTable";
+
+// ─── Form validation ──────────────────────────────────────────────────────────
+
 const metadataSchema = z.object({
   batchName: z
     .string()
-    .min(1, 'Batch name is required')
-    .max(100, 'Batch name must be under 100 characters'),
+    .min(1, "Batch name is required")
+    .max(100, "Must be under 100 characters"),
   notes: z
     .string()
-    .max(1000, 'Notes must be under 1,000 characters')
+    .max(1000, "Must be under 1,000 characters")
     .optional()
-    .or(z.literal('')),
+    .or(z.literal("")),
 });
 
+// ─── Step labels ──────────────────────────────────────────────────────────────
+
+const STEPS = [
+  { label: "Upload File" },
+  { label: "Batch Details" },
+  { label: "Review & Confirm" },
+  { label: "Processing" },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 /**
- * BulkUploadFlow — 4-step wizard for bulk uploads.
- *
- * Step 0: Upload File
- * Step 1: Batch Details (metadata)
- * Step 2: Review & Confirm
- * Step 3: Processing / Done
- *
- * PHASE 3 STEP 7: Now accepts optional 'hook' prop from parent (BulkUploadWizard).
- * If hook is provided, it uses the shared instance to enable auto-retry after
- * business profile creation. If not provided, creates its own hook instance.
+ * Safely format a Decimal/string total from the backend.
+ * effective_total comes back as a Decimal-serialised string e.g. "85.00".
  */
-export default function BulkUploadFlow({ onSuccess = () => {}, onClose = () => {}, hook = null }) {
-  // Use provided hook or create a new one
-  const bulkUploadHook = hook || useBulkUpload();
+function formatTotal(upload) {
+  const raw = upload?.effective_total ?? upload?.computed_total ?? 0;
+  const n = parseFloat(raw);
+  return isNaN(n) ? "0.00" : n.toFixed(2);
+}
+
+/**
+ * Derive a display-friendly status from the latestUpload snapshot.
+ * Returns one of: "processing" | "payment_pending" | "completed" | "failed"
+ */
+function deriveStatus(latestUpload, isPolling) {
+  if (!latestUpload) return isPolling ? "processing" : null;
+  const s = latestUpload.status?.toLowerCase();
+  if (s === "payment_pending") return "payment_pending";
+  if (s === "completed")       return "completed";
+  // FIX Bug 2: "partial" is a terminal success for NET — treat same as "completed"
+  // so the UI never falls through to "processing" and gets stuck.
+  if (s === "partial")         return "completed";
+  if (s === "failed")          return "failed";
+  return "processing";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BulkUploadFlow component
+// ─────────────────────────────────────────────────────────────────────────────
+
+export default function BulkUploadFlow({
+  onSuccess = () => {},
+  onClose = () => {},
+  hook = null,
+}) {
+  // Allow parent to pass a shared hook instance (recommended) or create own.
+  // BulkUploadWizard always passes its hook to avoid duplicate state trees.
+  const navigate = useNavigate();
+  const h = hook || useBulkUpload();
+
+  // Destructure NEW hook API (see migration note at top of file)
   const {
-    file,
-    setFile,
-    batchName,
-    setBatchName,
-    notes,
-    setNotes,
-    currentStep,
-    nextStep,
-    prevStep,
-    goToStep,
-    uploadProgress,
-    isUploading,
-    isSubmitting,
-    uploadError,
-    uploadResult,
-    processingStatus,
-    latestUpload,
-    paymentPath,
-    errorRows,
-    errorMeta,
-    errorPage,
-    setErrorPage,
-    isFetchingErrors,
-    handleFileSelect,
-    handleValidateAndUpload,   // FIX: was missing — must be called at step 1→2 transition
-    handleSubmit,
-    handleRetryFailed,
-    handleDownloadTemplate,
-    handleDownloadErrorReport,
-    handleInitiatePayment,
-    isInitiatingPayment,
-    fetchErrors,
-    reset,
-    setUploadError,
-    gatewayPreference,
-    setGatewayPreference,
-  } = bulkUploadHook;
+    selectedFile,       // File | null
+    validationResult,   // result from validate endpoint
+    isValidating,       // true while validate POST is in-flight
+    validateFile,       // (file: File) => Promise<void>
+    isUploading,        // true while create POST is in-flight
+    startUpload,        // () => Promise<void>  — starts Celery task + polling
+    latestUpload,       // { id, status, customer_type, success_count, total_amount, ... } | null
+    isPolling,          // true while poller is running
+    isAutoNavQueued,    // true as soon as terminal success detected (nav imminent)
+    isWaitingForReceivable, // true while polling for AR record (NET flow)
+    manualContinueToPayment, // () => void — escape hatch for PREPAID
+    manualViewInvoice,  // () => void — FIX Bug 4: escape hatch for NET
+    uploadError,        // string | null
+    reset,              // () => void — full reset
+  } = h;
 
-  // FIX-BUG-05: Local gateway selector state for the Done step
-  const [selectedGateway, setSelectedGateway] = useState("stripe");
+  // ── Local wizard state ────────────────────────────────────────────────────
+  const [currentStep, setCurrentStep] = useState(0);
+  const [localError, setLocalError] = useState(null);
 
+  const nextStep = () => setCurrentStep((s) => Math.min(s + 1, STEPS.length - 1));
+  const prevStep = () => setCurrentStep((s) => Math.max(s - 1, 0));
+
+  // ── React Hook Form for step 1 ────────────────────────────────────────────
   const {
     register,
-    handleSubmit: rhfHandleSubmit,   // FIX: renamed so it doesn't shadow hook's handleSubmit
-    watch,
+    handleSubmit: rhfSubmit,
     formState: { errors: formErrors },
   } = useForm({
     resolver: zodResolver(metadataSchema),
-    defaultValues: { batchName: '', notes: '' },
+    defaultValues: { batchName: "", notes: "" },
   });
 
-  // Sync form state to hook
-  const watchedBatchName = watch('batchName');
-  const watchedNotes = watch('notes');
+  // ── File handling ─────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    setBatchName(watchedBatchName);
-    setNotes(watchedNotes);
-  }, [watchedBatchName, watchedNotes, setBatchName, setNotes]);
+  const handleFileSelect = useCallback(
+    (file) => {
+      setLocalError(null);
+      // validateFile updates selectedFile inside the hook
+      validateFile(file);
+    },
+    [validateFile],
+  );
 
-  // Step indicator
-  const stepLabels = [
-    { name: 'Upload File', icon: '📁' },
-    { name: 'Batch Details', icon: '📝' },
-    { name: 'Review & Confirm', icon: '✓' },
-    { name: 'Processing', icon: '⚙️' },
-  ];
+  const handleRemoveFile = useCallback(() => {
+    // Reset just enough to clear the file; hook.reset() would wipe all state.
+    // Since the hook doesn't expose setSelectedFile we call validateFile(null)
+    // if it handles null, otherwise reset and stay on step 0.
+    reset();
+    setCurrentStep(0);
+    setLocalError(null);
+  }, [reset]);
 
-  const canAdvanceStep0 = !!file;
-  // FIX: step 2 button must be disabled until uploadResult.id is available
-  const canAdvanceStep2 = !!uploadResult?.id && !isUploading && !isSubmitting;
+  // ── Step 1 submit (validate + move to review) ─────────────────────────────
 
-  // FIX: step 1 "Continue" must call validateFile, not just nextStep.
-  // Previously onClick={nextStep} skipped the upload entirely, so uploadResult
-  // was always null by the time the user reached the Review step.
-  const handleStep1Continue = rhfHandleSubmit(async () => {
-    const success = await handleValidateAndUpload();
-    if (success) {
-      nextStep(); // advance to Review only after uploadResult.id is set
+  const handleStep1Continue = rhfSubmit(async () => {
+    setLocalError(null);
+    if (validationResult) {
+      // File was already validated on drop — just advance.
+      nextStep();
+      return;
     }
-    // If validation failed, stay on step 1; error is already in uploadError state
+    if (selectedFile) {
+      // Re-validate (user may have re-uploaded after a reset).
+      // validateFile sets validationResult via setState which is async —
+      // we cannot read the new value synchronously here.
+      // The useEffect below watches validationResult and calls nextStep()
+      // once the state update lands, provided we are still on step 1.
+      await validateFile(selectedFile);
+    }
   });
 
-  // Close modal (X button)
+  // When validation completes (hook sets validationResult), advance to step 2
+  // if the user had already clicked "Continue" (i.e. we are still on step 1).
+  // This replaces the stale `if (validationResult) nextStep()` that read the
+  // pre-await value of React state.
+  useEffect(() => {
+    if (validationResult && currentStep === 1) {
+      nextStep();
+    }
+    // nextStep is a stable inline arrow — intentionally excluded from deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [validationResult]);
+
+  // ── Step 2 submit → step 3 ────────────────────────────────────────────────
+
+  const handleStep2Submit = async () => {
+    setLocalError(null);
+    try {
+      await startUpload();
+      // Only advance to the processing screen if startUpload() succeeded.
+      // If it throws, uploadError will be set in the hook and the user stays
+      // on step 2 — the wizard must NOT navigate forward to a polling screen
+      // that has no upload id to poll.
+      nextStep();
+    } catch (err) {
+      // startUpload already calls setUploadError; we just prevent step advance.
+      if (process.env.NODE_ENV === "development") {
+        console.error("[BulkUploadFlow] startUpload threw:", err);
+      }
+    }
+  };
+
+  // ── Template download ─────────────────────────────────────────────────────
+
+  const handleDownloadTemplate = () => {
+    // Adjust URL to wherever your template CSV lives
+    const link = document.createElement("a");
+    link.href = "/templates/bulk_upload_template.csv";
+    link.download = "bulk_upload_template.csv";
+    link.click();
+  };
+
+  // ── Close handler ─────────────────────────────────────────────────────────
+
   const handleClose = () => {
     reset();
+    setCurrentStep(0);
+    setLocalError(null);
     onClose();
   };
 
+  // ── Derive status for Step 3 rendering ───────────────────────────────────
+
+  const derivedStatus = deriveStatus(latestUpload, isPolling);
+  const isPaymentPending = derivedStatus === "payment_pending";
+  const isCompleted      = derivedStatus === "completed";
+  const isFailed         = derivedStatus === "failed";
+  const isProcessing     = derivedStatus === "processing" || (!derivedStatus && isPolling);
+
+  // ── Defensive observability: log status changes in dev ────────────────────
+
+  useEffect(() => {
+    if (!latestUpload) return;
+    if (process.env.NODE_ENV === "development") {
+      console.debug(
+        `[BulkUploadFlow] latestUpload status changed | id=${latestUpload.id} | status=${latestUpload.status} | customer_type=${latestUpload.customer_type} | isPolling=${isPolling} | isAutoNavQueued=${isAutoNavQueued}`,
+      );
+    }
+
+    // If we've reached payment_pending and auto-nav is queued, log the
+    // expected timing so it's visible in dev tools.
+    if (latestUpload.status?.toLowerCase() === "payment_pending" && isAutoNavQueued) {
+      console.debug("[BulkUploadFlow] Auto-nav is queued — expect redirect within ~2s.");
+    }
+  }, [latestUpload, isPolling, isAutoNavQueued]);
+
+  // ── Combine errors for display ────────────────────────────────────────────
+
+  const displayError = localError || uploadError || null;
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden max-w-2xl w-full mx-auto">
-      {/* Header with close button */}
-      <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Bulk Upload</h2>
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.95 }}
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden max-w-2xl w-full mx-auto">
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200 dark:border-gray-700">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          Bulk Upload
+        </h2>
+        <button
           onClick={handleClose}
-          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all"
-          title="Close"
+          className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          aria-label="Close"
         >
-          <X className="h-6 w-6 text-gray-500 dark:text-gray-400" />
-        </motion.button>
+          <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+        </button>
       </div>
 
-      {/* Steps indicator */}
-      <div className="px-6 pt-6">
-        <div className="flex items-center justify-between mb-8">
-          {stepLabels.map((step, idx) => (
-            <div key={idx} className="flex flex-col items-center">
-              <motion.div
-                animate={{
-                  scale: currentStep === idx ? 1.2 : 1,
-                  backgroundColor:
-                    currentStep > idx
-                      ? '#f97316'
-                      : currentStep === idx
-                      ? '#fed7aa'
-                      : '#e5e7eb',
-                }}
-                className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm dark:bg-gray-700 dark:text-gray-300 mb-2"
+      {/* ── Step indicator ─────────────────────────────────────────────────── */}
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between">
+          {STEPS.map((step, idx) => (
+            <div key={idx} className="flex items-center">
+              <div
+                className={`flex items-center gap-2 ${idx <= currentStep ? "opacity-100" : "opacity-40"}`}
               >
-                {currentStep > idx ? '✓' : idx + 1}
-              </motion.div>
-              <span
-                className={`text-xs font-medium text-center max-w-20 ${
-                  currentStep >= idx
-                    ? 'text-orange-600 dark:text-orange-400'
-                    : 'text-gray-500 dark:text-gray-400'
-                }`}
-              >
-                {step.name}
-              </span>
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
+                    idx < currentStep
+                      ? "bg-green-500 text-white"
+                      : idx === currentStep
+                        ? "bg-orange-500 text-white"
+                        : "bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300"
+                  }`}
+                >
+                  {idx < currentStep ? "✓" : idx + 1}
+                </div>
+                <span className="hidden sm:block text-xs font-medium text-gray-600 dark:text-gray-300">
+                  {step.label}
+                </span>
+              </div>
+              {idx < STEPS.length - 1 && (
+                <div
+                  className={`w-6 sm:w-14 h-0.5 mx-2 transition-colors ${
+                    idx < currentStep
+                      ? "bg-green-500"
+                      : "bg-gray-200 dark:bg-gray-600"
+                  }`}
+                />
+              )}
             </div>
           ))}
         </div>
-
-        {/* Progress line */}
-        <div className="flex gap-2 mb-8">
-          {[0, 1, 2].map((idx) => (
-            <motion.div
-              key={idx}
-              className="flex-1 h-1 bg-gray-200 dark:bg-gray-700 rounded-full"
-              animate={{
-                backgroundColor: currentStep > idx ? '#f97316' : '#e5e7eb',
-              }}
-            />
-          ))}
-        </div>
       </div>
 
-      {/* ── Persistent error banner — visible on every step ─────────────────
-           Errors (uploadError) can fire on any step (e.g. BUSINESS_PROFILE_PENDING
-           fires on step 1 after the user hits "Validate & Review"). Rendering the
-           error here — outside AnimatePresence — keeps it visible while the user
-           reads it, regardless of which step they are on.
-      ─────────────────────────────────────────────────────────────────────── */}
-      {uploadError && (
-        <motion.div
-          key={uploadError.title}
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          className={`mx-6 mb-2 p-4 rounded-lg flex gap-3 border ${
-            uploadError.code === 'BUSINESS_PROFILE_PENDING'
-              ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-900/30'
-              : 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30'
-          }`}
-        >
-          <AlertCircle
-            className={`h-5 w-5 flex-shrink-0 mt-0.5 ${
-              uploadError.code === 'BUSINESS_PROFILE_PENDING'
-                ? 'text-amber-500'
-                : 'text-red-500'
-            }`}
-          />
-          <div className="flex-1 min-w-0">
-            <p
-              className={`font-semibold text-sm ${
-                uploadError.code === 'BUSINESS_PROFILE_PENDING'
-                  ? 'text-amber-700 dark:text-amber-400'
-                  : 'text-red-700 dark:text-red-400'
-              }`}
-            >
-              {uploadError.title}
-            </p>
-            <p
-              className={`text-sm mt-1 ${
-                uploadError.code === 'BUSINESS_PROFILE_PENDING'
-                  ? 'text-amber-600 dark:text-amber-400/80'
-                  : 'text-red-600 dark:text-red-400/80'
-              }`}
-            >
-              {uploadError.message}
-            </p>
-          </div>
-          {/* Dismiss button */}
-          <button
-            onClick={() => setUploadError(null)}
-            className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            title="Dismiss"
-            aria-label="Dismiss error"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </motion.div>
-      )}
-
-      {/* Content */}
-      <div className="px-6 pb-6 min-h-96">
+      {/* ── Step content ───────────────────────────────────────────────────── */}
+      <div className="px-6 py-6 min-h-[340px]">
         <AnimatePresence mode="wait">
-          {/* Step 0: Upload File */}
+
+          {/* ════ STEP 0 — File upload ═══════════════════════════════════════ */}
           {currentStep === 0 && (
             <motion.div
               key="step0"
-              initial={{ opacity: 0, x: 100 }}
+              initial={{ opacity: 0, x: -40 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -100 }}
-              transition={{ duration: 0.3 }}
+              exit={{ opacity: 0, x: 40 }}
+              transition={{ duration: 0.25 }}
               className="space-y-6"
             >
-              {/* Download template button */}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleDownloadTemplate}
-                className="w-full px-4 py-3 border border-orange-500 text-orange-600 dark:text-orange-400 dark:border-orange-500/50 hover:bg-orange-50 dark:hover:bg-orange-900/10 rounded-lg font-medium flex items-center justify-center gap-2 transition-all"
-              >
-                <Download className="h-5 w-5" />
-                Download Template
-              </motion.button>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                  Upload your CSV file
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Download our template to see the required format.
+                </p>
+              </div>
 
-              {/* File upload zone */}
+              {/*
+               * FIX (hook shape): hook now exposes `selectedFile` (not `file`).
+               * FileUploadZone prop is also `selectedFile` — the naming now matches.
+               * onRemoveFile calls local handleRemoveFile which resets the hook.
+               */}
               <FileUploadZone
+                selectedFile={selectedFile}
                 onFileSelect={handleFileSelect}
-                selectedFile={file}
-                onRemoveFile={() => setFile(null)}
-                isLoading={isUploading}
-                uploadProgress={uploadProgress}
-                error={uploadError}
+                onRemoveFile={selectedFile ? handleRemoveFile : undefined}
+                accept=".csv,.xlsx"
+                isLoading={isValidating}
               />
 
-              {/* File format info */}
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 rounded-lg">
-                <p className="text-sm text-blue-700 dark:text-blue-400">
-                  <strong>File format:</strong> CSV or Excel (.xlsx) · <strong>Max 10 MB</strong> · <strong>Max 1,000 rows</strong>
-                </p>
+              {displayError && <ErrorBanner error={displayError} />}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleDownloadTemplate}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium
+                             text-gray-700 dark:text-gray-300 border border-gray-300
+                             dark:border-gray-600 rounded-lg hover:bg-gray-50
+                             dark:hover:bg-gray-700 transition-colors"
+                >
+                  <Download className="h-4 w-4" /> Template
+                </button>
+                <button
+                  onClick={nextStep}
+                  disabled={!selectedFile || isValidating}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm
+                             font-semibold text-white bg-orange-500 hover:bg-orange-600
+                             disabled:bg-gray-300 dark:disabled:bg-gray-600 rounded-lg
+                             transition-colors disabled:cursor-not-allowed"
+                >
+                  {isValidating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Checking file…
+                    </>
+                  ) : (
+                    <>
+                      Continue <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
               </div>
             </motion.div>
           )}
 
-          {/* Step 1: Batch Details */}
+          {/* ════ STEP 1 — Batch details ══════════════════════════════════════ */}
           {currentStep === 1 && (
             <motion.div
               key="step1"
-              initial={{ opacity: 0, x: 100 }}
+              initial={{ opacity: 0, x: 40 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -100 }}
-              transition={{ duration: 0.3 }}
+              exit={{ opacity: 0, x: -40 }}
+              transition={{ duration: 0.25 }}
               className="space-y-6"
             >
-              {/* Batch Name */}
               <div>
-                <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                  Batch Name *
-                </label>
-                <input
-                  {...register('batchName')}
-                  type="text"
-                  placeholder="e.g., London Deliveries May 2024"
-                  maxLength={100}
-                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
-                />
-                <div className="flex items-end justify-between mt-2">
-                  {formErrors.batchName && (
-                    <p className="text-sm text-red-600 dark:text-red-400">
-                      {formErrors.batchName.message}
-                    </p>
-                  )}
-                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">
-                    {watchedBatchName.length}/100
-                  </span>
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                  Notes (Optional)
-                </label>
-                <textarea
-                  {...register('notes')}
-                  placeholder="Add any notes about this batch..."
-                  maxLength={1000}
-                  rows={4}
-                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none transition-all"
-                />
-                <div className="flex items-end justify-between mt-2">
-                  {formErrors.notes && (
-                    <p className="text-sm text-red-600 dark:text-red-400">
-                      {formErrors.notes.message}
-                    </p>
-                  )}
-                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">
-                    {watchedNotes.length}/1,000
-                  </span>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Step 2: Review & Confirm */}
-          {currentStep === 2 && (
-            <motion.div
-              key="step2"
-              initial={{ opacity: 0, x: 100 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -100 }}
-              transition={{ duration: 0.3 }}
-              className="space-y-6"
-            >
-              {/* Summary card */}
-              <div className="p-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg space-y-3">
-                <div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 font-semibold">FILE</p>
-                  <p className="text-sm text-gray-900 dark:text-white font-medium">
-                    {file?.name}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 font-semibold">BATCH NAME</p>
-                  <p className="text-sm text-gray-900 dark:text-white font-medium">
-                    {batchName || '—'}
-                  </p>
-                </div>
-                {notes && (
-                  <div>
-                    <p className="text-xs text-gray-600 dark:text-gray-400 font-semibold">NOTES</p>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">{notes}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Info callout */}
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 rounded-lg flex gap-3">
-                <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-blue-700 dark:text-blue-400">
-                  Your file will be validated and processed after submission. This may take 1–2 minutes for
-                  large files.
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                  Batch details
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Give your batch a name so you can find it later.
                 </p>
               </div>
 
-              {/* Progress bar (while uploading) */}
-              {isUploading && (
-                <BulkUploadProgressBar
-                  pct={uploadProgress}
-                  label={`Uploading... ${uploadProgress}%`}
-                  status="processing"
-                />
-              )}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Batch name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    {...register("batchName")}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600
+                               rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                               focus:outline-none focus:ring-2 focus:ring-orange-500 transition"
+                    placeholder="e.g. March Week 2 Deliveries"
+                  />
+                  {formErrors.batchName && (
+                    <p className="mt-1 text-xs text-red-500">
+                      {formErrors.batchName.message}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Notes (optional)
+                  </label>
+                  <textarea
+                    {...register("notes")}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600
+                               rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                               focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none transition"
+                    placeholder="Any special instructions…"
+                  />
+                  {formErrors.notes && (
+                    <p className="mt-1 text-xs text-red-500">
+                      {formErrors.notes.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {displayError && <ErrorBanner error={displayError} />}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={prevStep}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium
+                             text-gray-700 dark:text-gray-300 border border-gray-300
+                             dark:border-gray-600 rounded-lg hover:bg-gray-50
+                             dark:hover:bg-gray-700 transition-colors"
+                >
+                  <ArrowLeft className="h-4 w-4" /> Back
+                </button>
+                <button
+                  onClick={handleStep1Continue}
+                  disabled={isValidating}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm
+                             font-semibold text-white bg-orange-500 hover:bg-orange-600
+                             disabled:bg-gray-300 dark:disabled:bg-gray-600 rounded-lg
+                             transition-colors disabled:cursor-not-allowed"
+                >
+                  Validate & Continue <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
             </motion.div>
           )}
 
-          {/* Step 3: Processing / Done */}
-          {currentStep === 3 && latestUpload && (
+          {/* ════ STEP 2 — Review & Confirm ══════════════════════════════════ */}
+          {currentStep === 2 && (
             <motion.div
-              key="step3"
-              initial={{ opacity: 0, x: 100 }}
+              key="step2"
+              initial={{ opacity: 0, x: 40 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -100 }}
-              transition={{ duration: 0.3 }}
+              exit={{ opacity: 0, x: -40 }}
+              transition={{ duration: 0.25 }}
               className="space-y-6"
             >
-              {/* Status */}
-              {['pending', 'processing'].includes(latestUpload.status) && (
-                <div className="space-y-4">
-                  {/* Animated progress bar */}
-                  <BulkUploadProgressBar
-                    pct={latestUpload.progress_pct || 0}
-                    label={`Processed: ${latestUpload.processed || 0} / ${latestUpload.total_rows || 0} rows`}
-                    status="processing"
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                  Review & Confirm
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Check your upload details before submitting.
+                </p>
+              </div>
+
+              {validationResult && (
+                <div className="space-y-3">
+                  <ReviewRow label="File" value={selectedFile?.name} />
+                  <ReviewRow
+                    label="Valid rows"
+                    value={validationResult.valid_rows ?? validationResult.row_count}
                   />
-
-                  {/* Live stats */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-900/30">
-                      <p className="text-xs text-green-700 dark:text-green-400 font-semibold">SUCCESSFUL</p>
-                      <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
-                        {latestUpload.successful || 0}
-                      </p>
-                    </div>
-                    <div className="p-3 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-200 dark:border-red-900/30">
-                      <p className="text-xs text-red-700 dark:text-red-400 font-semibold">FAILED</p>
-                      <p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">
-                        {latestUpload.failed || 0}
-                      </p>
-                    </div>
-                  </div>
-
-                  <p className="text-center text-sm text-gray-600 dark:text-gray-400">
-                    Processing... Please wait.
-                  </p>
-                </div>
-              )}
-
-              {/* Completed */}
-              {latestUpload.status === 'completed' && (
-                <div className="space-y-4">
-                  <div className="p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30 rounded-lg flex gap-3">
-                    <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold text-green-700 dark:text-green-400">
-                        ✓ All {latestUpload.total_rows} bookings created successfully
-                      </p>
-                      {latestUpload.total_spend_gbp && (
-                        <p className="text-sm text-green-600 dark:text-green-400/80 mt-1">
-                          Total: £{latestUpload.total_spend_gbp.toFixed(2)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* FIX-BUG-05: PREPAID payment with gateway selector */}
-                  {paymentPath === "prepaid" && (
-                    <div className="space-y-4">
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => setSelectedGateway("stripe")}
-                          className={`flex-1 py-2 rounded-lg border text-sm font-medium transition
-                            ${selectedGateway === "stripe"
-                              ? "border-orange-500 bg-orange-500/10 text-orange-400"
-                              : "border-slate-600 text-slate-400 hover:border-slate-500"}`}
-                        >
-                          💳 Pay by Card (Stripe)
-                        </button>
-                        <button
-                          onClick={() => setSelectedGateway("paypal")}
-                          className={`flex-1 py-2 rounded-lg border text-sm font-medium transition
-                            ${selectedGateway === "paypal"
-                              ? "border-blue-500 bg-blue-500/10 text-blue-400"
-                              : "border-slate-600 text-slate-400 hover:border-slate-500"}`}
-                        >
-                          🔵 Pay via PayPal
-                        </button>
-                      </div>
-
-                      <button
-                        onClick={() => handleInitiatePayment(selectedGateway)}
-                        disabled={isInitiatingPayment}
-                        className="w-full py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-slate-600
-                                   text-white rounded-xl font-semibold transition flex items-center justify-center gap-2"
-                      >
-                        {isInitiatingPayment ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Preparing payment…
-                          </>
-                        ) : (
-                          `Pay £${latestUpload?.effective_total || latestUpload?.total_spend_gbp?.toFixed(2) || "0.00"}`
-                        )}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* FIX-BUG-09: NET terms confirmation with invoice link */}
-                  {paymentPath === "net" && latestUpload?.receivable_id && (
-                    <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-5">
-                      <div className="flex items-center gap-2 mb-3">
-                        <FileText className="w-5 h-5 text-blue-400" />
-                        <span className="font-semibold text-white">Invoice Raised</span>
-                      </div>
-                      <p className="text-sm text-slate-400 mb-1">
-                        An invoice has been emailed to your registered address.
-                      </p>
-                      <p className="text-sm text-slate-400 mb-4">
-                        Due in {latestUpload.net_days || 30} days.
-                      </p>
-                      <button
-                        onClick={() => {
-                          reset();
-                          onSuccess();
-                          onClose();
-                        }}
-                        className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white
-                                   rounded-lg font-medium text-sm transition"
-                      >
-                        View Invoice
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Partial / Failed */}
-              {['partial', 'failed'].includes(latestUpload.status) && (
-                <div className="space-y-4">
-                  <div
-                    className={`p-4 rounded-lg flex gap-3 ${
-                      latestUpload.status === 'partial'
-                        ? 'bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30'
-                        : 'bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30'
-                    }`}
-                  >
-                    <AlertCircle
-                      className={`h-6 w-6 flex-shrink-0 mt-0.5 ${
-                        latestUpload.status === 'partial'
-                          ? 'text-amber-600 dark:text-amber-400'
-                          : 'text-red-600 dark:text-red-400'
-                      }`}
+                  {validationResult.error_count > 0 && (
+                    <ReviewRow
+                      label="Rows with errors"
+                      value={validationResult.error_count}
+                      valueClass="text-red-500"
                     />
-                    <div>
-                      <p
-                        className={`font-bold ${
-                          latestUpload.status === 'partial'
-                            ? 'text-amber-700 dark:text-amber-400'
-                            : 'text-red-700 dark:text-red-400'
-                        }`}
-                      >
-                        {latestUpload.successful} / {latestUpload.total_rows} bookings created.{' '}
-                        {latestUpload.failed} rows failed.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Error table */}
-                  <ErrorTable
-                    errors={errorRows}
-                    meta={errorMeta}
-                    onPageChange={setErrorPage}
-                    isLoading={isFetchingErrors}
-                    onDownloadCSV={handleDownloadErrorReport}
-                    onRetry={handleRetryFailed}
-                    isRetrying={false}
+                  )}
+                  <ReviewRow
+                    label="Estimated total"
+                    value={`£${formatTotal(validationResult)}`}
+                    valueClass="text-orange-400 font-bold"
                   />
                 </div>
               )}
+
+              {displayError && <ErrorBanner error={displayError} />}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={prevStep}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium
+                             text-gray-700 dark:text-gray-300 border border-gray-300
+                             dark:border-gray-600 rounded-lg hover:bg-gray-50
+                             dark:hover:bg-gray-700 transition-colors"
+                >
+                  <ArrowLeft className="h-4 w-4" /> Back
+                </button>
+                <button
+                  onClick={handleStep2Submit}
+                  disabled={isUploading}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm
+                             font-semibold text-white bg-orange-500 hover:bg-orange-600
+                             disabled:bg-gray-300 dark:disabled:bg-gray-600 rounded-lg
+                             transition-colors disabled:cursor-not-allowed"
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Submitting…
+                    </>
+                  ) : (
+                    <>
+                      Submit Batch <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              </div>
             </motion.div>
           )}
+
+          {/* ════ STEP 3 — Processing ═════════════════════════════════════════ */}
+          {currentStep === 3 && (
+            <motion.div
+              key="step3"
+              initial={{ opacity: 0, x: 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -40 }}
+              transition={{ duration: 0.25 }}
+              className="space-y-6"
+            >
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                  Processing your batch
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {isProcessing
+                    ? "Please wait while we process your bookings…"
+                    : isPaymentPending
+                      ? "Bookings created — preparing payment…"
+                      : isCompleted
+                        ? "Processing complete."
+                        : isFailed
+                          ? "Processing failed."
+                          : ""}
+                </p>
+              </div>
+
+              {/* Progress bar — always shown in step 3 */}
+              <BulkUploadProgressBar
+                upload={latestUpload}
+                status={isProcessing ? "processing" : derivedStatus}
+                highlight={
+                  latestUpload?.customer_type?.toUpperCase() === "NET"
+                    ? "blue"
+                    : "orange"
+                }
+              />
+
+              {/* ── PAYMENT_PENDING: auto-nav in flight ──────────────────── */}
+              {isPaymentPending && isAutoNavQueued && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex items-center gap-3 p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg"
+                >
+                  <Loader2 className="h-5 w-5 animate-spin text-orange-400 flex-shrink-0" />
+                  <p className="text-sm text-orange-300 font-medium">
+                    Preparing your payment — redirecting shortly…
+                  </p>
+                </motion.div>
+              )}
+
+              {/*
+               * ── PAYMENT_PENDING: manual escape hatch ──────────────────────
+               * Always shown when status is payment_pending so the user can
+               * continue even if the auto-nav timer misbehaves.
+               * Calls manualContinueToPayment() which navigates to
+               * /pay/bulk/:uploadId (same route as auto-nav).
+               */}
+              {isPaymentPending && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-3 p-4 bg-green-500/10 border border-green-500/30 rounded-xl"
+                >
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-400 flex-shrink-0" />
+                    <p className="text-sm font-semibold text-green-300">
+                      Bookings created successfully!
+                    </p>
+                  </div>
+                  {latestUpload?.success_count && (
+                    <p className="text-sm text-green-200/80">
+                      {latestUpload.success_count} booking
+                      {latestUpload.success_count !== 1 ? "s" : ""} ready for payment (£
+                      {formatTotal(latestUpload)}).
+                    </p>
+                  )}
+                  <button
+                    onClick={manualContinueToPayment}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-orange-500
+                               hover:bg-orange-600 text-white text-sm font-semibold rounded-lg
+                               transition-colors"
+                  >
+                    Continue to Payment <ArrowRight className="h-4 w-4" />
+                  </button>
+                </motion.div>
+              )}
+
+              {/* ── COMPLETED (NET flow): invoice raised ──────────────────── */}
+              {isCompleted && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-4 bg-blue-900/20 border border-blue-500/30 rounded-xl space-y-3"
+                >
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-blue-400" />
+                    <p className="text-sm font-semibold text-blue-300">
+                      Invoice Raised
+                    </p>
+                  </div>
+                  <p className="text-sm text-blue-200/80">
+                    Your invoice for{" "}
+                    <strong>£{formatTotal(latestUpload)}</strong> has been
+                    created. You will receive a confirmation email shortly.
+                  </p>
+                  {/* FIX Bug 4: manual "View Invoice" escape hatch for NET flow */}
+                  {latestUpload?.receivable_id && (
+                    <button
+                      onClick={manualViewInvoice}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-600
+                                 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg
+                                 transition-colors mt-2"
+                    >
+                      View Invoice <ArrowRight className="h-4 w-4" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { handleClose(); navigate("/billing"); }}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 border border-blue-500/40
+                               text-blue-300 text-sm font-medium rounded-lg
+                               transition-colors hover:bg-blue-500/10"
+                  >
+                    View Billing &amp; Invoices <ArrowRight className="h-4 w-4" />
+                  </button>
+                </motion.div>
+              )}
+
+              {/* ── Waiting for receivable (NET interim) ──────────────────── */}
+              {isWaitingForReceivable && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex items-center gap-3 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg"
+                >
+                  <Loader2 className="h-5 w-5 animate-spin text-blue-400 flex-shrink-0" />
+                  <p className="text-sm text-blue-300">
+                    Generating your invoice — this takes a moment…
+                  </p>
+                </motion.div>
+              )}
+
+              {/* ── FAILED ────────────────────────────────────────────────── */}
+              {isFailed && displayError && (
+                <ErrorBanner error={displayError} />
+              )}
+              {isFailed && !displayError && (
+                <ErrorBanner error="Processing failed. Please try again or contact support." />
+              )}
+
+              <div className="flex justify-end">
+                <button
+                  onClick={handleClose}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400
+                             hover:text-gray-900 dark:hover:text-white transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          )}
+
         </AnimatePresence>
       </div>
+    </div>
+  );
+}
 
-      {/* Footer navigation */}
-      <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3 bg-gray-50 dark:bg-gray-700/50">
-        {currentStep > 0 && currentStep < 3 && (
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={prevStep}
-            className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg font-medium flex items-center gap-2 transition-all"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </motion.button>
-        )}
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-        <div className="flex-1" />
+function ErrorBanner({ error }) {
+  if (!error) return null;
+  const msg =
+    typeof error === "string" ? error : error?.message || "An error occurred";
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"
+    >
+      <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+      <p className="text-sm text-red-700 dark:text-red-400">{msg}</p>
+    </motion.div>
+  );
+}
 
-        {currentStep < 2 && (
-          <motion.button
-            whileHover={canAdvanceStep0 ? { scale: 1.02 } : {}}
-            whileTap={canAdvanceStep0 ? { scale: 0.98 } : {}}
-            // FIX: step 0 uses nextStep; step 1 must call handleStep1Continue
-            // which runs RHF validation then handleValidateAndUpload
-            onClick={currentStep === 0 ? nextStep : handleStep1Continue}
-            disabled={currentStep === 0 ? !canAdvanceStep0 : (isUploading || !batchName?.trim())}
-            className="px-6 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium flex items-center gap-2 transition-all"
-          >
-            {isUploading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Uploading...
-              </>
-            ) : (
-              <>
-                {currentStep === 0 ? 'Continue' : 'Validate & Review'} <ArrowRight className="h-4 w-4" />
-              </>
-            )}
-          </motion.button>
-        )}
-
-        {currentStep === 2 && (
-          <motion.button
-            whileHover={canAdvanceStep2 ? { scale: 1.02 } : {}}
-            whileTap={canAdvanceStep2 ? { scale: 0.98 } : {}}
-            // FIX: call handleSubmit directly — no RHF wrapper needed at step 2
-            // (there are no form fields on the Review screen to validate)
-            onClick={async () => {
-              const success = await handleSubmit();
-              if (success) nextStep();
-            }}
-            disabled={!canAdvanceStep2}
-            className="px-6 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium flex items-center gap-2 transition-all"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              <>
-                Submit Batch <ArrowRight className="h-4 w-4" />
-              </>
-            )}
-          </motion.button>
-        )}
-
-        {currentStep === 3 && (
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => {
-              reset();
-              onSuccess();
-              onClose();
-            }}
-            className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium flex items-center gap-2 transition-all"
-          >
-            Done <CheckCircle2 className="h-4 w-4" />
-          </motion.button>
-        )}
-      </div>
+function ReviewRow({
+  label,
+  value,
+  valueClass = "text-gray-900 dark:text-white",
+}) {
+  return (
+    <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+      <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
+      <span className={`text-sm font-medium ${valueClass}`}>
+        {value ?? "—"}
+      </span>
     </div>
   );
 }
