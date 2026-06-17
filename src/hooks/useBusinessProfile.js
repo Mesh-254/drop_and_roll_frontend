@@ -60,6 +60,8 @@ export function useBusinessProfile() {
   const isApproved = hasProfile && businessProfile.is_approved === true;
   const isPending  = hasProfile && businessProfile.is_approved === false;
   const isRejected = false; // not implemented in backend yet
+  const packageTier = hasProfile ? (businessProfile.package_tier ?? 'none') : 'none';
+  const hasNetTerms = hasProfile && businessProfile.payment_terms !== 'prepaid';
 
   return {
     businessProfile,
@@ -70,7 +72,10 @@ export function useBusinessProfile() {
     isApproved,
     isPending,
     isRejected,
+    packageTier,
+    hasNetTerms,
   };
 }
 
 export default useBusinessProfile;
+  
