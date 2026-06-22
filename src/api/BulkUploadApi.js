@@ -225,14 +225,18 @@ class BulkUploadApi extends ApiBase {
   }
 
   /**
-   * TEMPLATE — Download the CSV upload template.
+   * TEMPLATE — Download the bulk upload template (.xlsx).
+   * Calls GET /api/booking/bulk-template/ which returns a live-generated
+   * Excel file with dropdowns sourced from the DB.
    */
   async downloadTemplate() {
     const response = await this.axiosInstance.get(
       '/api/booking/bulk-template/',
       { responseType: 'blob' },
     );
-    this._triggerDownload(response.data, 'drop-n-roll-bulk-template.csv');
+    // FIX: backend returns .xlsx — was incorrectly named .csv which caused
+    // Excel to open it in compatibility mode without dropdown validation.
+    this._triggerDownload(response.data, 'drop-n-roll-bulk-template.xlsx');
   }
 
   /**
