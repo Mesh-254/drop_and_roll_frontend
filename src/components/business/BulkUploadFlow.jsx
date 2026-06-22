@@ -69,6 +69,7 @@ import {
   X,
 } from "lucide-react";
 import { useBulkUpload } from "../../hooks/useBulkUpload";
+import BulkUploadApi from "../../api/BulkUploadApi";
 import FileUploadZone from "./FileUploadZone";
 import BulkUploadProgressBar from "./BulkUploadProgressBar";
 import ErrorTable from "./ErrorTable";
@@ -244,13 +245,18 @@ export default function BulkUploadFlow({
   };
 
   // ── Template download ─────────────────────────────────────────────────────
+  // FIX: was pointing at a non-existent static file (/templates/bulk_upload_template.csv)
+  // which caused Vite's SPA fallback to serve index.html instead of a real file.
+  // Now delegates to BulkUploadApi.downloadTemplate() which calls
+  // GET /api/booking/bulk-template/ — the backend generates a live .xlsx with
+  // dropdowns sourced from the DB and returns it as an attachment.
 
-  const handleDownloadTemplate = () => {
-    // Adjust URL to wherever your template CSV lives
-    const link = document.createElement("a");
-    link.href = "/templates/bulk_upload_template.csv";
-    link.download = "bulk_upload_template.csv";
-    link.click();
+  const handleDownloadTemplate = async () => {
+    try {
+      await BulkUploadApi.downloadTemplate();
+    } catch (err) {
+      console.error("[BulkUploadFlow] Template download failed:", err);
+    }
   };
 
   // ── Close handler ─────────────────────────────────────────────────────────
