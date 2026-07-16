@@ -14,9 +14,13 @@
 //        and InvoiceDetailPage but never registered, causing blank-page 404s.
 //        Both routes added under ProtectedRoute allowedRoles=["customer"].
 
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { GoogleOAuthProvider } from "@react-oauth/google";
+import { Toaster } from "react-hot-toast";
+import ErrorBoundary from "./components/common/ErrorBoundary";
+import { AuthModalProvider, useAuthModal } from "./contexts/AuthModalContext";
+import AuthModal from "./components/auth/AuthModal";
 import { QuoteProvider } from "./contexts/QuoteContext";
 import Header from "./components/common/Header";
 import Hero from "./components/landingPage/Hero";
@@ -105,12 +109,70 @@ function AdminRedirect() {
   );
 }
 
+/**
+ * AuthModalRoute — handles deep-linked /login and /register URLs.
+ * Opens the auth modal immediately and renders the home page as the background
+ * so the user doesn't land on a blank page.
+ */
+function AuthModalRoute({ view }) {
+  const { openLogin, openRegister, isOpen } = useAuthModal();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (view === "login") openLogin();
+    else openRegister();
+  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When the modal closes (user logged in or dismissed), go home.
+  useEffect(() => {
+    if (!isOpen) navigate("/", { replace: true });
+  }, [isOpen, navigate]);
+
+  return (
+    <MainLayout>
+      <HomePage />
+    </MainLayout>
+  );
+}
+
 function App() {
   const googleClientId = import.meta.env.VITE_PUBLIC_GOOGLE_CLIENT_ID;
 
   return (
+    <ErrorBoundary>
     <GoogleOAuthProvider clientId={googleClientId}>
+    <AuthModalProvider>
+      <AuthModal />
       <div className="min-h-screen bg-black text-white">
+        {/*
+          Single app-wide Toaster. Several components already call
+          `toast.success/.error(...)` from "react-hot-toast" (driver
+          dashboard, quote/booking validation, address geofencing) but
+          nothing was mounting the portal that actually renders them —
+          those calls were silently no-ops. Mounted once here so every
+          toast in the app shows up, styled to match the brand accent.
+        */}
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 4500,
+            style: {
+              background: "#1f2937",
+              color: "#fff",
+              border: "1px solid rgba(249,115,22,0.35)",
+              fontSize: "0.875rem",
+            },
+            success: {
+              iconTheme: { primary: "#f97316", secondary: "#fff" },
+            },
+            error: {
+              iconTheme: { primary: "#ef4444", secondary: "#fff" },
+              style: {
+                border: "1px solid rgba(239,68,68,0.45)",
+              },
+            },
+          }}
+        />
         <Routes>
           {/* ── Public ──────────────────────────────────────────────── */}
           <Route
@@ -129,14 +191,17 @@ function App() {
               </MainLayout>
             }
           />
-          <Route path="/register" element={<RegisterPage />} />
+          {/* /login and /register open the auth modal over the home page.
+              Deep-linking still works: the URL is valid, user sees content,
+              modal appears immediately. */}
+          <Route path="/login" element={<AuthModalRoute view="login" />} />
+          <Route path="/register" element={<AuthModalRoute view="register" />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route
             path="/reset-password/:uid/:token"
             element={<ResetPassword />}
           />
           <Route path="/check-email" element={<CheckEmail />} />
-          <Route path="/login" element={<LoginPage />} />
           <Route
             path="/email-confirmation"
             element={<EmailConfirmationPage />}
@@ -324,7 +389,9 @@ function App() {
           />
         </Routes>
       </div>
+    </AuthModalProvider>
     </GoogleOAuthProvider>
+    </ErrorBoundary>
   );
 }
 

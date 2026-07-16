@@ -7,10 +7,12 @@ import TrackParcelModal from "../track/TrackParcelModal";
 import GetQuoteBook from "../quote/GetQuoteBook";
 import ProfileDropdown from "../profile/ProfileDropdown";
 import { useAuth } from "../../contexts/AuthContext";
+import { useAuthModal } from "../../contexts/AuthModalContext";
 
 export default function Header() {
   const navigate = useNavigate();
   const { isAuthenticated, logout } = useAuth();
+  const { openLogin, openRegister } = useAuthModal();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showTrackModal, setShowTrackModal] = useState(false);
@@ -41,13 +43,8 @@ export default function Header() {
     setShowQuoteModal(false);
   };
 
-  const handleLogin = () => {
-    navigate("/login");
-  };
-
-  const handleRegister = () => {
-    navigate("/register");
-  };
+  const handleLogin = () => openLogin();
+  const handleRegister = () => openRegister();
 
   const handleSmoothScroll = (elementId) => {
     const element = document.getElementById(elementId)

@@ -277,6 +277,72 @@ async searchPostcodeAddresses(query, apiKey) {
 }
 
 /**
+ * Search premise-level addresses via OUR backend proxy, which holds the
+ * Ideal Postcodes API key server-side (bookings/api_views_address.py).
+ *
+ * This is the method PostcodeFirstAutocomplete uses — unlike
+ * searchPostcodeAddresses() above, no API key ever reaches the browser, so
+ * there's nothing for a curious devtools user to lift and abuse against our
+ * metered Ideal Postcodes quota.
+ *
+ * Returns { success, results, reason? }. `reason` is only present on
+ * failure ("not_configured" | "rate_limited" | "upstream_error" |
+ * "bad_request") so the caller can decide whether to fall back to Google
+ * Places or straight to manual entry — see PostcodeFirstAutocomplete's
+ * fallback chain.
+ */
+async autocompleteAddress(query, limit = 10) {
+  if (!query || query.trim().length < 2) {
+    return { success: true, results: [] };
+  }
+  try {
+    const response = await this.request("/api/booking/address/autocomplete/", {
+      method: "GET",
+      params: { query: query.trim(), limit },
+      includeAuth: false, // public endpoint, used pre-authentication
+    });
+    // The view always returns 200 (even on upstream failure) so we can
+    // branch on `reason` here instead of on HTTP status.
+    return response.data;
+  } catch (error) {
+    console.error("[BookingApi] autocompleteAddress error:", error);
+    return {
+      success: false,
+      reason: "upstream_error",
+      message: error.message || "Address search failed",
+    };
+  }
+}
+
+/**
+ * Fetch a full premise-level address (line1/line2/city/region/postal_code/
+ * lat/lng) for a suggestion returned by autocompleteAddress(), via our
+ * backend proxy. Also returns an immediate `in_service_area` / 
+ * `service_area_message` preflight so the UI can warn the user before they
+ * even reach the booking-create request — the backend AddressSerializer
+ * still re-validates this authoritatively at booking time.
+ */
+async getPostcodeAddressDetails(addressId) {
+  if (!addressId) {
+    return { success: false, message: "Missing address id" };
+  }
+  try {
+    const response = await this.request(
+      `/api/booking/address/lookup/${encodeURIComponent(addressId)}/`,
+      { method: "GET", includeAuth: false }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("[BookingApi] getPostcodeAddressDetails error:", error);
+    return {
+      success: false,
+      reason: "upstream_error",
+      message: error.message || "Address lookup failed",
+    };
+  }
+}
+
+/**
  * DEPRECATED: Use Ideal Postcodes API instead.
  * This method returns only postcode centroid, not individual addresses.
  * Retained for backward compatibility.
@@ -305,43 +371,72 @@ async lookupPostcode(postcode) {
 }
 
 /**
- * Validate address is within service area (MK or OX postcodes)
- * and geographic bounds
+ * Validate address is within service area (MK or OX postcodes, plus any
+ * extra approved districts) and geographic bounds.
+ *
+ * Mirrors the backend's two-tier check (bookings/utils/service_area.py) so
+ * the user gets instant feedback without a round trip — but this is a UX
+ * convenience only. The backend re-validates authoritatively on booking
+ * create and will reject anything that slips past this client check.
+ *
+ * NOTE: keep SERVICE_AREAS / EXTRA_PREFIXES / ANCHORS in sync with
+ * bookings/utils/service_area.py if the service area ever changes.
  */
 validateAddressInServiceArea(address) {
   const SERVICE_AREAS = ["MK", "OX"];
-  const BOUNDS = {
-    southWest: { lat: 51.65, lng: -1.35 },
-    northEast: { lat: 52.1, lng: -0.65 },
-  };
+  // Extra approved districts outside the MK/OX prefix pattern — keep in
+  // sync with settings.SERVICE_AREA_EXTRA_PREFIXES on the backend.
+  const EXTRA_PREFIXES = ["CV47", "SP4"];
+  const RADIUS_KM = 40;
+  // Same anchor points as _SERVICE_AREA_ANCHORS in service_area.py.
+  const ANCHORS = [
+    { lat: 52.0406, lng: -0.7594, name: "Milton Keynes" },
+    { lat: 51.7520, lng: -1.2577, name: "Oxford" },
+    { lat: 52.0303, lng: -0.8884, name: "Buckingham" },
+    { lat: 51.9974, lng: -0.7426, name: "Newport Pagnell" },
+  ];
 
-  // Check postcode
   const postcodeTrimmed = (address.postal_code || "")
     .replace(/\s+/g, "")
     .toUpperCase();
-  const isInServiceArea = SERVICE_AREAS.some((area) =>
-    postcodeTrimmed.startsWith(area)
-  );
 
-  if (!isInServiceArea) {
-    return {
-      valid: false,
-      message: "We only deliver in Milton Keynes (MK) and Oxford (OX) areas",
-    };
+  const matchesPrefix =
+    SERVICE_AREAS.some((area) => postcodeTrimmed.startsWith(area)) ||
+    EXTRA_PREFIXES.some((prefix) => postcodeTrimmed.startsWith(prefix.replace(/\s+/g, "")));
+
+  const lat = Number.parseFloat(address.latitude);
+  const lng = Number.parseFloat(address.longitude);
+  const hasCoords = !Number.isNaN(lat) && !Number.isNaN(lng);
+
+  if (!matchesPrefix) {
+    // Tier 1 failed. If we also have coordinates, Tier 2 (radius) might
+    // still rescue an edge-of-district postcode that just isn't in our
+    // hard-coded prefix list yet — otherwise reject outright.
+    if (!hasCoords) {
+      return {
+        valid: false,
+        message: "We only deliver in the Milton Keynes (MK) and Oxford (OX) areas.",
+      };
+    }
   }
 
-  // Check bounds
-  const lat = address.latitude;
-  const lng = address.longitude;
-
-  if (
-    !lat ||
-    !lng ||
-    lat < BOUNDS.southWest.lat ||
-    lat > BOUNDS.northEast.lat ||
-    lng < BOUNDS.southWest.lng ||
-    lng > BOUNDS.northEast.lng
-  ) {
+  if (hasCoords) {
+    let nearestKm = Infinity;
+    let nearestName = "service area";
+    for (const anchor of ANCHORS) {
+      const dKm = this._haversineKm(lat, lng, anchor.lat, anchor.lng);
+      if (dKm < nearestKm) {
+        nearestKm = dKm;
+        nearestName = anchor.name;
+      }
+    }
+    if (nearestKm > RADIUS_KM) {
+      return {
+        valid: false,
+        message: `This address is ${nearestKm.toFixed(1)}km from ${nearestName}, outside our ${RADIUS_KM}km service radius.`,
+      };
+    }
+  } else if (!matchesPrefix) {
     return {
       valid: false,
       message: "Address is outside our service area",
@@ -349,6 +444,17 @@ validateAddressInServiceArea(address) {
   }
 
   return { valid: true };
+}
+
+/** Great-circle distance in km — shared by validateAddressInServiceArea. */
+_haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = this.deg2rad(lat2 - lat1);
+  const dLng = this.deg2rad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(this.deg2rad(lat1)) * Math.cos(this.deg2rad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 //  Create quote and booking methods with improved error handling and validation
@@ -469,6 +575,16 @@ async createQuote(quoteData) {
         method: "POST",
         data: backendData,
       });
+
+      // Guest bookings return a guest_identifier - an opaque token that,
+      // together with guest_email, is now REQUIRED to look up or pay for
+      // this booking later (a bare email match is no longer accepted by
+      // the backend). Persist it the same way we persist guestEmail.
+      const returnedIdentifier = response.data?.guest_identifier;
+      if (returnedIdentifier) {
+        localStorage.setItem("guestIdentifier", returnedIdentifier);
+      }
+
       return { success: true, data: response.data };
     } catch (error) {
       console.error("[BookingApi] createBooking error:", error);
@@ -545,7 +661,7 @@ async createQuote(quoteData) {
    * @param {string} bookingId - The UUID of the booking
    * @returns {Promise<Object>}
    */
-  async getBooking(bookingId) {
+  async getBooking(bookingId, guestEmail, guestIdentifier) {
     if (!bookingId || typeof bookingId !== "string") {
       console.error("[BookingAPI] Invalid bookingId provided:", bookingId);
       return {
@@ -557,12 +673,17 @@ async createQuote(quoteData) {
 
     try {
       console.log(`[BookingAPI] Fetching booking details: ${bookingId}`);
-      const response = await super.request(
-        `/api/booking/bookings/${bookingId}/`,
-        {
-          method: "GET",
-        }
-      );
+      // Guests are unauthenticated, so the backend identifies ownership via
+      // ?guest_email=&guest_identifier= (mirrors PaymentApi.getTransaction).
+      // Both are required — guest_email alone is no longer accepted.
+      let url = `/api/booking/bookings/${bookingId}/`;
+      const identifier = guestIdentifier || localStorage.getItem("guestIdentifier");
+      if (guestEmail && identifier) {
+        url += `?guest_email=${encodeURIComponent(guestEmail)}&guest_identifier=${encodeURIComponent(identifier)}`;
+      }
+      const response = await super.request(url, {
+        method: "GET",
+      });
       return { success: true, data: response.data };
     } catch (error) {
       console.error("[BookingAPI] Error fetching booking:", error);
@@ -619,3 +740,4 @@ async createQuote(quoteData) {
 }
 
 export const bookingApi = new BookingApi();
+export default bookingApi;
