@@ -4,6 +4,10 @@ import "./index.css";
 import App from "./App.jsx";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { fetchParcelLimits } from "./utils/parcelValidation";
+
+// Warm the parcel limits cache so Zod schemas use live backend values.
+fetchParcelLimits();
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

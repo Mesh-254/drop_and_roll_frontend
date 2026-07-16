@@ -23,9 +23,16 @@ import {
   Plus,
 } from "lucide-react";
 import MapComponent from "../map/MapComponent";
-import AddressAutocomplete from "../map/AddressAutocomplete";
+import PostcodeFirstAutocomplete from "../map/PostcodeFirstAutocomplete";
 import ParcelCard from "./ParcelCard";
 import { APIProvider } from "@vis.gl/react-google-maps";
+import { useDebouncedValidation } from "../../hooks/useDebouncedValidation";
+import {
+  validateParcelFields,
+  validateField,
+  insuranceSchema,
+  PARCEL_LIMITS,
+} from "../../utils/parcelValidation";
 
 const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
@@ -329,6 +336,26 @@ export default function GetQuoteModal({
     }, 0);
   }, [formData.parcels]);
 
+  // Real-time, debounced (300ms) insurance amount validation with a critical
+  // -error toast (e.g. negative or unreasonably large values).
+  const insuranceLive = useDebouncedValidation(
+    formData.insuranceAmount,
+    (v) => validateField(insuranceSchema, v),
+    {
+      toastOnError: true,
+      toastId: "insurance-amount",
+      skip: !formData.insurance,
+    },
+  );
+  const insuranceError = formData.insurance
+    ? insuranceLive.error || validation.insuranceAmount
+    : null;
+  const insuranceValid =
+    formData.insurance &&
+    !insuranceError &&
+    formData.insuranceAmount !== "" &&
+    !insuranceLive.isValidating;
+
   // Load shipping types and services on mount
   useEffect(() => {
     if (isOpen) {
@@ -515,37 +542,25 @@ export default function GetQuoteModal({
         }
         break;
       case 3:
-        // Validate all parcels
+        // Validate all parcels (min AND max — mirrors backend ParcelValidator /
+        // DimensionsValidator in bookings/serializers.py so nothing that would
+        // be rejected server-side can slip past this step).
         const parcelErrors = {};
         data.parcels.forEach((parcel, idx) => {
-          const pErrors = {};
-          if (!parcel.weightKg || Number.parseFloat(parcel.weightKg) <= 0) {
-            pErrors.weightKg = "Enter valid weight";
-          }
-          if (
-            !parcel.dimensions.length ||
-            Number.parseFloat(parcel.dimensions.length) <= 0
-          ) {
-            pErrors.length = "Required";
-          }
-          if (
-            !parcel.dimensions.width ||
-            Number.parseFloat(parcel.dimensions.width) <= 0
-          ) {
-            pErrors.width = "Required";
-          }
-          if (
-            !parcel.dimensions.height ||
-            Number.parseFloat(parcel.dimensions.height) <= 0
-          ) {
-            pErrors.height = "Required";
-          }
+          const pErrors = validateParcelFields(parcel);
           if (Object.keys(pErrors).length > 0) {
             parcelErrors[idx] = pErrors;
           }
         });
         if (Object.keys(parcelErrors).length > 0) {
           errors.parcels = parcelErrors;
+        }
+        // Insurance amount, only when the person has opted in.
+        if (data.insurance) {
+          const insuranceCheck = validateField(insuranceSchema, data.insuranceAmount);
+          if (!insuranceCheck.valid) {
+            errors.insuranceAmount = insuranceCheck.error;
+          }
         }
         break;
       case 4:
@@ -584,17 +599,13 @@ export default function GetQuoteModal({
       case 2:
         return data.service !== null;
       case 3:
-        return data.parcels.every(
-          (p) =>
-            p.weightKg &&
-            Number.parseFloat(p.weightKg) > 0 &&
-            p.dimensions.width &&
-            Number.parseFloat(p.dimensions.width) > 0 &&
-            p.dimensions.length &&
-            Number.parseFloat(p.dimensions.length) > 0 &&
-            p.dimensions.height &&
-            Number.parseFloat(p.dimensions.height) > 0,
+        const parcelsValid = data.parcels.every(
+          (p) => Object.keys(validateParcelFields(p)).length === 0,
         );
+        const insuranceValid =
+          !data.insurance ||
+          validateField(insuranceSchema, data.insuranceAmount).valid;
+        return parcelsValid && insuranceValid;
       case 4:
         return data.pickupAddress && data.dropoffAddress;
       case 5:
@@ -1006,23 +1017,55 @@ export default function GetQuoteModal({
 
                   {formData.insurance && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label
+                        htmlFor="insuranceAmount"
+                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                      >
                         Total Insurance Amount (£)
                       </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={formData.insuranceAmount || ""}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            insuranceAmount: e.target.value,
-                          }))
-                        }
-                        placeholder="Enter insurance value"
-                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                      />
+                      <div className="relative">
+                        <input
+                          id="insuranceAmount"
+                          type="number"
+                          min={PARCEL_LIMITS.INSURANCE_MIN_GBP}
+                          max={PARCEL_LIMITS.INSURANCE_MAX_GBP}
+                          step="0.01"
+                          value={formData.insuranceAmount || ""}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              insuranceAmount: e.target.value,
+                            }))
+                          }
+                          placeholder="Enter insurance value"
+                          aria-invalid={!!insuranceError}
+                          aria-describedby={insuranceError ? "insuranceAmount-error" : undefined}
+                          className={`w-full px-4 py-3 pr-10 border-2 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors ${
+                            insuranceError
+                              ? "border-red-500"
+                              : insuranceValid
+                                ? "border-green-500"
+                                : "border-gray-300 dark:border-gray-600"
+                          }`}
+                        />
+                        {insuranceValid && (
+                          <Check
+                            size={18}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500"
+                            aria-hidden="true"
+                          />
+                        )}
+                      </div>
+                      {insuranceError && (
+                        <div
+                          id="insuranceAmount-error"
+                          role="alert"
+                          className="flex items-center text-red-500 text-sm mt-2"
+                        >
+                          <AlertCircle size={16} className="mr-2 shrink-0" />
+                          {insuranceError}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1052,7 +1095,7 @@ export default function GetQuoteModal({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <AddressAutocomplete
+                  <PostcodeFirstAutocomplete
                     label="Pickup Address"
                     postcode={pickupPostcode}
                     onPostcodeChange={setPickupPostcode}
@@ -1070,7 +1113,7 @@ export default function GetQuoteModal({
                     placeholder="Enter pickup address"
                   />
 
-                  <AddressAutocomplete
+                  <PostcodeFirstAutocomplete
                     label="Dropoff Address"
                     postcode={dropoffPostcode}
                     onPostcodeChange={setDropoffPostcode}

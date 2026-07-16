@@ -1,8 +1,6 @@
 "use client";
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { bookingApi } from "../../api/BookingApi";
-import { useAuth } from "../../contexts/AuthContext";
 import {
   X,
   User,
@@ -11,7 +9,18 @@ import {
   CreditCard,
   AlertCircle,
   Loader2,
+  Info,
 } from "lucide-react";
+import ParcelDetails from "./ParcelDetails";
+import { validateAllParcels, formatParcelsForSubmission } from "./parcelValidation";
+
+const DEBUG = import.meta.env.NODE_ENV === 'development' && false; // Set to true for dev debug logs
+
+const debugLog = (msg, data) => {
+  if (DEBUG) {
+    console.log(`[BookingModal] ${msg}`, data);
+  }
+};
 
 const ContactInfo = ({ formData, onUpdate, validation, isAuthenticated }) => {
   if (isAuthenticated) {
@@ -50,26 +59,42 @@ const ContactInfo = ({ formData, onUpdate, validation, isAuthenticated }) => {
   );
 };
 
-export default function BookingModal({
+export default function BookingModalEnhanced({
   isOpen,
   onClose,
   quote,
+  bookingApi,
+  paymentApi,
+  isAuthenticated,
+  user,
   initialFormData = {},
+  existingBookingId,
+  existingTransactionId,
+  resumeGuestEmail,
 }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [validation, setValidation] = useState({});
+  const [parcels, setParcels] = useState(initialFormData.parcels || []);
+  const [showParcelErrors, setShowParcelErrors] = useState(false);
 
-  const { isAuthenticated, user } = useAuth();
+  const resumeBookingId =
+    location.state?.existingBookingId || existingBookingId || null;
+  const resumeTransactionId =
+    location.state?.existingTransactionId || existingTransactionId || null;
+  const resumeEmail =
+    location.state?.guestEmail || resumeGuestEmail || null;
+
+  const [resumeStatus, setResumeStatus] = useState(
+    resumeTransactionId ? "checking" : null
+  );
 
   const [formData, setFormData] = useState({
     promoCode: "",
     notes: "",
-    // Only pre-fill guestEmail for unauthenticated users.
-    // Authenticated users don't send guest_email — their identity comes from JWT.
-    guestEmail: isAuthenticated ? "" : user?.email || "",
+    guestEmail: isAuthenticated ? "" : resumeEmail || user?.email || "",
     pickupAddress: initialFormData.pickupAddress || {},
     dropoffAddress: initialFormData.dropoffAddress || {},
     ...initialFormData,
@@ -79,12 +104,38 @@ export default function BookingModal({
     if (location.state?.formData) {
       setFormData((prev) => ({
         ...prev,
-        pickupAddress: location.state.formData.pickupAddress || " ",
-        dropoffAddress: location.state.formData.dropoffAddress || " ",
+        pickupAddress: location.state.formData.pickupAddress || {},
+        dropoffAddress: location.state.formData.dropoffAddress || {},
         ...location.state.formData,
       }));
+      if (location.state.formData.parcels) {
+        setParcels(location.state.formData.parcels);
+      }
     }
   }, [location.state]);
+
+  useEffect(() => {
+    if (!resumeTransactionId || !paymentApi) return;
+    let mounted = true;
+    setResumeStatus("checking");
+    (async () => {
+      const result = await paymentApi.getTransaction(
+        resumeTransactionId,
+        resumeEmail
+      );
+      if (!mounted) return;
+      if (!result.success || !result.data) {
+        setResumeStatus("unknown");
+        return;
+      }
+      setResumeStatus(
+        result.data.status === "pending" ? "pending" : "stale"
+      );
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [resumeTransactionId, resumeEmail, paymentApi]);
 
   const updateFormData = useCallback((updates) => {
     setFormData((prev) => ({ ...prev, ...updates }));
@@ -120,22 +171,26 @@ export default function BookingModal({
       errors.dropoffAddress = "Please select a valid dropoff address";
     }
 
+    // Validate parcels
+    const parcelValidation = validateAllParcels(parcels);
+    if (!parcelValidation.isValid) {
+      errors.parcels = "Please fix all parcel validation errors";
+    }
+
+    debugLog("Form validation complete:", { errors, parcelCount: parcels.length });
     return errors;
   };
 
   const handleSubmit = async () => {
+    setShowParcelErrors(true);
     const errors = validateForm();
-    if (
-      Object.keys(errors).length > 0 ||
-      !formData.pickupAddress.line1 ||
-      !formData.dropoffAddress.line1
-    ) {
+
+    if (Object.keys(errors).length > 0) {
+      debugLog("Form submission blocked due to errors:", errors);
       setValidation({
         ...errors,
         ...(!formData.pickupAddress.line1 ? { pickupAddress: "Required" } : {}),
-        ...(!formData.dropoffAddress.line1
-          ? { dropoffAddress: "Required" }
-          : {}),
+        ...(!formData.dropoffAddress.line1 ? { dropoffAddress: "Required" } : {}),
       });
       return;
     }
@@ -144,6 +199,10 @@ export default function BookingModal({
     setSubmitError(null);
 
     try {
+      // Format parcels for submission
+      const formattedParcels = formatParcelsForSubmission(parcels);
+      debugLog("Formatted parcels for submission:", formattedParcels);
+
       const payload = {
         quoteId: quote.id,
         pickupAddress: formData.pickupAddress,
@@ -152,47 +211,51 @@ export default function BookingModal({
         notes: formData.notes || null,
         receiverEmail: formData.receiverEmail,
         receiverPhone: formData.receiverPhone,
+        parcels: formattedParcels, // Include validated parcels
       };
 
       if (!isAuthenticated && formData.guestEmail) {
         payload.guestEmail = formData.guestEmail.trim();
       }
 
-      console.log("Booking payload:", payload);
+      debugLog("Booking payload:", payload);
 
       const result = await bookingApi.createBooking(payload);
 
       if (result.success) {
         const transaction = result.data;
-        console.log("Transaction:", transaction);
+        debugLog("Transaction created:", transaction);
 
-        // Ensure transaction has an id
         if (!transaction.id) {
           throw new Error("Transaction ID is missing");
         }
 
-        // Navigate to payment page for all bookings (even if amount is 0, to handle edge cases)
         navigate(`/pay/${transaction.id}`, {
           state: {
             transaction,
             quote,
             booking: transaction.booking,
-            guestEmail: payload.guestEmail, // Pass guest_email to PaymentPage
+            guestEmail: payload.guestEmail,
           },
         });
       } else {
         throw new Error(result.message || "Failed to create booking");
       }
     } catch (error) {
-      console.error("Booking error:", error);
+      console.error("[BookingModal] Booking error:", error);
       setSubmitError(
-        error.message || "An error occurred while creating the booking",
+        error.message || "An error occurred while creating the booking"
       );
     } finally {
       setIsSubmitting(false);
     }
   };
+
   if (!isOpen || !quote) return null;
+
+  // Validate parcels for display
+  const parcelValidation = validateAllParcels(parcels);
+  const hasParcelErrors = !parcelValidation.isValid;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -217,6 +280,33 @@ export default function BookingModal({
         </div>
 
         <div className="p-6 space-y-6">
+          {resumeBookingId && resumeStatus && (
+            <div
+              role="status"
+              className={`flex items-start gap-2 rounded-lg p-3 text-sm border ${
+                resumeStatus === "stale"
+                  ? "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300"
+                  : "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300"
+              }`}
+            >
+              {resumeStatus === "checking" ? (
+                <Loader2 className="h-4 w-4 mt-0.5 flex-shrink-0 animate-spin" />
+              ) : (
+                <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              )}
+              <span>
+                {resumeStatus === "checking" &&
+                  "Checking your previous payment session…"}
+                {resumeStatus === "pending" &&
+                  "You're editing a booking you already started. Your original payment session will be reused — no duplicate charge."}
+                {resumeStatus === "stale" &&
+                  "Your previous payment session is no longer available. A new one will be created when you proceed."}
+                {resumeStatus === "unknown" &&
+                  "You're editing a previously started booking. We couldn't verify the payment session status, but it's safe to continue."}
+              </span>
+            </div>
+          )}
+
           <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center">
               <Package className="h-5 w-5 text-orange-500 mr-2" />
@@ -272,6 +362,13 @@ export default function BookingModal({
               </div>
             </div>
           </div>
+
+          {/* Enhanced Parcel Details Section */}
+          <ParcelDetails
+            parcels={parcels}
+            onUpdate={setParcels}
+            showErrors={showParcelErrors || hasParcelErrors}
+          />
 
           <ContactInfo
             formData={formData}
@@ -346,8 +443,12 @@ export default function BookingModal({
 
             <button
               onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="flex items-center px-6 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all transform hover:scale-105 disabled:transform-none focus:outline-none focus:ring-2 focus:ring-orange-500"
+              disabled={isSubmitting || hasParcelErrors}
+              className={`flex items-center px-6 py-3 text-white font-bold rounded-lg transition-all transform focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                hasParcelErrors
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-orange-500 hover:bg-orange-600 hover:scale-105'
+              } ${isSubmitting ? 'opacity-75 cursor-not-allowed' : ''}`}
             >
               {isSubmitting ? (
                 <>
