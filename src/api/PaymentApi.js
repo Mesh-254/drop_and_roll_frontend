@@ -41,6 +41,7 @@ export class PaymentApi extends ApiBase {
    * @param {Object} p
    * @param {string} p.bookingId
    * @param {string} [p.guestEmail]     For guest users (unauthenticated)
+   * @param {string} [p.guestIdentifier] Required alongside guestEmail for guest users
    * @param {string} [p.idempotencyKey]
    * @param {string} [p.currency]       default "GBP"
    * @param {string} [p.gateway]        "stripe" | "paypal"
@@ -48,7 +49,7 @@ export class PaymentApi extends ApiBase {
    * Stripe response data: { flow, transaction_id, gateway, client_secret, amount, currency }
    * PayPal response data: { flow, transaction_id, gateway, approval_url, order_id, amount, currency }
    */
-  async initiateBookingPayment({ bookingId, guestEmail, idempotencyKey, currency = "GBP", gateway = "stripe" }) {
+  async initiateBookingPayment({ bookingId, guestEmail, guestIdentifier, idempotencyKey, currency = "GBP", gateway = "stripe" }) {
     try {
       const body = {
         booking_id:      bookingId,
@@ -59,6 +60,7 @@ export class PaymentApi extends ApiBase {
 
       if (guestEmail) {
         body.guest_email = guestEmail.trim().toLowerCase();
+        body.guest_identifier = guestIdentifier || localStorage.getItem("guestIdentifier") || undefined;
       }
 
       const resp = await this.axiosInstance.post("/api/payments/initiate/", body);
@@ -240,7 +242,7 @@ export class PaymentApi extends ApiBase {
    * @returns {Promise<{ flow, client_secret, amount, currency, transaction_id, ... }>}
    */
   async getOrCreateBulkIntent(uploadId, gateway = "stripe") {
-    if (process.env.NODE_ENV === "development") {
+    if (import.meta.env.NODE_ENV === "development") {
       console.debug(`[PaymentApi] getOrCreateBulkIntent | uploadId=${uploadId} | gateway=${gateway}`);
     }
     try {
@@ -278,7 +280,7 @@ export class PaymentApi extends ApiBase {
    *   transactionId   — our internal UUID (best-effort; backend falls back to session lookup)
    */
   async confirmBulkPayment({ uploadId, paymentIntentId, transactionId }) {
-    if (process.env.NODE_ENV === "development") {
+    if (import.meta.env.NODE_ENV === "development") {
       console.debug(
         `[PaymentApi] confirmBulkPayment | uploadId=${uploadId} | ref=${paymentIntentId} | tx=${transactionId}`
       );
@@ -307,13 +309,15 @@ export class PaymentApi extends ApiBase {
 
   /**
    * Get transaction details by ID.
-   * Supports guest access via guest_email query param.
+   * Supports guest access via guest_email + guest_identifier query params
+   * (both required - see CODE_REVIEW.md finding #4).
    */
-  async getTransaction(txId, guestEmail) {
+  async getTransaction(txId, guestEmail, guestIdentifier) {
     try {
       let url = `/api/payments/transactions/${txId}/`;
-      if (guestEmail) {
-        url += `?guest_email=${encodeURIComponent(guestEmail)}`;
+      const identifier = guestIdentifier || localStorage.getItem("guestIdentifier");
+      if (guestEmail && identifier) {
+        url += `?guest_email=${encodeURIComponent(guestEmail)}&guest_identifier=${encodeURIComponent(identifier)}`;
       }
       const resp = await this.axiosInstance.get(url);
       return { success: true, data: resp.data };

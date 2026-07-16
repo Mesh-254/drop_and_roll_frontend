@@ -92,6 +92,7 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import paymentApi from "../../api/PaymentApi";
+import bookingApi from "../../api/BookingApi";
 import {
   Loader2,
   CreditCard,
@@ -557,6 +558,8 @@ export default function PaymentPage() {
     selectedGateway: null,
     // loading during /initiate/ call
     initiatingPayment: false,
+    // true while re-fetching booking details for the "Back to booking" flow
+    backNavigating: false,
   });
 
   // PayPal return flow detection.
@@ -789,6 +792,79 @@ export default function PaymentPage() {
     }));
   }, []);
 
+  /**
+   * "Back to booking" — navigates the user to the booking form (BookingPage /
+   * BookingModal) with their original booking details pre-populated, and
+   * links the still-pending transaction/booking so the same one is reused
+   * on resubmission instead of creating a duplicate.
+   *
+   * Only meaningful for single-booking (non-bulk) PENDING transactions —
+   * bulk uploads and already-finalised transactions fall back to normal
+   * browser history navigation.
+   */
+  const handleBackToBooking = useCallback(async () => {
+    const tx = state.tx;
+
+    // Bulk uploads have their own wizard/back flow — not handled here.
+    // A finished (non-pending) transaction has nothing left to edit.
+    if (!tx || tx.bulk_upload || !tx.booking || tx.status !== "pending") {
+      navigate(-1);
+      return;
+    }
+
+    setState((s) => ({ ...s, backNavigating: true }));
+    try {
+      const result = await bookingApi.getBooking(tx.booking, guestEmail);
+      if (!result.success || !result.data) {
+        // Fall back to plain history navigation — better than a dead end.
+        navigate(-1);
+        return;
+      }
+
+      const booking = result.data;
+      const toNumber = (v) => (v === null || v === undefined ? v : Number(v));
+
+      navigate("/booking", {
+        state: {
+          quote: booking.quote,
+          formData: {
+            pickupAddress: booking.pickup_address
+              ? {
+                  ...booking.pickup_address,
+                  latitude: toNumber(booking.pickup_address.latitude),
+                  longitude: toNumber(booking.pickup_address.longitude),
+                }
+              : {},
+            dropoffAddress: booking.dropoff_address
+              ? {
+                  ...booking.dropoff_address,
+                  latitude: toNumber(booking.dropoff_address.latitude),
+                  longitude: toNumber(booking.dropoff_address.longitude),
+                }
+              : {},
+            promoCode: booking.promo_code || "",
+            notes: booking.notes || "",
+            guestEmail: booking.guest_email || guestEmail || "",
+            receiverEmail: booking.receiver_email || "",
+            receiverPhone: booking.receiver_phone || "",
+            scheduledPickupAt: booking.scheduled_pickup_at || null,
+            scheduledDropoffAt: booking.scheduled_dropoff_at || null,
+          },
+          // Lets BookingModal detect and reuse the still-pending transaction
+          // instead of blindly creating a new booking + transaction.
+          existingBookingId: booking.id,
+          existingTransactionId: tx.id,
+          guestEmail: booking.guest_email || guestEmail || null,
+        },
+      });
+    } catch (err) {
+      console.warn("[PaymentPage] handleBackToBooking failed:", err);
+      navigate(-1);
+    } finally {
+      setState((s) => ({ ...s, backNavigating: false }));
+    }
+  }, [state.tx, guestEmail, navigate]);
+
   // Auto-redirect to PayPal approval URL (300 ms delay gives React time to
   // render the redirect spinner before the browser navigates away).
   //
@@ -925,7 +1001,7 @@ export default function PaymentPage() {
     // there's genuinely nothing to show.
     if (!clientSecret && !approvalUrl) {
       return (
-        <Layout>
+        <Layout onBack={handleBackToBooking} backLoading={state.backNavigating}>
           <div className="space-y-4">
             <div className="text-center">
               <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
@@ -966,6 +1042,8 @@ export default function PaymentPage() {
         heading="Secure Payment"
         guestEmail={state.guestEmail}
         isBulk={isBulk}
+        onBack={handleBackToBooking}
+        backLoading={state.backNavigating}
       >
         <GatewaySelectionScreen
           tx={tx}
@@ -981,7 +1059,7 @@ export default function PaymentPage() {
   // ── Initiation in progress ──────────────────────────────────────────────────
   if (state.initiatingPayment) {
     return (
-      <Layout>
+      <Layout onBack={handleBackToBooking} backLoading={state.backNavigating}>
         <div className="flex flex-col items-center gap-4 py-16">
           <Loader2 className="w-10 h-10 animate-spin text-orange-400" />
           <p className="text-slate-400">
@@ -996,7 +1074,12 @@ export default function PaymentPage() {
   // ── Stripe ─────────────────────────────────────────────────────────────────
   if (activeGateway === "stripe" && clientSecret) {
     return (
-      <Layout heading="Complete Payment" guestEmail={state.guestEmail}>
+      <Layout
+        heading="Complete Payment"
+        guestEmail={state.guestEmail}
+        onBack={handleBackToBooking}
+        backLoading={state.backNavigating}
+      >
         <Elements stripe={stripePromise} options={{ clientSecret }}>
           <StripeCheckoutForm
             clientSecret={clientSecret}
@@ -1015,7 +1098,12 @@ export default function PaymentPage() {
   // spinner. Guard: approvalUrl is set (we have somewhere to redirect to).
   if (approvalUrl) {
     return (
-      <Layout heading="Redirecting to PayPal…" guestEmail={state.guestEmail}>
+      <Layout
+        heading="Redirecting to PayPal…"
+        guestEmail={state.guestEmail}
+        onBack={handleBackToBooking}
+        backLoading={state.backNavigating}
+      >
         <PayPalRedirectScreen
           approvalUrl={approvalUrl}
           amount={amount}
@@ -1057,9 +1145,19 @@ function Layout({
   heading = "Complete Your Payment",
   guestEmail,
   isBulk = false,
+  onBack,
+  backLoading = false,
   children,
 }) {
   const navigate = useNavigate();
+  const handleBackClick = () => {
+    if (backLoading) return;
+    if (onBack) {
+      onBack();
+    } else {
+      navigate(-1);
+    }
+  };
   return (
     <div className="min-h-screen bg-slate-900 py-12 px-4">
       <div className="max-w-lg mx-auto">
@@ -1074,12 +1172,20 @@ function Layout({
         {/* Header with back button */}
         <div className="flex items-center gap-3 mb-8">
           <button
-            onClick={() => navigate(-1)}
+            type="button"
+            onClick={handleBackClick}
+            disabled={backLoading}
+            aria-label={onBack ? "Back to booking details" : "Go back"}
+            title={onBack ? "Back to booking details" : "Go back"}
             className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300
-                       transition-colors"
-            aria-label="Go back"
+                       transition-colors disabled:opacity-60 disabled:cursor-wait
+                       focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
           >
-            <ArrowLeft className="w-5 h-5" />
+            {backLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <ArrowLeft className="w-5 h-5" />
+            )}
           </button>
           <div className="flex items-center gap-2">
             <Package className="w-6 h-6 text-orange-400" />

@@ -15,6 +15,7 @@ export default function PaymentCancel() {
   useEffect(() => {
     if (!isAuthenticated) {
       localStorage.removeItem("guestEmail");
+      localStorage.removeItem("guestIdentifier");
     }
   }, [isAuthenticated]);
 
