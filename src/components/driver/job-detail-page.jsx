@@ -121,6 +121,16 @@ function ProofOfDeliveryView({ proofData, onClose }) {
   );
 }
 
+const STATUS_TRANSITIONS = [
+  { current: "pending", next: "scheduled" },
+  { current: "scheduled", next: "assigned" },
+  { current: "assigned", next: "picked_up" },
+  { current: "picked_up", next: "at_hub" },
+  { current: "at_hub", next: "in_transit" },
+  { current: "in_transit", next: "delivered" },
+  { current: "delivered", next: null },
+];
+
 export function JobDetailPage({ jobId, onBack }) {
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -134,26 +144,23 @@ export function JobDetailPage({ jobId, onBack }) {
   const [showQRScanner, setShowQRScanner] = useState(false); // NEW: QR scanner state
   const [showProofDeliveryFlow, setShowProofDeliveryFlow] = useState(false); // NEW: Proof delivery flow for marking as delivered
 
-  const statuses = [
-    { current: "pending", next: "scheduled" },
-    { current: "scheduled", next: "assigned" },
-    { current: "assigned", next: "picked_up" },
-    { current: "picked_up", next: "at_hub" },
-    { current: "at_hub", next: "in_transit" },
-    { current: "in_transit", next: "delivered" },
-    { current: "delivered", next: null },
-  ];
-
-  useEffect(() => {
-    if (!jobId) {
-      console.error("Missing jobId");
-      toast.error("Invalid job ID");
-      setLoading(false);
-      return;
+  const loadProofOfDelivery = useCallback(async (bookingId) => {
+    try {
+      const response = await driverApi.getProofOfDelivery(bookingId);
+      if (response.success && response.data) {
+        setProofData(response.data);
+        setHasProof(true);
+      } else {
+        setProofData(null);
+        setHasProof(false);
+      }
+    } catch (error) {
+      console.error("Error fetching proof of delivery:", error);
+      toast.error("Failed to fetch proof of delivery");
+      setProofData(null);
+      setHasProof(false);
     }
-    loadJobDetails();
-    getCurrentLocation();
-  }, [jobId]);
+  }, []);
 
   const loadJobDetails = useCallback(async () => {
     try {
@@ -181,25 +188,7 @@ export function JobDetailPage({ jobId, onBack }) {
     } finally {
       setLoading(false);
     }
-  }, [jobId]);
-
-  const loadProofOfDelivery = useCallback(async (bookingId) => {
-    try {
-      const response = await driverApi.getProofOfDelivery(bookingId);
-      if (response.success && response.data) {
-        setProofData(response.data);
-        setHasProof(true);
-      } else {
-        setProofData(null);
-        setHasProof(false);
-      }
-    } catch (error) {
-      console.error("Error fetching proof of delivery:", error);
-      toast.error("Failed to fetch proof of delivery");
-      setProofData(null);
-      setHasProof(false);
-    }
-  }, []);
+  }, [jobId, loadProofOfDelivery]);
 
   const getCurrentLocation = useCallback(async () => {
     try {
@@ -208,6 +197,33 @@ export function JobDetailPage({ jobId, onBack }) {
     } catch (error) {
       console.error("Failed to get current location:", error);
     }
+  }, []);
+
+  useEffect(() => {
+    if (!jobId) {
+      console.error("Missing jobId");
+      toast.error("Invalid job ID");
+      setLoading(false);
+      return;
+    }
+    loadJobDetails();
+    getCurrentLocation();
+  }, [jobId, loadJobDetails, getCurrentLocation]);
+
+  const getStatusText = useCallback((status) => {
+    const texts = {
+      assigned: "Assigned",
+      picked_up: "Picked Up",
+      at_hub: "At Hub",
+      in_transit: "In Transit",
+      delivered: "Delivered",
+      cancelled: "Cancelled",
+      failed: "Failed",
+    };
+    return (
+      texts[status] ||
+      (status ? status.replace("_", " ").toUpperCase() : status)
+    );
   }, []);
 
   const handleStatusUpdate = useCallback(
@@ -229,7 +245,7 @@ export function JobDetailPage({ jobId, onBack }) {
       if (!window.confirm(`Mark job as ${getStatusText(newStatus)}?`)) return;
 
       try {
-        await driverApi.updateJobStatus(job.data.id, newStatus, currentLocation);
+        const result = await driverApi.updateJobStatus(job.data.id, newStatus, currentLocation);
         setJob({
           ...job,
           data: {
@@ -238,7 +254,11 @@ export function JobDetailPage({ jobId, onBack }) {
             updated_at: new Date().toISOString(),
           },
         });
-        toast.success(`Job status updated to ${getStatusText(newStatus)}`);
+        if (result?.queued) {
+          toast(`Saved offline — will sync when you're back online (${getStatusText(newStatus)})`, { icon: "📶" });
+        } else {
+          toast.success(`Job status updated to ${getStatusText(newStatus)}`);
+        }
 
         const immutabilityCheck = await driverApi.checkImmutable(job.data.id);
         if (immutabilityCheck.success) {
@@ -252,11 +272,11 @@ export function JobDetailPage({ jobId, onBack }) {
         );
       }
     },
-    [job, currentLocation, immutable, immutableReason]
+    [job, currentLocation, immutable, immutableReason, getStatusText]
   );
 
   const getNextStatus = useCallback((currentStatus) => {
-    return statuses.find((s) => s.current === currentStatus)?.next || null;
+    return STATUS_TRANSITIONS.find((s) => s.current === currentStatus)?.next || null;
   }, []);
 
   const getStatusColor = useCallback((status) => {
@@ -270,22 +290,6 @@ export function JobDetailPage({ jobId, onBack }) {
       failed: "bg-red-100 text-red-700 border border-red-200",
     };
     return colors[status] || "bg-slate-100 text-slate-700 border border-slate-200";
-  }, []);
-
-  const getStatusText = useCallback((status) => {
-    const texts = {
-      assigned: "Assigned",
-      picked_up: "Picked Up",
-      at_hub: "At Hub",
-      in_transit: "In Transit",
-      delivered: "Delivered",
-      cancelled: "Cancelled",
-      failed: "Failed",
-    };
-    return (
-      texts[status] ||
-      (status ? status.replace("_", " ").toUpperCase() : status)
-    );
   }, []);
 
   const formatDimensions = useCallback((dimensions) => {
@@ -328,11 +332,25 @@ export function JobDetailPage({ jobId, onBack }) {
         }
 
         console.log("[JobDetailPage] Proof submitted and status updated:", result);
-        toast.success("Delivery completed successfully! ✓");
-        
+
         // Close modal
         setShowProofDeliveryFlow(false);
 
+        if (result.queued) {
+          // Offline: reflect the delivery locally right away rather than
+          // re-fetching (which would just fail with no connection), and
+          // let the sync engine reconcile the real record once online.
+          toast("Saved offline — proof of delivery will sync automatically 📶", {
+            icon: "📶",
+          });
+          setJob({
+            ...job,
+            data: { ...job.data, status: "delivered", updated_at: new Date().toISOString() },
+          });
+          return;
+        }
+
+        toast.success("Delivery completed successfully! ✓");
         // Reload job details to show updated status
         await loadJobDetails();
       } catch (error) {
@@ -340,7 +358,7 @@ export function JobDetailPage({ jobId, onBack }) {
         toast.error(error.message || "Failed to complete delivery");
       }
     },
-    [job?.data?.id]
+    [job, loadJobDetails]
   );
 
   // NEW: Handle QR scan success
@@ -683,9 +701,19 @@ export function JobDetailPage({ jobId, onBack }) {
                 proofData
               );
               if (response.success) {
-                toast.success("Proof of delivery submitted successfully!");
                 setShowProofModal(false);
-                await loadJobDetails();
+                if (response.queued) {
+                  toast("Saved offline — proof of delivery will sync automatically 📶", {
+                    icon: "📶",
+                  });
+                  setJob({
+                    ...job,
+                    data: { ...job.data, status: "delivered", updated_at: new Date().toISOString() },
+                  });
+                } else {
+                  toast.success("Proof of delivery submitted successfully!");
+                  await loadJobDetails();
+                }
               } else {
                 toast.error(response.message || "Failed to submit proof");
               }

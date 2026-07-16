@@ -1,8 +1,26 @@
 import { ApiBase } from "./ApiBase";
+import { isOnline } from "../offline/network";
+import { workOfflineMode } from "../offline/workOfflineMode";
+import {
+  ACTION_TYPES,
+  enqueueAction,
+  bufferLocationPing,
+} from "../offline/offlineQueueManager";
+import { db } from "../offline/db";
 
 class DriverAPI extends ApiBase {
   constructor() {
     super(); // Initialize ApiBase
+  }
+
+  /**
+   * Should this mutating call be queued locally instead of sent now?
+   * True when manual "Work Offline" mode is on, or a real connectivity
+   * check says we're offline.
+   */
+  async _shouldQueue() {
+    if (workOfflineMode.isActive()) return true;
+    return !(await isOnline());
   }
 
   // Profile Management
@@ -28,15 +46,39 @@ class DriverAPI extends ApiBase {
   }
 
   // Job Management
+  /**
+   * Read-through cache helpers for GET endpoints the driver relies on to
+   * see their work (job list / route). On success we stash the latest
+   * good response; on failure we serve that stashed copy instead of a
+   * blank/error screen, tagged so the UI can show a "last updated Xm
+   * ago — offline" banner rather than pretending it's live data.
+   */
+  async _cacheRead(key, value) {
+    await db.cachedReads.put({ key, value, cachedAt: Date.now() });
+  }
+
+  async _readCache(key) {
+    const row = await db.cachedReads.get(key);
+    if (!row) return null;
+    return { ...row.value, _stale: true, _cachedAt: row.cachedAt };
+  }
+
   async getAssignedJobs(page = 1, pageSize = 10, status = "") {
+    const cacheKey = `assigned-jobs:${page}:${pageSize}:${status}`;
     try {
       let url = `/api/driver/driver-routes/current-route/?page=${page}&page_size=${pageSize}`;
       if (status) url += `&status=${status}`;
       const response = await super.request(url);
       console.log("[DriverAPI] Assigned jobs response:", response.data);
+      await this._cacheRead(cacheKey, response.data);
       return response.data;
     } catch (error) {
       console.error("[DriverAPI] Error fetching assigned jobs:", error);
+      const cached = await this._readCache(cacheKey);
+      if (cached) {
+        console.warn("[DriverAPI] Serving cached assigned jobs (offline)");
+        return cached;
+      }
       throw error; // Let the caller handle the error
     }
   }
@@ -81,7 +123,10 @@ class DriverAPI extends ApiBase {
     }
   }
 
-  async updateJobStatus(jobId, status, location = null) {
+  // ── RAW: actual HTTP call, used both for the online path here and by
+  // the sync engine when flushing a queued action. Never calls back into
+  // the queue-aware wrapper — that would create an infinite loop.
+  async _updateJobStatusRaw(jobId, status, location = null, clientActionId = null) {
     const response = await super.request(
       `/api/booking/bookings/${jobId}/set-status/`,
       {
@@ -89,6 +134,62 @@ class DriverAPI extends ApiBase {
         data: {
           status,
           driver_location: location,
+          ...(clientActionId ? { client_action_id: clientActionId } : {}),
+        },
+      },
+    );
+    return response.data;
+  }
+
+  async updateJobStatus(jobId, status, location = null) {
+    if (await this._shouldQueue()) {
+      const { clientActionId } = await enqueueAction({
+        type: ACTION_TYPES.STATUS_UPDATE,
+        bookingId: jobId,
+        payload: { status, driver_location: location },
+      });
+      console.log(
+        `[DriverAPI] Offline — queued status update for ${jobId} → ${status} (${clientActionId})`,
+      );
+      // Optimistic result: the UI updates immediately, the real sync
+      // happens later. If the server ultimately rejects it (e.g. the
+      // booking became immutable in the meantime), the Sync Issues panel
+      // will surface that — better than blocking the driver's workflow
+      // now on a connection they don't have.
+      return { id: jobId, status, queued: true, clientActionId };
+    }
+
+    try {
+      return await this._updateJobStatusRaw(jobId, status, location);
+    } catch (error) {
+      // A request that started online can still fail mid-flight (signal
+      // dropped while in transit). Network-level failures (no `status` on
+      // the error, i.e. it never reached the server) fall back to the
+      // queue instead of surfacing an error the driver can't do anything
+      // about right now.
+      if (!error?.response) {
+        const { clientActionId } = await enqueueAction({
+          type: ACTION_TYPES.STATUS_UPDATE,
+          bookingId: jobId,
+          payload: { status, driver_location: location },
+        });
+        console.warn(
+          `[DriverAPI] Request failed mid-flight — queued status update for ${jobId} (${clientActionId})`,
+        );
+        return { id: jobId, status, queued: true, clientActionId };
+      }
+      throw error;
+    }
+  }
+
+  async _reportJobIssueRaw(jobId, issueData, clientActionId = null) {
+    const response = await super.request(
+      `/api/bookings/jobs/${jobId}/report-issue/`,
+      {
+        method: "POST",
+        data: {
+          ...issueData,
+          ...(clientActionId ? { client_action_id: clientActionId } : {}),
         },
       },
     );
@@ -100,14 +201,29 @@ class DriverAPI extends ApiBase {
       `[DriverAPI] Calling reportJobIssue() - Reporting issue for job ${jobId} with data:`,
       issueData,
     );
-    const response = await super.request(
-      `/api/bookings/jobs/${jobId}/report-issue/`,
-      {
-        method: "POST",
-        data: issueData,
-      },
-    );
-    return response.data;
+
+    if (await this._shouldQueue()) {
+      const { clientActionId } = await enqueueAction({
+        type: ACTION_TYPES.REPORT_ISSUE,
+        bookingId: jobId,
+        payload: issueData,
+      });
+      return { queued: true, clientActionId };
+    }
+
+    try {
+      return await this._reportJobIssueRaw(jobId, issueData);
+    } catch (error) {
+      if (!error?.response) {
+        const { clientActionId } = await enqueueAction({
+          type: ACTION_TYPES.REPORT_ISSUE,
+          bookingId: jobId,
+          payload: issueData,
+        });
+        return { queued: true, clientActionId };
+      }
+      throw error;
+    }
   }
 
   // STEP: Scan QR method
@@ -184,7 +300,30 @@ class DriverAPI extends ApiBase {
     }
   }
 
-    async submitProofOfDelivery(bookingId, proofData) {
+  // ── RAW: builds the multipart request from either a live File (online
+  // path) or a Blob pulled back out of IndexedDB (sync engine flush path)
+  // — FormData.append() accepts either transparently.
+  async _submitProofOfDeliveryRaw(bookingId, proofData, clientActionId = null) {
+    const formData = new FormData();
+    if (proofData.photo) formData.append("photo", proofData.photo);
+    if (proofData.notes) formData.append("notes", proofData.notes);
+    if (proofData.location) {
+      formData.append("location", JSON.stringify(proofData.location));
+    }
+    if (clientActionId) formData.append("client_action_id", clientActionId);
+
+    const response = await super.request(
+      `/api/tracking/pod/?booking=${bookingId}`,
+      {
+        method: "POST",
+        data: formData,
+        headers: { "Content-Type": undefined },
+      }
+    );
+    return response.data;
+  }
+
+  async submitProofOfDelivery(bookingId, proofData) {
     console.log(
       `[DriverAPI] Submitting proof for booking ${bookingId}`,
       {
@@ -194,36 +333,52 @@ class DriverAPI extends ApiBase {
       }
     );
 
-    const formData = new FormData();
-    if (proofData.photo) formData.append("photo", proofData.photo);
-    if (proofData.notes) formData.append("notes", proofData.notes);
-    if (proofData.location) {
-      formData.append("location", JSON.stringify(proofData.location));
+    if (await this._shouldQueue()) {
+      // The photo (a File from an <input type="file">/camera capture) is
+      // itself a Blob, so it's stored as-is in the podPhotos table and
+      // reconstructed into FormData at flush time.
+      const { clientActionId } = await enqueueAction({
+        type: ACTION_TYPES.POD_SUBMIT,
+        bookingId,
+        payload: { notes: proofData.notes, location: proofData.location },
+        photoBlob: proofData.photo || null,
+      });
+      console.log(
+        `[DriverAPI] Offline — queued POD for booking ${bookingId} (${clientActionId})`,
+      );
+      return {
+        success: true,
+        queued: true,
+        clientActionId,
+        data: { booking: bookingId, notes: proofData.notes },
+        statusUpdated: true,
+      };
     }
 
     try {
-      // SINGLE API CALL – backend handles POD + status update atomically
-      const response = await super.request(
-        `/api/tracking/pod/?booking=${bookingId}`,
-        {
-          method: "POST",
-          data: formData,
-          headers: { "Content-Type": undefined },
-        }
-      );
-
-      console.log("[DriverAPI] Proof of Delivery submitted successfully:", response.data);
-
-      // Optional: Refresh job to confirm new status in UI
+      const data = await this._submitProofOfDeliveryRaw(bookingId, proofData);
+      console.log("[DriverAPI] Proof of Delivery submitted successfully:", data);
       const updatedJob = await this.getJob(bookingId);
-
-      return {
-        success: true,
-        data: response.data,
-        updatedJob,
-        statusUpdated: true,
-      };
+      return { success: true, data, updatedJob, statusUpdated: true };
     } catch (error) {
+      if (!error?.response) {
+        const { clientActionId } = await enqueueAction({
+          type: ACTION_TYPES.POD_SUBMIT,
+          bookingId,
+          payload: { notes: proofData.notes, location: proofData.location },
+          photoBlob: proofData.photo || null,
+        });
+        console.warn(
+          `[DriverAPI] POD request failed mid-flight — queued for booking ${bookingId} (${clientActionId})`,
+        );
+        return {
+          success: true,
+          queued: true,
+          clientActionId,
+          data: { booking: bookingId, notes: proofData.notes },
+          statusUpdated: true,
+        };
+      }
       console.error(
         `[DriverAPI] Failed to submit proof for booking ${bookingId}:`,
         error
@@ -495,6 +650,20 @@ class DriverAPI extends ApiBase {
      * @param {string} driver_id - Optional. If not provided, will fetch from profile first.
      * @returns {Promise<Object>} - { success: boolean, data: Object | null, error?: string }
      */
+    const cacheKey = `current-route:${driver_id || "self"}`;
+
+    // If we already know we're offline, skip straight to cache rather than
+    // failing on the getProfile() call this function would otherwise make
+    // first (that GET would just fail too, wasting a heartbeat round trip).
+    if (await this._shouldQueue()) {
+      const cached = await this._readCache(cacheKey);
+      if (cached) {
+        console.warn("[DriverAPI] Serving cached current route (offline)");
+        return { success: true, data: cached, _stale: true, _cachedAt: cached._cachedAt };
+      }
+      return { success: false, error: "Offline and no cached route available" };
+    }
+
     try {
       // If driver_id not provided, fetch from profile
       let id = driver_id;
@@ -510,6 +679,7 @@ class DriverAPI extends ApiBase {
       const url = `/api/driver/live-tracking/current-route/?driver_id=${id}`;
       console.log(`[DriverAPI] Fetching current route for driver: ${id}`);
       const response = await this.request(url);
+      await this._cacheRead(cacheKey, response.data);
       return { success: true, data: response.data };
     } catch (error) {
       if (error.response?.status === 404) {
@@ -517,6 +687,11 @@ class DriverAPI extends ApiBase {
         return { success: true, data: null }; // No route is valid
       }
       console.error("[DriverAPI] Get current route failed:", error);
+      const cached = await this._readCache(cacheKey);
+      if (cached) {
+        console.warn("[DriverAPI] Serving cached current route after fetch failure");
+        return { success: true, data: cached, _stale: true, _cachedAt: cached._cachedAt };
+      }
       return { success: false, error: error.message };
     }
   }
@@ -572,7 +747,9 @@ class DriverAPI extends ApiBase {
     }
   }
 
-  // Send current location to backend via HTTP POST (called periodically by driver app)
+  // Send current location to backend via HTTP POST (kept for any direct
+  // callers, e.g. a manual "send now" action). Routine tracking pings go
+  // through bufferLocation() below instead, which is offline-safe.
   async sendLocationUpdate(locationData) {
     console.log("[DriverAPI] Sending location update:", locationData);
     try {
@@ -594,6 +771,27 @@ class DriverAPI extends ApiBase {
       };
     }
   }
+
+  // RAW: batch endpoint used by the sync engine to flush buffered pings.
+  async _sendLocationBatchRaw(locations) {
+    const response = await this.request(
+      "/api/driver/live-tracking/update-location/batch/",
+      {
+        method: "POST",
+        data: { locations },
+      },
+    );
+    return response.data;
+  }
+
+  // Buffers a GPS ping locally rather than sending it immediately. The
+  // sync engine flushes buffered pings in batches (on reconnect, and on a
+  // ~45s safety timer) — this cuts network chatter even while online, and
+  // means a dropped signal mid-shift never loses breadcrumb data.
+  async bufferLocation(locationData) {
+    await bufferLocationPing(locationData);
+  }
+
   async fetchLiveLocations(filters = {}) {
     /**
      * Fetches live locations for all active drivers (admin only).
@@ -728,15 +926,16 @@ class DriverAPI extends ApiBase {
         accuracy_meters: position.coords.accuracy ?? null,
       };
 
+      // Buffer locally rather than posting immediately — the sync engine
+      // flushes buffered pings in a batch on reconnect and on a periodic
+      // safety timer. This is safe whether online or offline: online, it
+      // just trades "one request per ping" for "one request per batch";
+      // offline, it means breadcrumb data survives a dropped signal
+      // instead of being silently lost.
       try {
-        const result = await this.sendLocationUpdate(locationData);
-        if (result.success) {
-          console.log("[DriverAPI] Location sent successfully");
-        } else {
-          console.warn("[DriverAPI] Location send failed:", result);
-        }
+        await this.bufferLocation(locationData);
       } catch (err) {
-        console.error("[DriverAPI] Failed to send location update:", err);
+        console.error("[DriverAPI] Failed to buffer location update:", err);
       }
     };
 
@@ -831,6 +1030,20 @@ class DriverAPI extends ApiBase {
 
 
    // { success: boolean, data?: object, message?: string }
+  async _recordFailureRaw(jobId, normalizedPayload, clientActionId = null) {
+    const response = await super.request(
+      `/api/booking/bookings/${jobId}/report-failed/`,
+      {
+        method: "POST",
+        data: {
+          ...normalizedPayload,
+          ...(clientActionId ? { client_action_id: clientActionId } : {}),
+        },
+      },
+    );
+    return response.data;
+  }
+
   async recordFailure(jobId, payload) {
     if (!jobId || typeof jobId !== "string") {
       console.error("[DriverAPI] recordFailure: invalid jobId", jobId);
@@ -870,24 +1083,38 @@ class DriverAPI extends ApiBase {
       `[DriverAPI] recordFailure — job=${jobId} failure_type=${failure_type}`,
       `is_pickup_failure=${is_pickup_failure} reason=${mappedReason}`,
     );
+
+    const normalizedPayload = {
+      reason: mappedReason,
+      notes,
+      return_to_hub,
+      is_pickup_failure,
+    };
+
+    if (await this._shouldQueue()) {
+      const { clientActionId } = await enqueueAction({
+        type: ACTION_TYPES.REPORT_FAILURE,
+        bookingId: jobId,
+        payload: normalizedPayload,
+      });
+      console.log(`[DriverAPI] Offline — queued failure report for ${jobId} (${clientActionId})`);
+      return { success: true, queued: true, clientActionId };
+    }
  
     try {
-      const response = await super.request(
-        `/api/booking/bookings/${jobId}/report-failed/`,
-        {
-          method: "POST",
-          data: {
-            reason: mappedReason,
-            notes,
-            return_to_hub,
-            is_pickup_failure,  // explicit override — backend won't need to auto-detect
-          },
-        },
-      );
- 
-      console.log("[DriverAPI] recordFailure success:", response.data);
-      return { success: true, data: response.data };
+      const data = await this._recordFailureRaw(jobId, normalizedPayload);
+      console.log("[DriverAPI] recordFailure success:", data);
+      return { success: true, data };
     } catch (error) {
+      if (!error?.response) {
+        const { clientActionId } = await enqueueAction({
+          type: ACTION_TYPES.REPORT_FAILURE,
+          bookingId: jobId,
+          payload: normalizedPayload,
+        });
+        console.warn(`[DriverAPI] Failure report request dropped mid-flight — queued (${clientActionId})`);
+        return { success: true, queued: true, clientActionId };
+      }
       const msg =
         error.response?.data?.detail ||
         error.response?.data?.message ||

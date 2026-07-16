@@ -353,7 +353,7 @@ export function DeliveryStatusUpdates({
 
       try {
         // Step 4: Call backend to update status
-        await driverApi.updateJobStatus(jobId, newStatus);
+        const result = await driverApi.updateJobStatus(jobId, newStatus);
 
         // Step 5: Optimistic UI update + SMART removal
         // We remove the job from the list immediately when status becomes "at_hub"
@@ -373,10 +373,15 @@ export function DeliveryStatusUpdates({
             .filter((job) => !(job.id === jobId && newStatus === "at_hub"))
         );
 
-        // Step 6: Single success toast
-        toast.success(
-          `Job marked as ${newStatus.toUpperCase().replace("_", " ")}`
-        );
+        // Step 6: Single success toast — distinguish "queued for later" from
+        // "confirmed by the server" so the driver always knows sync state.
+        if (result?.queued) {
+          toast(`Saved offline — will sync once you're back online`, { icon: "📶" });
+        } else {
+          toast.success(
+            `Job marked as ${newStatus.toUpperCase().replace("_", " ")}`
+          );
+        }
 
         // Step 7: Notify parent component (triggers refresh if needed)
         if (onStatusUpdate) onStatusUpdate();
@@ -446,8 +451,7 @@ export function DeliveryStatusUpdates({
         }
 
         console.log("[DeliveryStatusUpdates] Proof submitted and status updated:", result);
-        toast.success("Delivery completed successfully! ✓");
-        
+
         // Close modal and reset state
         setShowProofModal(false);
         setPendingDeliveryJob(null);
@@ -459,8 +463,17 @@ export function DeliveryStatusUpdates({
         setJobs((prev) => prev.filter((job) => job.id !== jobId));
         setSelectedJobs((prev) => prev.filter((id) => id !== jobId));
 
-        // Refresh the jobs list to show updated status
-        await fetchJobs(1, false);
+        if (result.queued) {
+          toast("Saved offline — proof of delivery will sync automatically 📶", {
+            icon: "📶",
+          });
+          // No network refetch here — there's nothing to fetch until sync
+          // happens, and the optimistic removal above already reflects it.
+        } else {
+          toast.success("Delivery completed successfully! ✓");
+          // Refresh the jobs list to show updated status
+          await fetchJobs(1, false);
+        }
         if (onStatusUpdate) onStatusUpdate();
       } catch (error) {
         console.error("[DeliveryStatusUpdates] Proof submission error:", error);
@@ -699,11 +712,6 @@ export function DeliveryStatusUpdates({
               const nextStatus = getNextStatus(job.status);
               const canUpdate = nextStatus && !isImmutable;
               const urgent = isUrgentPickup(job.scheduled_pickup_at);
-              const isPickedUp = job.status === "picked_up";
-              const allSelectedPickedUp = selectedJobs.length > 0 && selectedJobs.every((id) => {
-                const j = jobs.find((job) => job.id === id);
-                return j?.status === "picked_up";
-              });
 
               return (
                 <div

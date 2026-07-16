@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import {
@@ -29,14 +29,13 @@ import { PerformanceMetrics } from "./performance-metrics";
 import { ActiveJobsOverviewCard } from "./active-jobs-overview-card";
 import { EarningsChart } from "./earnings-chart";
 import { DeliveryStatusUpdates } from "./delivery-status-updates";
-import { JobDetailsModal } from "./job-details-modal";
 import { JobDetailPage } from "./job-detail-page";
+import { OfflineStatusBar } from "./offline/OfflineStatusBar";
+import * as syncEngine from "../../offline/syncEngine";
 import driverApi from "../../api/driver-api";
 
 export default function DriverDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [selectedJob, setSelectedJob] = useState(null);
-  const [showJobModal, setShowJobModal] = useState(false);
   const [showJobDetail, setShowJobDetail] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -83,12 +82,30 @@ export default function DriverDashboard() {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [geolocationError, setGeolocationError] = useState(null);
   const [toggleLoading, setToggleLoading] = useState(false);
-  const [backendTrackingStatus, setBackendTrackingStatus] = useState(false);
   const routePollIntervalRef = useRef(null);
   const routeCheckTimeRef = useRef(null);
 
   const wsRef = useRef(null); // New: For per-driver WS
   const pollIntervalRef = useRef(null); // For polling
+
+  // Mirror fast-changing state in refs so the setInterval callback inside
+  // startRoutePoll always reads current values instead of the values that
+  // were in scope the one time startRoutePoll() was invoked (stale closure).
+  const profileRef = useRef(profile);
+  const isTrackingRef = useRef(isTracking);
+  const manualTrackingEnabledRef = useRef(manualTrackingEnabled);
+
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
+
+  useEffect(() => {
+    isTrackingRef.current = isTracking;
+  }, [isTracking]);
+
+  useEffect(() => {
+    manualTrackingEnabledRef.current = manualTrackingEnabled;
+  }, [manualTrackingEnabled]);
 
   const navigate = useNavigate();
 
@@ -98,11 +115,19 @@ export default function DriverDashboard() {
   useEffect(() => {
     fetchData();
     startRoutePoll();
+    // Starts watching connectivity and flushing the offline queue whenever
+    // a connection is available. Cheap to call once per dashboard mount —
+    // it's a no-op loop when the queue is empty.
+    const stopSyncEngine = syncEngine.init(driverApi);
     // Cleanup on unmount
     return () => {
       stopRoutePoll();
       driverApi.stopLocationTracking();
+      stopSyncEngine();
     };
+    // fetchData/startRoutePoll/stopRoutePoll are stable (useCallback, no reactive
+    // deps) and are intentionally only invoked once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // New: Poll profile to detect tracking changes (every 60s)
@@ -131,6 +156,7 @@ export default function DriverDashboard() {
           }
         }
       } catch (err) {
+        console.error("[DriverDashboard] Tracking check failed:", err);
         toast.error("Tracking check failed - retrying...");
         setTimeout(fetchProfileAndCheckTracking, 10000); // Retry on error
       }
@@ -209,17 +235,32 @@ export default function DriverDashboard() {
     };
   }, [profile?.id]);
 
-  const startRoutePoll = () => {
+  const stopRoutePoll = useCallback(() => {
+    if (routePollIntervalRef.current) {
+      clearInterval(routePollIntervalRef.current);
+      routePollIntervalRef.current = null;
+    }
+  }, []);
+
+  const startRoutePoll = useCallback(() => {
     // Poll for active route every 60 seconds
     routePollIntervalRef.current = setInterval(async () => {
       try {
+        // Read latest values via refs (this closure is created once, so plain
+        // state variables here would always reflect their value at mount time).
+        const currentProfile = profileRef.current;
+        const currentlyTracking = isTrackingRef.current;
+        const manualEnabled = manualTrackingEnabledRef.current;
+
         // Only poll if we have profile with driver_id
-        if (!profile?.driver_profile) {
+        if (!currentProfile?.driver_profile) {
           console.log("[DriverDashboard] Waiting for profile to load...");
           return;
         }
 
-        const result = await driverApi.getCurrentRoute(profile.driver_profile);
+        const result = await driverApi.getCurrentRoute(
+          currentProfile.driver_profile,
+        );
         console.log("[DriverDashboard] Route poll result:", result);
 
         if (result.success && result.data) {
@@ -231,22 +272,22 @@ export default function DriverDashboard() {
             hasRoute: !!route,
             status: route?.status,
             isActive: hasActiveRoute,
-            isTracking,
-            manualEnabled: manualTrackingEnabled,
+            isTracking: currentlyTracking,
+            manualEnabled,
           });
 
-          if (hasActiveRoute && !isTracking && !manualTrackingEnabled) {
+          if (hasActiveRoute && !currentlyTracking && !manualEnabled) {
             console.log(
               "[DriverDashboard] Auto-starting tracking due to active route",
             );
             startTracking();
-          } else if (!hasActiveRoute && isTracking && !manualTrackingEnabled) {
+          } else if (!hasActiveRoute && currentlyTracking && !manualEnabled) {
             console.log(
               "[DriverDashboard] Stopping tracking - no active route and manual not enabled",
             );
             stopTracking();
           }
-        } else if (!isTracking && !manualTrackingEnabled) {
+        } else if (!currentlyTracking && !manualEnabled) {
           console.log(
             "[DriverDashboard] No active route and not tracking - ensuring stopped",
           );
@@ -258,14 +299,11 @@ export default function DriverDashboard() {
     }, 60000); // 60 seconds
 
     routeCheckTimeRef.current = Date.now();
-  };
-
-  const stopRoutePoll = () => {
-    if (routePollIntervalRef.current) {
-      clearInterval(routePollIntervalRef.current);
-      routePollIntervalRef.current = null;
-    }
-  };
+    // startTracking/stopTracking are stable identities are not required here since
+    // they're re-created each render but startRoutePoll itself is only ever invoked
+    // once on mount; the interval body always reads fresh state via the refs above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const startTracking = async () => {
     if (isTracking) return;
@@ -345,66 +383,33 @@ export default function DriverDashboard() {
     }
   };
 
-  // Toggle tracking via backend API
-  const handleToggleTracking = async () => {
+  // Toggle tracking with manual override
+  const toggleManualTracking = async () => {
     if (toggleLoading) return;
-
     setToggleLoading(true);
-    console.log("[DriverDashboard] Initiating toggle tracking...");
+    const newState = !manualTrackingEnabled;
+    setManualTrackingEnabled(newState);
 
     try {
-      const result = await driverApi.toggleTracking();
-      console.log("[DriverDashboard] Toggle tracking result:", result);
-
-      if (result.success) {
-        const newStatus = result.isEnabled;
-        setBackendTrackingStatus(newStatus);
-
-        if (newStatus) {
-          console.log("[DriverDashboard] Tracking enabled via backend");
-          await startTracking();
-          toast.success(result.message || "Tracking enabled successfully");
-        } else {
-          console.log("[DriverDashboard] Tracking disabled via backend");
-          await stopTracking();
-          toast.success(result.message || "Tracking disabled successfully");
+      if (newState) {
+        // Turn on manual tracking
+        await startTracking();
+        // Optionally update availability if backend supports
+        try {
+          await driverApi.updateAvailability({ available: false });
+        } catch (error) {
+          console.warn("[DriverDashboard] Availability update failed:", error);
         }
       } else {
-        console.error(
-          "[DriverDashboard] Toggle tracking failed:",
-          result.message,
-        );
-        toast.error(result.message || "Failed to toggle tracking");
+        // Turn off manual tracking, let route polling control it
+        await stopTracking();
       }
-    } catch (error) {
-      console.error("[DriverDashboard] Toggle tracking error:", error);
-      toast.error("An error occurred while toggling tracking");
     } finally {
       setToggleLoading(false);
     }
   };
 
-  // Toggle tracking with manual override
-  const toggleManualTracking = async () => {
-    const newState = !manualTrackingEnabled;
-    setManualTrackingEnabled(newState);
-
-    if (newState) {
-      // Turn on manual tracking
-      await startTracking();
-      // Optionally update availability if backend supports
-      try {
-        await driverApi.updateAvailability({ available: false });
-      } catch (error) {
-        console.warn("[DriverDashboard] Availability update failed:", error);
-      }
-    } else {
-      // Turn off manual tracking, let route polling control it
-      await stopTracking();
-    }
-  };
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     const token = localStorage.getItem("access_token");
     if (!token) {
       toast.error("Please log in to view the dashboard");
@@ -414,38 +419,21 @@ export default function DriverDashboard() {
 
     setLoading(true);
     try {
-      const [
-        profResp,
-        jbsResp,
-        earnsResp,
-        ratsResp,
-        metricsResp,
-        docsResp,
-        trackingResp,
-      ] = await Promise.all([
-        driverApi.getProfile(),
-        driverApi.getAssignedJobs(1, 10, "all"),
-        driverApi.getEarnings(),
-        driverApi.getRatings(),
-        driverApi.getMetrics(),
-        driverApi.getDocuments(),
-        driverApi.getTrackingStatus(),
-      ]);
+      const [profResp, jbsResp, earnsResp, ratsResp, metricsResp, docsResp] =
+        await Promise.all([
+          driverApi.getProfile(),
+          driverApi.getAssignedJobs(1, 10, "all"),
+          driverApi.getEarnings(),
+          driverApi.getRatings(),
+          driverApi.getMetrics(),
+          driverApi.getDocuments(),
+        ]);
 
       // Handle profile response
       if (!profResp.success) {
         throw new Error(profResp.message || "Failed to fetch profile");
       }
       setProfile(profResp.data || null);
-
-      // Handle tracking status response
-      if (trackingResp.success) {
-        setBackendTrackingStatus(trackingResp.isEnabled);
-        console.log(
-          "[DriverDashboard] Initial tracking status:",
-          trackingResp.isEnabled,
-        );
-      }
 
       // Handle jobs response: Extract results array from paginated response
       const jobsData =
@@ -539,7 +527,7 @@ export default function DriverDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
 
   // Add document upload handler
   const handleDocumentUpload = async (docType, event) => {
@@ -613,30 +601,6 @@ export default function DriverDashboard() {
     }
   };
 
-  const handleJobModalOpen = (job) => {
-    setSelectedJob(job);
-    setShowJobModal(true);
-  };
-
-  const formatCurrency = (amount) => {
-    return `GB ${amount.toLocaleString()}`;
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "assigned":
-        return "bg-blue-500/10 text-blue-600 border-blue-500/20";
-      case "picked_up":
-        return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
-      case "in_transit":
-        return "bg-primary/10 text-primary border-primary/20";
-      case "delivered":
-        return "bg-green-500/10 text-green-600 border-green-500/20";
-      default:
-        return "bg-muted text-muted-foreground border-border";
-    }
-  };
-
   const renderMapTab = () => {
     if (typeof window === "undefined" || !window.google) {
       return (
@@ -657,33 +621,6 @@ export default function DriverDashboard() {
               Live Tracking
             </h3>
             <div className="flex gap-2 w-full sm:w-auto">
-              {/* <button
-                onClick={handleToggleTracking}
-                disabled={toggleLoading}
-                className={`flex-1 sm:flex-none px-4 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
-                  toggleLoading
-                    ? "bg-gray-400 text-white cursor-not-allowed opacity-60"
-                    : backendTrackingStatus
-                      ? "bg-red-500 text-white hover:bg-red-600 active:scale-95"
-                      : "bg-green-500 text-white hover:bg-green-600 active:scale-95"
-                }`}
-              >
-                {toggleLoading ? (
-                  <>
-                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                    <span>Updating...</span>
-                  </>
-                ) : (
-                  <>
-                    <Activity className="w-4 h-4" />
-                    <span>
-                      {backendTrackingStatus
-                        ? "Stop Tracking"
-                        : "Start Tracking"}
-                    </span>
-                  </>
-                )}
-              </button> */}
               <button
                 onClick={toggleManualTracking}
                 disabled={toggleLoading}
@@ -718,16 +655,6 @@ export default function DriverDashboard() {
                 {trackingStatus}
               </p>
             </div>
-            {/* <div className="p-3 bg-muted rounded-lg">
-              <p className="text-xs text-muted-foreground mb-1">
-                Backend Status
-              </p>
-              <p
-                className={`font-semibold text-sm ${backendTrackingStatus ? "text-green-600" : "text-slate-600"}`}
-              >
-                {backendTrackingStatus ? "ACTIVE" : "INACTIVE"}
-              </p>
-            </div> */}
             <div className="p-3 bg-muted rounded-lg">
               <p className="text-xs text-muted-foreground mb-1">
                 Manual Override
@@ -907,6 +834,8 @@ export default function DriverDashboard() {
           </div>
         </header>
 
+        <OfflineStatusBar />
+
         <main className="flex-1 p-4 lg:p-6 max-w-none">
           {activeTab === "overview" && (
             <div className="space-y-5 max-w-none">
@@ -932,6 +861,43 @@ export default function DriverDashboard() {
           )}
 
           {activeTab === "map" && renderMapTab()}
+
+          {activeTab === "earnings" && (
+            <div className="space-y-5 max-w-none">
+              <EarningsChart earnings={earnings} detailed />
+              <div className="bg-card border border-border rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-foreground mb-4">
+                  Recent Ratings
+                </h3>
+                {ratings.length > 0 ? (
+                  <div className="space-y-3">
+                    {ratings.map((rating) => (
+                      <div
+                        key={rating.id}
+                        className="flex items-center justify-between border-b border-border pb-3 last:border-b-0 last:pb-0"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                          <span className="font-semibold text-foreground">
+                            {rating.score ?? rating.rating ?? "N/A"}
+                          </span>
+                        </div>
+                        {rating.comment && (
+                          <p className="text-sm text-muted-foreground truncate max-w-xs">
+                            {rating.comment}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No ratings yet.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {activeTab === "jobs" && (
             <div className="max-w-none">
@@ -1086,22 +1052,6 @@ export default function DriverDashboard() {
           )}
         </main>
       </div>
-
-      {showJobModal && selectedJob && (
-        <JobDetailsModal
-          job={selectedJob}
-          isOpen={showJobModal}
-          onClose={() => setShowJobModal(false)}
-          onUpdateBookingStatus={(bookingId, status) => {
-            toast.success(`Booking ${bookingId} updated to ${status}`);
-            fetchData(); // Refresh data after status update
-          }}
-          onBulkDelivery={(formData) => {
-            toast.success("Bulk delivery completed");
-            fetchData(); // Refresh data after bulk delivery
-          }}
-        />
-      )}
     </div>
   );
 }
