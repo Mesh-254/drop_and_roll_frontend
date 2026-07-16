@@ -137,8 +137,13 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
 
   return (
     <AnimatePresence>
+      {/* Bug 1: AnimatePresence derives each child's tracking key via `child.key || ""`.
+          Two keyless children (backdrop + modal) both collapsed to "" → React's
+          "two children with the same key, ``" warning, which corrupted presence
+          reconciliation and blocked the close. Unique, stable keys fix it. */}
       {/* Backdrop — click to close */}
       <motion.div
+        key="onboarding-backdrop"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -148,6 +153,7 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
 
       {/* Modal container */}
       <motion.div
+        key="onboarding-modal"
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}

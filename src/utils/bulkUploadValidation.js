@@ -177,9 +177,11 @@ export function getStatusLabel(status) {
   const labels = {
     pending: 'Pending',
     processing: 'Processing',
+    payment_pending: 'Awaiting Payment',
     completed: 'Completed',
     failed: 'Failed',
     partial: 'Partial',
+    cancelled: 'Cancelled',
   };
   return labels[status] || 'Unknown';
 }
@@ -187,7 +189,7 @@ export function getStatusLabel(status) {
 /**
  * Get status color for UI badges/indicators
  * @param {string} status - Status code
- * @returns {Object} { bg: string, text: string, badge: string }
+ * @returns {Object} { bg: string, text: string, badge: string, dot: string }
  */
 export function getStatusColors(status) {
   const colors = {
@@ -195,26 +197,43 @@ export function getStatusColors(status) {
       bg: 'bg-yellow-900/30',
       text: 'text-yellow-300',
       badge: 'bg-yellow-500/20',
+      dot: 'bg-yellow-500',
     },
     processing: {
       bg: 'bg-blue-900/30',
       text: 'text-blue-300',
       badge: 'bg-blue-500/20',
+      dot: 'bg-blue-500',
     },
     completed: {
       bg: 'bg-green-900/30',
       text: 'text-green-300',
       badge: 'bg-green-500/20',
+      dot: 'bg-green-500',
     },
     failed: {
       bg: 'bg-red-900/30',
       text: 'text-red-300',
       badge: 'bg-red-500/20',
+      dot: 'bg-red-500',
     },
     partial: {
       bg: 'bg-yellow-900/30',
       text: 'text-yellow-300',
       badge: 'bg-yellow-500/20',
+      dot: 'bg-yellow-500',
+    },
+    payment_pending: {
+      bg: 'bg-amber-900/30',
+      text: 'text-amber-300',
+      badge: 'bg-amber-500/20',
+      dot: 'bg-amber-500',
+    },
+    cancelled: {
+      bg: 'bg-gray-800/30',
+      text: 'text-gray-300',
+      badge: 'bg-gray-500/20',
+      dot: 'bg-gray-500',
     },
   };
   return colors[status] || colors.pending;

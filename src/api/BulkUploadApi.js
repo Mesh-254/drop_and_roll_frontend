@@ -142,17 +142,17 @@ class BulkUploadApi extends ApiBase {
   }
 
   /**
-   * LIST — All bulk uploads for the current user (most recent first).
+   * LIST — Bulk uploads for the current user (most recent first), paginated.
    *
-   * @param {Object} params - { page, pageSize, status }
-   * @returns {Promise<Array>}
+   * @param {Object} params - { page, page_size, status, search, date_from, date_to }
+   * @returns {Promise<{count: number, next: string|null, previous: string|null, results: Array}>}
    */
   async listUploads(params = {}) {
     const response = await this.axiosInstance.get(
       '/api/booking/bulk-uploads/',
       { params },
     );
-    // Backend returns plain array (not wrapped)
+    // Backend returns the standard DRF paginated envelope: { count, next, previous, results }.
     return response.data;
   }
 
@@ -183,10 +183,24 @@ class BulkUploadApi extends ApiBase {
   }
 
   /**
+   * SUCCESSFUL — Paginated successfully processed rows (created bookings).
+   *
+   * @param {string} id
+   * @param {Object} params - { page, pageSize }
+   */
+  async getSuccessful(id, params = {}) {
+    const response = await this.axiosInstance.get(
+      `/api/booking/bulk-uploads/${id}/successful/`,
+      { params },
+    );
+    return response.data;
+  }
+
+  /**
    * STATS — Dashboard aggregate statistics + credit info for NET businesses.
    *
    * Response shape:
-   *   { total_uploads, total_bookings, success_rate, monthly_uploads,
+   *   { total_uploads, total_bookings, success_rate, total_spend, monthly_uploads,
    *     credit_info: { payment_terms, credit_limit, available_credit, net_days } | null }
    */
   async getStats() {

@@ -29,6 +29,12 @@ export default function BulkUploadWizard({ onSuccess = () => {}, onClose = () =>
   const { uploadError } = hook;
 
   const [showProfileModal, setShowProfileModal] = useState(false);
+  // Bug 1 (independent close bug): the auto-open effect below fires whenever
+  // `isBusinessProfileRequired && !showProfileModal`. Without a latch, clicking the modal's
+  // "X" set showProfileModal=false, the effect re-ran (the error is still present) and
+  // instantly reopened it — so the modal appeared un-closeable. This flag records a manual
+  // dismissal so we only auto-open ONCE per error.
+  const [profileModalDismissed, setProfileModalDismissed] = useState(false);
 
   // Detect a missing-business-profile error by inspecting the error string.
   const isBusinessProfileRequired =
@@ -37,24 +43,31 @@ export default function BulkUploadWizard({ onSuccess = () => {}, onClose = () =>
 
   // ── Auto-show profile modal when error indicates missing profile ──────────
   useEffect(() => {
-    if (isBusinessProfileRequired && !showProfileModal) {
-      console.log('[BulkUploadWizard] Business profile required — opening onboarding modal');
+    if (isBusinessProfileRequired && !showProfileModal && !profileModalDismissed) {
       setShowProfileModal(true);
     }
-  }, [isBusinessProfileRequired, showProfileModal]);
+  }, [isBusinessProfileRequired, showProfileModal, profileModalDismissed]);
+
+  // Reset the dismissal latch once the underlying error clears, so a *new*
+  // business-profile error later can re-trigger the modal.
+  useEffect(() => {
+    if (!isBusinessProfileRequired && profileModalDismissed) {
+      setProfileModalDismissed(false);
+    }
+  }, [isBusinessProfileRequired, profileModalDismissed]);
 
   // ── Handle profile creation success ──────────────────────────────────────
   const handleProfileSuccess = async () => {
-    console.log('[BulkUploadWizard] Business profile created — user should re-submit the upload');
     setShowProfileModal(false);
+    setProfileModalDismissed(false); // profile now exists — allow future prompts
     // retryPendingAction is not available in the new hook.
     // The user will simply re-submit; the profile will now exist.
   };
 
   // ── Handle profile modal close ────────────────────────────────────────
   const handleProfileClose = () => {
-    console.log('[v0] BusinessProfileOnboarding modal closed by user');
     setShowProfileModal(false);
+    setProfileModalDismissed(true); // respect the manual close; don't auto-reopen
   };
 
   return (

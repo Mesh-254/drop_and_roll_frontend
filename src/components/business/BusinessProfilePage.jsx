@@ -303,8 +303,26 @@ export default function BusinessProfilePage() {
               <h3 className="text-lg font-bold text-white">Payment Terms</h3>
             </div>
 
-            {/* Approved NET Terms */}
-            {netTermsRequest?.status === 'approved' || businessProfile.payment_terms !== 'prepaid' ? (
+            {/* Bug 2: "NET Terms Approved" must never show while the overall account is not
+                approved. The account status (isApproved) and the NET-terms signal are
+                independent, so gate the approved badge on BOTH. While the account is under
+                review we show a neutral pending notice instead of a contradictory green badge. */}
+            {!isApproved ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-yellow-400" />
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-400">
+                    Pending Account Review
+                  </span>
+                </div>
+                <div className="bg-gray-800/50 rounded-xl p-4">
+                  <p className="text-sm text-gray-400">
+                    Your payment terms{netTermsRequest?.status === 'pending' ? ' and NET terms application' : ''} will
+                    be finalised once your business account is approved.
+                  </p>
+                </div>
+              </div>
+            ) : netTermsRequest?.status === 'approved' || businessProfile.payment_terms !== 'prepaid' ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 text-green-400" />

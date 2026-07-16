@@ -213,7 +213,7 @@ export function useBulkUpload() {
     _clearPollTimer();
     setIsPolling(true);
 
-    if (process.env.NODE_ENV === "development") {
+    if (import.meta.env.NODE_ENV === "development") {
       console.debug(`[BulkUpload] Started polling for upload ${uploadId}`);
     }
 
@@ -337,7 +337,10 @@ export function useBulkUpload() {
             `[BulkUpload] Receivable not found after ${MAX_ATTEMPTS} attempts; falling back.`,
           );
           setIsWaitingForReceivable(false);
-          navigate(`/bulk-uploads/${uploadId}`);
+          // FIX: the app's route is singular `/bulk-upload/:id` (see App.jsx);
+          // navigating to the plural `/bulk-uploads/:id` 404'd instead of
+          // falling back gracefully to the detail page.
+          navigate(`/bulk-upload/${uploadId}`);
         }
       };
 
