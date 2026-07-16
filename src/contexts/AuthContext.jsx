@@ -73,10 +73,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (email, password, rememberMe = false) => {
+  const login = async (email, password, rememberMe = false, turnstileToken = "") => {
     try {
-      const response = await authApi.login(email, password);
+      // Phase 3, Task 3.4: forward the Turnstile token (only set after a CHALLENGE_REQUIRED).
+      const response = await authApi.login(email, password, turnstileToken);
       localStorage.removeItem("guestEmail"); // Clear guest email
+      localStorage.removeItem("guestIdentifier");
       if (response.success) {
         if (rememberMe) {
           localStorage.setItem("remember_me", "true");
@@ -157,6 +159,7 @@ export const AuthProvider = ({ children }) => {
   const googleAuth = async (idToken) => {
     const result = await authApi.googleAuth(idToken);
     localStorage.removeItem("guestEmail"); // Clear guest email
+    localStorage.removeItem("guestIdentifier");
 
     if (result.success) {
       if (result.data.user) {

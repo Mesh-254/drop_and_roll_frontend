@@ -2,11 +2,12 @@ import { ApiBase } from "./ApiBase"
 
 class AuthApi extends ApiBase {
   // In AuthApi.js, update login method:
-  async login(email, password) {
+  async login(email, password, turnstileToken) {
     try {
       const response = await this.request("/api/users/auth/login/", {
         method: "POST",
-        data: { email: email.toLowerCase(), password },
+        // Phase 3, Task 3.4: only present once the backend has asked for a challenge.
+        data: { email: email.toLowerCase(), password, ...(turnstileToken ? { turnstile_token: turnstileToken } : {}) },
         includeAuth: false,
       })
       if (response.data.access) {
@@ -30,6 +31,9 @@ class AuthApi extends ApiBase {
         success: false,
         code,
         message,
+        // Phase 2, Task 2.7: surface the lockout retry-after hint (seconds) so the login
+        // form can tell the user roughly how long to wait before trying again.
+        retryAfter: backendError.retry_after,
       }
     }
   }
@@ -196,11 +200,12 @@ class AuthApi extends ApiBase {
     }
   }
 
-  async forgotPassword(email) {
+  async forgotPassword(email, turnstileToken) {
     try {
       const response = await this.request("/api/users/auth/forgot-password/", {
         method: "POST",
-        data: { email: email.toLowerCase() },
+        // Phase 3, Task 3.3: bot verification is unconditional on forgot-password.
+        data: { email: email.toLowerCase(), ...(turnstileToken ? { turnstile_token: turnstileToken } : {}) },
         includeAuth: false,
       });
       return {

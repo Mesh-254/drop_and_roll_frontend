@@ -13,6 +13,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { authApi } from "../../api/AuthApi";
+import { getFailedRules } from "../../utils/passwordValidation";
 
 export default function ResetPassword() {
   const [formData, setFormData] = useState({
@@ -24,6 +25,7 @@ export default function ResetPassword() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState(""); // 'idle', 'success', 'error', 'invalid'
+  const [isInvalidLink, setIsInvalidLink] = useState(false);
   const [countdown, setCountdown] = useState(3);
   const navigate = useNavigate();
   const { uid, token } = useParams();
@@ -51,12 +53,8 @@ export default function ResetPassword() {
 
   const validatePassword = (password) => {
     if (!password) return "Password is required";
-    if (password.length < 8) return "Password must be at least 8 characters";
-    if (!/[A-Z]/.test(password))
-      return "Password must include an uppercase letter";
-    if (!/[a-z]/.test(password))
-      return "Password must include a lowercase letter";
-    if (!/[0-9]/.test(password)) return "Password must include a number";
+    const failed = getFailedRules(password);
+    if (failed.length > 0) return failed.map((r) => r.label).join(", ");
     return "";
   };
 
@@ -114,8 +112,10 @@ export default function ResetPassword() {
       } else {
         setStatus("error");
         let msg = result.message || "Failed to reset password.";
-        if (result.code === "INVALID_RESET_LINK")
+        if (result.code === "INVALID_RESET_LINK") {
           msg = "Invalid or expired reset link. Please request a new one.";
+          setIsInvalidLink(true);
+        }
         setErrors({ submit: msg });
       }
     } catch (error) {
@@ -239,9 +239,20 @@ export default function ResetPassword() {
               className="mb-6 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2"
             >
               <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-              <p className="text-red-600 dark:text-red-400 text-sm">
-                {errors.submit}
-              </p>
+              <div className="flex-1">
+                <p className="text-red-600 dark:text-red-400 text-sm">
+                  {errors.submit}
+                </p>
+                {isInvalidLink && (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/forgot-password")}
+                    className="mt-2 text-sm text-orange-600 hover:text-orange-700 font-medium underline"
+                  >
+                    Request a new reset link
+                  </button>
+                )}
+              </div>
             </motion.div>
           )}
           <form onSubmit={handleSubmit} className="space-y-6">

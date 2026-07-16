@@ -11,12 +11,15 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { authApi } from "../../api/AuthApi"; // Adjust path
+import TurnstileWidget, { TURNSTILE_ENABLED } from "./TurnstileWidget";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [errors, setErrors] = useState({});
   const [status, setStatus] = useState(""); // 'idle', 'success', 'error'
   const [isLoading, setIsLoading] = useState(false);
+  // Phase 3, Task 3.5: bot verification is unconditional on forgot-password.
+  const [turnstileToken, setTurnstileToken] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -46,11 +49,16 @@ export default function ForgotPassword() {
       setErrors({ email: emailError });
       return;
     }
+    // Phase 3, Task 3.5: require a solved challenge before submitting when Turnstile is on.
+    if (TURNSTILE_ENABLED && !turnstileToken) {
+      setErrors({ submit: "Please complete the verification challenge below." });
+      return;
+    }
     setIsLoading(true);
     setErrors({});
     setStatus("idle");
     try {
-      const result = await authApi.forgotPassword(email);
+      const result = await authApi.forgotPassword(email, turnstileToken);
       if (result.success) {
         setStatus("success");
         sessionStorage.setItem("resetEmail", email);
@@ -169,6 +177,16 @@ export default function ForgotPassword() {
                 </motion.p>
               )}
             </div>
+            {/* Phase 3, Task 3.5: Cloudflare Turnstile — renders only when a site key is set */}
+            <TurnstileWidget
+              className="flex justify-center"
+              onVerify={setTurnstileToken}
+              onExpire={() => setTurnstileToken("")}
+              onError={() => setTurnstileToken("")}
+            />
+            {errors.submit && (
+              <p className="text-red-400 text-sm text-center">{errors.submit}</p>
+            )}
             <motion.button
               whileHover={{ scale: isFormValid && !isLoading ? 1.02 : 1 }}
               whileTap={{ scale: isFormValid && !isLoading ? 0.98 : 1 }}

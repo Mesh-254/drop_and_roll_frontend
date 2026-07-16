@@ -60,14 +60,10 @@ const ResendConfirmationPage = () => {
             navigate("/login");
           }, 4000);
           break;
-        case "EMAIL_NOT_FOUND":
-          setMessage(
-            "No account found with this email. Redirecting to register...",
-          );
-          setTimeout(() => {
-            navigate("/register");
-          }, 4000);
-          break;
+        // Finding A: the backend no longer returns EMAIL_NOT_FOUND for resend — an unknown
+        // email now gets the same generic CONFIRMATION_SENT (200) as a real unconfirmed one
+        // and lands in the success branch above ("check your inbox"). Nothing to branch on
+        // here, so we no longer leak "no account found" / redirect to register.
         default:
           setMessage(result.message || "Failed to send email. Try again.");
       }

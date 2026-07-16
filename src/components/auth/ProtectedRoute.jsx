@@ -1,16 +1,27 @@
 "use client";
 
+import { useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { useAuthModal } from "../../contexts/AuthModalContext";
 
 const ProtectedRoute = ({
   children,
   allowedRoles = [],
-  redirectTo = "/login",
   requireAuth = true,
 }) => {
   const { user, loading, isAuthenticated } = useAuth();
+  const { openLogin, isOpen } = useAuthModal();
   const location = useLocation();
+
+  // Open the login modal in place instead of navigating to /login,
+  // so the user stays on the current page (dimmed behind the modal).
+  // We also store location.state.from via the modal's post-login navigate.
+  useEffect(() => {
+    if (!loading && requireAuth && !isAuthenticated) {
+      openLogin();
+    }
+  }, [loading, requireAuth, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
@@ -20,9 +31,9 @@ const ProtectedRoute = ({
     );
   }
 
-  // Require auth but not logged in
+  // Not authenticated — render nothing (modal is open).
   if (requireAuth && !isAuthenticated) {
-    return <Navigate to={redirectTo} state={{ from: location }} replace />;
+    return null;
   }
 
   // Role-based access
