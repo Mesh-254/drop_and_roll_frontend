@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Calendar,
@@ -29,6 +29,7 @@ import dayjs from "dayjs";
 // NAVIGATION & PROFILE UPGRADE: Added modal state for booking details view
 export default function BookingHistory() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { isAuthenticated, user } = useAuth();
   const [activeTab, setActiveTab] = useState("bookings");
   const [bookings, setBookings] = useState([]);
@@ -43,7 +44,10 @@ export default function BookingHistory() {
     dateFrom: "",
     dateTo: "",
     status: "",
-    search: "",
+    // Deep-link support: BulkUploadDetail's Successful tab links here with
+    // ?search=<booking id> so tapping "View" lands directly on that booking
+    // instead of a generic, unfiltered history page.
+    search: searchParams.get("search") || "",
   });
 
   // Pagination constants
