@@ -317,20 +317,45 @@ export class PaymentApi extends ApiBase {
   /**
    * Get transaction details by ID.
    * Supports guest access via guest_email + guest_identifier query params
-   * (both required - see CODE_REVIEW.md finding #4).
+   * (both required - see CODE_REVIEW.md finding #4). Both fall back to
+   * localStorage — the backend scopes the guest queryset on BOTH, so a
+   * request missing either one 404s even for a transaction the guest owns.
    */
   async getTransaction(txId, guestEmail, guestIdentifier) {
     try {
       let url = `/api/payments/transactions/${txId}/`;
+      const email = guestEmail || localStorage.getItem("guestEmail");
       const identifier = guestIdentifier || localStorage.getItem("guestIdentifier");
-      if (guestEmail && identifier) {
-        url += `?guest_email=${encodeURIComponent(guestEmail)}&guest_identifier=${encodeURIComponent(identifier)}`;
+      if (email && identifier) {
+        url += `?guest_email=${encodeURIComponent(email)}&guest_identifier=${encodeURIComponent(identifier)}`;
       }
       const resp = await this.axiosInstance.get(url);
       return { success: true, data: resp.data };
     } catch (err) {
-      return this._err("GET_TX_ERROR", err);
+      const result = this._err("GET_TX_ERROR", err);
+      result.status = err.response?.status;
+      return result;
     }
+  }
+
+  /**
+   * getTransaction with backoff, for the resume/deep-link path ONLY.
+   *
+   * The happy path never needs this: booking creation returns the
+   * transaction inline and the payment page hydrates from navigation state.
+   * But a deep link (reminder email, refresh, replica lag) can race the
+   * transaction becoming visible — retry a 404 up to 3 times (300/600/1200ms)
+   * before surfacing the error. Non-404 failures are NOT retried: a 403 or
+   * 500 won't heal by waiting.
+   */
+  async getTransactionWithRetry(txId, guestEmail, guestIdentifier, delaysMs = [300, 600, 1200]) {
+    let result = await this.getTransaction(txId, guestEmail, guestIdentifier);
+    for (const delay of delaysMs) {
+      if (result.success || result.status !== 404) return result;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      result = await this.getTransaction(txId, guestEmail, guestIdentifier);
+    }
+    return result;
   }
 
   async listTransactions(params = {}) {

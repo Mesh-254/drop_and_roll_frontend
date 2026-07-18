@@ -77,7 +77,7 @@
  *        gateway selection / initiation guards.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   useParams,
   useNavigate,
@@ -646,27 +646,26 @@ export default function PaymentPage() {
     }
   }, [isPaypalCancelled, txId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Single owner of the transaction fetch (FIX-RACE) ────────────────────────
+  // txPromiseRef caches the in-flight request so React 18 StrictMode's
+  // double-mount (the "two GETs for the same tx id at the same millisecond"
+  // in the server logs) reuses ONE network call instead of firing twice.
+  // reloadTick lets handleRetry force a genuine re-fetch.
+  const txPromiseRef = useRef(null);
+  const [reloadTick, setReloadTick] = useState(0);
+
   // Load transaction details on mount
   useEffect(() => {
     if (isPaypalReturn || isPaypalCancelled) return; // handled separately
 
-    let mounted = true;
-    (async () => {
-      const result = await paymentApi.getTransaction(txId, guestEmail);
-      if (!mounted) return;
-
-      if (!result.success) {
-        setState((s) => ({ ...s, loading: false, error: result.message }));
-        return;
-      }
-
-      const tx = result.data;
-
+    // Shared state-transition for a loaded transaction, whether it came from
+    // navigation state (happy path) or the network (resume/deep-link path).
+    const navState = location.state || {};
+    const applyTx = (tx) => {
       if (tx.status === "success") {
         setState((s) => ({ ...s, loading: false, tx, succeeded: true }));
         return;
       }
-
       if (tx.status !== "pending") {
         setState((s) => ({
           ...s,
@@ -675,36 +674,59 @@ export default function PaymentPage() {
         }));
         return;
       }
-
-      // Gateway credentials are passed via React Router location.state when
-      // the user is navigated here from useBulkUpload / BookingPage.
-      // If absent, the gateway selection screen lets them re-initiate.
-      const navState = location.state || {};
-      const clientSecret = navState.clientSecret || null;
-      const approvalUrl = navState.approvalUrl || null;
-
-      // FIX-B1: seed selectedGateway from navState.gateway.
-      // Without this, both Stripe/PayPal render branches always evaluate false
-      // when arriving via useBulkUpload which passes gateway in location.state.
-      // That caused the fallback ErrorScreen → "Go Back" → re-fire → reload loop.
-      const selectedGateway = navState.gateway || null;
-
       setState((s) => ({
         ...s,
         loading: false,
         tx,
-        clientSecret,
-        approvalUrl,
+        // Gateway credentials arrive via location.state when navigated here
+        // from useBulkUpload / BookingModal. If absent, the gateway selection
+        // screen lets the user initiate.
+        clientSecret: navState.clientSecret || null,
+        approvalUrl: navState.approvalUrl || null,
         // FIX-B1: persist the gateway from navState into component state
-        selectedGateway,
+        selectedGateway: navState.gateway || null,
         // guestEmail was already seeded into initial state (FIX-B6); keep it.
         guestEmail: s.guestEmail,
       }));
+    };
+
+    // FIX-RACE (spec §A): hydrate INLINE from the transaction the booking-create
+    // response returned (BookingModal passes it via navigation state). No
+    // follow-up GET on the happy path — the GET below is reserved for the
+    // resume/deep-link case (email link, refresh, direct URL).
+    const navTx = navState.transaction;
+    if (navTx?.id && String(navTx.id) === String(txId)) {
+      // Persist guest credentials from the inline payload so any LATER fetch
+      // (success-screen refresh, retry) can authenticate the guest lookup.
+      if (navTx.guest_identifier) {
+        localStorage.setItem("guestIdentifier", navTx.guest_identifier);
+      }
+      applyTx(navTx);
+      return;
+    }
+
+    let mounted = true;
+    if (!txPromiseRef.current) {
+      // Resume path: tolerate momentary 404s (e.g. replica lag) with
+      // 3 backoff retries before surfacing an error.
+      txPromiseRef.current = paymentApi.getTransactionWithRetry(txId, guestEmail);
+    }
+    (async () => {
+      const result = await txPromiseRef.current;
+      if (!mounted) return;
+
+      if (!result.success) {
+        // NEVER fabricate a £0.00 amount from a failed fetch — surface the
+        // error state; handleRetry re-runs this effect via reloadTick.
+        setState((s) => ({ ...s, loading: false, error: result.message }));
+        return;
+      }
+      applyTx(result.data);
     })();
     return () => {
       mounted = false;
     };
-  }, [txId, isPaypalReturn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [txId, isPaypalReturn, reloadTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle gateway selection and payment initiation
   const handleSelectGateway = useCallback(
@@ -789,7 +811,13 @@ export default function PaymentPage() {
       clientSecret: null,
       approvalUrl: null,
       error: null,
+      // If the transaction never loaded, go back into the loading state and
+      // genuinely re-fetch — clearing the error alone used to drop the user
+      // on the gateway screen with a fabricated £0.00 total.
+      loading: s.tx ? s.loading : true,
     }));
+    txPromiseRef.current = null;
+    setReloadTick((t) => t + 1);
   }, []);
 
   /**
@@ -984,7 +1012,10 @@ export default function PaymentPage() {
 
   const { tx, clientSecret, approvalUrl } = state;
   const isBulk = !!tx?.bulk_upload;
-  const amount = tx?.amount || "0.00";
+  // NEVER default the amount to 0 — a fabricated £0.00 is worse than no
+  // amount. When tx hasn't loaded, the guards below render loading/error
+  // screens instead of a payment screen.
+  const amount = tx?.amount ?? null;
   const currency = tx?.currency || "GBP";
   // Use state.selectedGateway (user-chosen or navState-seeded), NOT tx.gateway
   // (stale placeholder that defaults to "stripe" on the backend).
@@ -1030,6 +1061,34 @@ export default function PaymentPage() {
         </Layout>
       );
     }
+  }
+
+  // ── No transaction loaded — cannot show a real amount ───────────────────────
+  // Reaching here without a tx (fetch failed but error was cleared, or an
+  // unexpected state) used to render the gateway screen with £0.00. Force a
+  // retry path instead — the retry re-fetches the transaction.
+  if (!tx) {
+    return (
+      <Layout>
+        <div className="space-y-4 text-center">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-white mb-2">
+            Payment Details Unavailable
+          </h2>
+          <p className="text-slate-400 mb-6">
+            We couldn't load your payment details. Your booking is saved — no
+            payment has been taken.
+          </p>
+          <button
+            onClick={handleRetry}
+            className="bg-orange-500 hover:bg-orange-600 text-white font-semibold
+                       rounded-xl px-6 py-3 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </Layout>
+    );
   }
 
   // ── Gateway selection — shown until credentials arrive ──────────────────────
