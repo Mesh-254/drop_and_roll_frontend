@@ -8,6 +8,7 @@ import { Moon, Sun, Save, X, Loader, Building2, CheckCircle, Clock, XCircle, Cre
 import { authApi } from "../../api/AuthApi";
 import { useBusinessProfile } from "../../hooks/useBusinessProfile";
 import BusinessProfileOnboarding from "../business/BusinessProfileOnboarding";
+import PendingBookingsSection from "./PendingBookingsSection";
 
 // NAVIGATION & PROFILE UPGRADE: New /profile page with editable name fields and theme toggle
 export default function ProfilePage() {
@@ -341,6 +342,9 @@ export default function ProfilePage() {
             </div>
           </motion.div>
         </div>
+
+        {/* Pending payments — bookings awaiting payment (customers only) */}
+        {user?.role === 'customer' && <PendingBookingsSection />}
 
         {/* Business Account Section - Only show for customers */}
         {user?.role === 'customer' && (
