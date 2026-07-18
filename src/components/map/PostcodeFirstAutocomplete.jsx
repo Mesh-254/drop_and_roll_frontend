@@ -2,9 +2,15 @@
 /**
  * components/map/PostcodeFirstAutocomplete.jsx
  * ════════════════════════════════════════════════════════════════════════
- * Postcode-first UK address selection with graceful multi-tier fallback.
+ * Postcode-first UK address selection with a graceful two-tier fallback.
  *
- *   Ideal Postcodes (primary)  →  Google Places (fallback)  →  manual entry
+ *   Ideal Postcodes (primary)  →  Google Places (fallback)
+ *
+ * There is deliberately NO free-text manual-entry path: every address must
+ * come from a real lookup (Ideal or Google) so we always have a verified,
+ * geocoded premise and can enforce the Milton Keynes / Oxford service area
+ * before the user proceeds. If both services are unavailable the user is asked
+ * to retry rather than typing an unverifiable address.
  *
  * Drop-in replacement for the old Google-only AddressAutocomplete — it
  * accepts the SAME props (label, value, postcode, onPostcodeChange, onSelect,
@@ -31,20 +37,22 @@
  *   5. If Ideal Postcodes is unavailable (not configured / rate-limited /
  *      upstream error) or returns zero results for a query that still looks
  *      postcode-like, we fall back to Google Places Autocomplete
- *      (bounded + biased to the MK/OX corridor, same as before).
- *   6. If Google also fails (or the user just wants to type it in), a
- *      "Enter address manually" link reveals plain form fields.
+ *      (bounded + biased to the MK/OX area, same as before).
+ *   6. Every selected address — Ideal OR Google — is checked against the
+ *      Milton Keynes / Oxford service area BEFORE it can be confirmed. An
+ *      out-of-area address shows a red banner, disables the confirm button,
+ *      and is never handed to onSelect, so the parent step stays blocked.
  *
- * Every path funnels through the same onSelect(address) contract, tagging
- * `address.meta = { source: "ideal_postcodes" | "google" | "manual" }` so
- * the backend can record provenance (Address.source / Address.meta).
+ * Both paths funnel through the same onSelect(address) contract, tagging
+ * `address.meta = { source: "ideal_postcodes" | "google" }` so the backend
+ * can record provenance (Address.source / Address.meta).
  */
 
 import { useRef, useState, useEffect, useCallback, useId } from "react"
 import { useMapsLibrary } from "@vis.gl/react-google-maps"
-import { AlertCircle, Loader2, MapPin, CheckCircle2, Pencil, ChevronDown } from "lucide-react"
-import toast from "react-hot-toast"
+import { AlertCircle, Loader2, MapPin, CheckCircle2, ChevronDown } from "lucide-react"
 import { bookingApi } from "../../api/BookingApi"
+import { isPostcodeQuery, formatPostcode } from "../../utils/ukPostcode"
 
 const DEBOUNCE_MS = 300
 const PAGE_SIZE = 20 // rendered per "page" in the dropdown — see file header
@@ -55,11 +63,12 @@ const PAGE_SIZE = 20 // rendered per "page" in the dropdown — see file header
 const USE_IDEAL_POSTCODES_PRIMARY =
   (import.meta.env.VITE_USE_IDEAL_POSTCODES_PRIMARY ?? "true") !== "false"
 
-// Loose "does this look like it could resolve to a UK postcode" check, used
-// only to decide whether an empty Ideal Postcodes result set should still
-// try Google (a postcode-shaped query that returns nothing might be a typo
-// Google's fuzzier matching can rescue) or go straight to "no results".
-const LOOKS_POSTCODE_ISH = /^[A-Z]{1,2}[0-9]/i
+// Human labels for the provenance badge in the confirmation modal.
+const SOURCE_LABELS = {
+  ideal_postcodes: "Ideal Postcodes",
+  google: "Google Places",
+  manual: "Manual",
+}
 
 function useDebouncedValue(value, delayMs) {
   const [debounced, setDebounced] = useState(value)
@@ -70,8 +79,32 @@ function useDebouncedValue(value, delayMs) {
   return debounced
 }
 
-/** Confirmation modal — "Is this correct?" */
-function ConfirmAddressModal({ address, onConfirm, onEdit, onCancel }) {
+/** Confirmation modal — "Is this correct?"
+ *  `pending` = { address, inServiceArea, areaMessage }. When the address is
+ *  outside the Milton Keynes / Oxford service area the confirm button is
+ *  disabled and a red banner explains why, so an out-of-area address can never
+ *  be handed back to the parent.
+ *
+ *  Shows the full premise detail (line 1/2/3, organisation, town, county,
+ *  postcode) plus a provenance badge (Ideal Postcodes / Google Places).
+ *  Google's search is postcode-only (types: ['postal_code']), so a
+ *  Google-sourced selection has a verified, geocoded postcode but no
+ *  premise line — the modal asks for "Address line 1" before confirming.
+ *  This is NOT free-text manual entry: postcode, town and coordinates all
+ *  come from the verified lookup; only the premise line is typed. */
+function ConfirmAddressModal({ pending, onConfirm, onCancel }) {
+  const { address, inServiceArea, areaMessage } = pending
+  const detail = address.detail || {}
+  const needsLine1 = !address.line1
+  const [line1Draft, setLine1Draft] = useState("")
+  const line1Ok = !needsLine1 || line1Draft.trim().length > 0
+  const sourceLabel = SOURCE_LABELS[address.meta?.source] || SOURCE_LABELS.manual
+
+  const handleConfirm = () => {
+    if (!inServiceArea || !line1Ok) return
+    onConfirm(needsLine1 ? { ...address, line1: line1Draft.trim() } : address)
+  }
+
   return (
     <div
       role="dialog"
@@ -86,116 +119,83 @@ function ConfirmAddressModal({ address, onConfirm, onEdit, onCancel }) {
       >
         <h3
           id="confirm-address-heading"
-          className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2"
+          className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center justify-between gap-2"
         >
-          <MapPin className="h-5 w-5 text-orange-500" />
-          Is this correct?
+          <span className="flex items-center gap-2">
+            <MapPin className="h-5 w-5 text-orange-500" />
+            Is this correct?
+          </span>
+          <span
+            data-testid="address-source-badge"
+            className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"
+          >
+            {sourceLabel}
+          </span>
         </h3>
         <div className="rounded-lg bg-gray-50 dark:bg-gray-900 p-3 text-sm text-gray-700 dark:text-gray-300 mb-4">
-          <p className="font-medium">{address.line1}</p>
-          {address.line2 && <p>{address.line2}</p>}
+          {detail.organisation_name && <p className="font-medium">{detail.organisation_name}</p>}
+          {needsLine1 ? (
+            <div className="mb-2">
+              <label
+                htmlFor="confirm-address-line1"
+                className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1"
+              >
+                Address line 1 (house number and street) *
+              </label>
+              <input
+                id="confirm-address-line1"
+                type="text"
+                value={line1Draft}
+                onChange={(e) => setLine1Draft(e.target.value)}
+                placeholder="e.g. 12 Midsummer Boulevard"
+                autoFocus
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+          ) : (
+            <p className="font-medium">{address.line1}</p>
+          )}
+          {detail.line_2 ? <p>{detail.line_2}</p> : address.line2 && <p>{address.line2}</p>}
+          {detail.line_3 && <p>{detail.line_3}</p>}
           <p>
             {address.city}
             {address.region ? `, ${address.region}` : ""}
           </p>
-          <p className="font-medium">{address.postal_code}</p>
+          <p className="font-medium">{formatPostcode(address.postal_code)}</p>
         </div>
+
+        {!inServiceArea && (
+          <div
+            role="alert"
+            className="flex items-start gap-2 text-sm text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2 mb-4"
+          >
+            <AlertCircle size={16} className="mt-0.5 shrink-0" />
+            <span>
+              {areaMessage ||
+                "Sorry, we currently only operate in Milton Keynes and Oxford. Please enter a postcode from these areas."}
+            </span>
+          </div>
+        )}
+
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={onEdit}
+            onClick={onCancel}
             className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium transition-colors"
           >
-            <Pencil className="h-4 w-4" />
-            Edit
+            {inServiceArea ? "Cancel" : "Choose another"}
           </button>
           <button
             type="button"
-            onClick={onConfirm}
-            autoFocus
-            className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium transition-colors"
+            onClick={handleConfirm}
+            autoFocus={inServiceArea && !needsLine1}
+            disabled={!inServiceArea || !line1Ok}
+            className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
           >
             <CheckCircle2 className="h-4 w-4" />
             Yes, that's right
           </button>
         </div>
-      </div>
-    </div>
-  )
-}
-
-/** Plain manual-entry fields — last-resort fallback. */
-function ManualAddressForm({ initial, onSubmit, onCancel }) {
-  const [fields, setFields] = useState({
-    line1: initial?.line1 || "",
-    line2: initial?.line2 || "",
-    city: initial?.city || "",
-    region: initial?.region || "",
-    postal_code: initial?.postal_code || "",
-  })
-
-  const update = (key) => (e) => setFields((prev) => ({ ...prev, [key]: e.target.value }))
-
-  const canSubmit = fields.line1.trim() && fields.city.trim() && fields.postal_code.trim()
-
-  return (
-    <div className="space-y-3 rounded-lg border border-gray-300 dark:border-gray-600 p-4 bg-white dark:bg-gray-800">
-      <p className="text-sm text-gray-600 dark:text-gray-400">
-        Enter the address manually. We'll verify the postcode before confirming your booking.
-      </p>
-      <input
-        aria-label="Address line 1"
-        value={fields.line1}
-        onChange={update("line1")}
-        placeholder="Address line 1 *"
-        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white"
-      />
-      <input
-        aria-label="Address line 2"
-        value={fields.line2}
-        onChange={update("line2")}
-        placeholder="Address line 2 (optional)"
-        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white"
-      />
-      <div className="grid grid-cols-2 gap-2">
-        <input
-          aria-label="Town or city"
-          value={fields.city}
-          onChange={update("city")}
-          placeholder="Town / City *"
-          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white"
-        />
-        <input
-          aria-label="Postcode"
-          value={fields.postal_code}
-          onChange={update("postal_code")}
-          placeholder="Postcode *"
-          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white"
-        />
-      </div>
-      <input
-        aria-label="County"
-        value={fields.region}
-        onChange={update("region")}
-        placeholder="County (optional)"
-        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white"
-      />
-      <div className="flex gap-2 pt-1">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700"
-        >
-          Back to search
-        </button>
-        <button
-          type="button"
-          disabled={!canSubmit}
-          onClick={() => onSubmit(fields)}
-          className="flex-1 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium"
-        >
-          Use this address
-        </button>
       </div>
     </div>
   )
@@ -223,8 +223,9 @@ const PostcodeFirstAutocomplete = ({
   const [isOpen, setIsOpen] = useState(false)
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
 
-  // "idealPostcodes" | "google" | "manual" — which source is currently
-  // driving the dropdown / input behaviour.
+  // "idealPostcodes" | "google" — which source is currently driving the
+  // dropdown / input behaviour. (No manual mode: all addresses come from a
+  // verified lookup so we can enforce the service area.)
   const [mode, setMode] = useState(USE_IDEAL_POSTCODES_PRIMARY ? "idealPostcodes" : "google")
   const [fallbackNotice, setFallbackNotice] = useState(null)
   const [pendingConfirm, setPendingConfirm] = useState(null) // address awaiting Yes/Edit
@@ -242,10 +243,17 @@ const PostcodeFirstAutocomplete = ({
   }, [postcode])
 
   // ── Ideal Postcodes search (primary) ──────────────────────────────────
+  // POSTCODE-ONLY (spec §A): the query must match a progressive UK postcode
+  // shape before we call the backend proxy. Free-text/name queries never
+  // leave the browser — the metered Ideal Postcodes quota is only spent on
+  // queries that can actually resolve to a postcode. The backend applies
+  // the same gate server-side as a backstop.
+  const trimmedQuery = debouncedQuery.trim()
+  const queryIsPostcode = isPostcodeQuery(trimmedQuery)
+
   useEffect(() => {
     if (mode !== "idealPostcodes") return
-    const trimmed = debouncedQuery.trim()
-    if (trimmed.length < 2) {
+    if (trimmedQuery.length < 2 || !queryIsPostcode) {
       setSuggestions([])
       setIsOpen(false)
       return
@@ -254,7 +262,7 @@ const PostcodeFirstAutocomplete = ({
     const thisRequestId = ++requestIdRef.current
     setIsSearching(true)
 
-    bookingApi.autocompleteAddress(trimmed).then((res) => {
+    bookingApi.autocompleteAddress(trimmedQuery).then((res) => {
       if (thisRequestId !== requestIdRef.current) return // stale response, ignore
       setIsSearching(false)
 
@@ -265,9 +273,9 @@ const PostcodeFirstAutocomplete = ({
         setHighlightedIndex(-1)
         setIsOpen(true)
 
-        if (hits.length === 0 && LOOKS_POSTCODE_ISH.test(trimmed)) {
-          // Looks like a postcode but Ideal Postcodes drew a blank — worth
-          // letting Google's fuzzier matching have a shot before we give up.
+        if (hits.length === 0) {
+          // A postcode-shaped query that Ideal Postcodes can't match might
+          // be a typo Google's fuzzier matching can rescue.
           setFallbackNotice(
             "No exact matches found. Showing suggestions from Google Maps instead."
           )
@@ -286,7 +294,7 @@ const PostcodeFirstAutocomplete = ({
       )
       setMode("google")
     })
-  }, [debouncedQuery, mode])
+  }, [trimmedQuery, queryIsPostcode, mode])
 
   // ── Google Places fallback ─────────────────────────────────────────────
   const places = useMapsLibrary("places")
@@ -302,7 +310,14 @@ const PostcodeFirstAutocomplete = ({
       ),
       strictBounds: false, // biased, not hard-limited — service-area check does the real enforcement
       componentRestrictions: { country: "gb" },
-      types: ["address"],
+      // POSTCODE-ONLY (spec §A): 'postal_code', never 'geocode'/'address',
+      // so Google can't return venue/business/name matches. The selection
+      // is a verified, geocoded postcode; the premise line is collected in
+      // the confirmation modal (see ConfirmAddressModal).
+      types: ["postal_code"],
+      // address_components + geometry here are the same data a separate
+      // Geocoding API call for this place_id would return — requesting
+      // them on the widget avoids burning a second metered call per pick.
       fields: ["address_components", "geometry", "name"],
     }
 
@@ -313,12 +328,16 @@ const PostcodeFirstAutocomplete = ({
       const place = autocomplete.getPlace()
       if (!place?.geometry?.location) return
 
-      const components = place.address_components.reduce((acc, comp) => {
+      // Extract address_components into the same shape the Ideal Postcodes
+      // path produces, so both providers feed the confirmation modal and
+      // the Address model identically.
+      const components = (place.address_components || []).reduce((acc, comp) => {
         const type = comp.types[0]
         if (type === "street_number") acc.street_number = comp.long_name
         if (type === "route") acc.route = comp.long_name
         if (type === "locality") acc.city = comp.long_name
         if (type === "postal_town") acc.city = acc.city || comp.long_name
+        if (type === "administrative_area_level_2") acc.county = comp.long_name
         if (type === "administrative_area_level_1") acc.region = comp.long_name
         if (type === "postal_code") acc.postal_code = comp.long_name
         if (type === "country") acc.country = comp.short_name
@@ -328,18 +347,34 @@ const PostcodeFirstAutocomplete = ({
       }, {})
 
       const address = {
-        line1: `${components.street_number || ""} ${components.route || ""}`.trim() || place.name,
+        // A postal_code place has no street/premise — line1 stays empty and
+        // the confirmation modal collects it before allowing confirm.
+        line1: `${components.street_number || ""} ${components.route || ""}`.trim(),
         line2: components.line2 || "",
         city: components.city || "",
-        region: components.region || "",
-        postal_code: components.postal_code || "",
+        region: components.county || components.region || "",
+        postal_code: components.postal_code || place.name || "",
         country: components.country || "GB",
         latitude: place.geometry.location.lat(),
         longitude: place.geometry.location.lng(),
+        detail: {
+          post_town: components.city || "",
+          county: components.county || "",
+        },
         meta: { source: "google", confidence: 0.8 },
       }
 
-      setPendingConfirm(address)
+      // Google's autocomplete is only *biased* to MK/OX (strictBounds: false),
+      // so it can return out-of-area results. Enforce the service area here the
+      // same way the Ideal path does — the client mirror of the backend's
+      // authoritative two-tier check (see BookingApi.validateAddressInServiceArea).
+      const check = bookingApi.validateAddressInServiceArea(address)
+      setAreaWarning(check.valid ? null : check.message)
+      setPendingConfirm({
+        address,
+        inServiceArea: check.valid,
+        areaMessage: check.valid ? null : check.message,
+      })
       setIsOpen(false)
     })
 
@@ -363,59 +398,33 @@ const PostcodeFirstAutocomplete = ({
       return
     }
 
-    if (!res.in_service_area) {
-      setAreaWarning(res.service_area_message)
-      toast.error(
-        res.service_area_message ||
-          "We don't currently operate in this area. Please choose an address in Milton Keynes, Oxford or surrounding postcodes.",
-        { id: `service-area-${label || "address"}` }
-      )
-    } else {
-      setAreaWarning(null)
-    }
-
-    setPendingConfirm(res.address)
-  }, [label])
+    const inArea = res.in_service_area !== false
+    setAreaWarning(inArea ? null : res.service_area_message)
+    setPendingConfirm({
+      address: res.address,
+      inServiceArea: inArea,
+      areaMessage: inArea ? null : res.service_area_message,
+    })
+  }, [])
 
   const closeConfirm = () => setPendingConfirm(null)
 
-  const confirmSelectedAddress = () => {
-    if (!pendingConfirm) return
-    if (typeof onSelect === "function") onSelect(pendingConfirm)
-    if (typeof onPostcodeChange === "function" && pendingConfirm.postal_code) {
-      onPostcodeChange(pendingConfirm.postal_code)
-    }
-    setQuery(pendingConfirm.postal_code || pendingConfirm.line1 || "")
-    setPendingConfirm(null)
-  }
-
-  const editSelectedAddress = () => {
-    setMode("manual")
-    setPendingConfirm(null)
-  }
-
-  // ── Manual entry ────────────────────────────────────────────────────────
-  const handleManualSubmit = (fields) => {
-    const address = {
-      ...fields,
-      country: "GB",
-      latitude: null,
-      longitude: null,
-      meta: { source: "manual", confidence: 0 },
-    }
-    const check = bookingApi.validateAddressInServiceArea(address)
-    setAreaWarning(check.valid ? null : check.message)
-    if (!check.valid) {
-      toast.error(
-        check.message ||
-          "We don't currently operate in this area. Please choose an address in Milton Keynes, Oxford or surrounding postcodes.",
-        { id: `service-area-${label || "address"}` }
-      )
-    }
+  // Confirm hands the address to the parent — but only for in-area addresses.
+  // Out-of-area selections keep the confirm button disabled (see
+  // ConfirmAddressModal), so onSelect never fires and the step stays blocked.
+  // The modal passes back the final address (with the typed premise line for
+  // Google-sourced postcode picks). `detail` is display-only — strip it so
+  // the parent gets exactly the Address-model shape.
+  const confirmSelectedAddress = (finalAddress) => {
+    if (!pendingConfirm || !pendingConfirm.inServiceArea || !finalAddress?.line1) return
+    const { detail: _display, ...address } = finalAddress
     if (typeof onSelect === "function") onSelect(address)
-    if (typeof onPostcodeChange === "function") onPostcodeChange(fields.postal_code)
-    setQuery(fields.postal_code)
-    setMode(USE_IDEAL_POSTCODES_PRIMARY ? "idealPostcodes" : "google")
+    if (typeof onPostcodeChange === "function" && address.postal_code) {
+      onPostcodeChange(address.postal_code)
+    }
+    setQuery(formatPostcode(address.postal_code) || address.line1 || "")
+    setAreaWarning(null)
+    setPendingConfirm(null)
   }
 
   // ── Keyboard navigation ────────────────────────────────────────────────
@@ -452,50 +461,45 @@ const PostcodeFirstAutocomplete = ({
         {label}
       </label>
 
-      {mode === "manual" ? (
-        <ManualAddressForm
-          initial={{ postal_code: query }}
-          onSubmit={handleManualSubmit}
-          onCancel={() => setMode(USE_IDEAL_POSTCODES_PRIMARY ? "idealPostcodes" : "google")}
+      <div className="relative">
+        <input
+          id={inputId}
+          ref={inputRef}
+          type="text"
+          role="combobox"
+          aria-expanded={isOpen}
+          aria-controls={listboxId}
+          aria-autocomplete="list"
+          aria-invalid={!!areaWarning || !!validation}
+          aria-activedescendant={
+            highlightedIndex >= 0 ? `${listboxId}-option-${highlightedIndex}` : undefined
+          }
+          autoComplete="off"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value)
+            if (typeof onPostcodeChange === "function") onPostcodeChange(e.target.value)
+          }}
+          onFocus={() => suggestions.length > 0 && mode === "idealPostcodes" && setIsOpen(true)}
+          onKeyDown={handleKeyDown}
+          disabled={disabled}
+          placeholder={placeholder || `Enter a postcode (e.g. MK9 1AA)`}
+          className={`w-full px-4 py-3 pr-10 border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors disabled:opacity-50 ${
+            areaWarning || validation
+              ? "border-red-500"
+              : "border-gray-300 dark:border-gray-600"
+          }`}
         />
-      ) : (
-        <>
-          <div className="relative">
-            <input
-              id={inputId}
-              ref={inputRef}
-              type="text"
-              role="combobox"
-              aria-expanded={isOpen}
-              aria-controls={listboxId}
-              aria-autocomplete="list"
-              aria-activedescendant={
-                highlightedIndex >= 0 ? `${listboxId}-option-${highlightedIndex}` : undefined
-              }
-              autoComplete="off"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value)
-                if (typeof onPostcodeChange === "function") onPostcodeChange(e.target.value)
-              }}
-              onFocus={() => suggestions.length > 0 && mode === "idealPostcodes" && setIsOpen(true)}
-              onKeyDown={handleKeyDown}
-              disabled={disabled}
-              placeholder={
-                placeholder || `Postcode or location name (e.g. MK9 1AA or Central Milton Keynes)`
-              }
-              className="w-full px-4 py-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors disabled:opacity-50"
-            />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              {isSearching ? (
-                <Loader2 className="h-4 w-4 text-orange-500 animate-spin" aria-hidden="true" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-gray-400" aria-hidden="true" />
-              )}
-            </div>
-          </div>
+        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          {isSearching ? (
+            <Loader2 className="h-4 w-4 text-orange-500 animate-spin" aria-hidden="true" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-gray-400" aria-hidden="true" />
+          )}
+        </div>
+      </div>
 
-          {mode === "idealPostcodes" && isOpen && visibleSuggestions.length > 0 && (
+      {mode === "idealPostcodes" && isOpen && visibleSuggestions.length > 0 && (
             <ul
               id={listboxId}
               role="listbox"
@@ -542,24 +546,26 @@ const PostcodeFirstAutocomplete = ({
           {mode === "idealPostcodes" &&
             isOpen &&
             !isSearching &&
-            debouncedQuery.trim().length >= 2 &&
+            queryIsPostcode &&
             suggestions.length === 0 && (
               <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded-lg">
                 No matches for "{debouncedQuery}". Did you mean to include the full postcode (e.g. MK9 1AA)?
               </div>
             )}
 
-          <button
-            type="button"
-            onClick={() => setMode("manual")}
-            className="text-xs font-medium text-gray-500 hover:text-orange-600 dark:text-gray-400 underline underline-offset-2"
-          >
-            Can't find your address? Enter it manually
-          </button>
-        </>
-      )}
+          {/* Postcode-only search: tell the user why free text gets no results
+              instead of silently doing nothing. */}
+          {mode === "idealPostcodes" &&
+            !isSearching &&
+            trimmedQuery.length >= 2 &&
+            !queryIsPostcode && (
+              <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded-lg">
+                Address search works by postcode only — start typing a UK postcode (e.g. MK9 1AA
+                or OX1 2JD).
+              </div>
+            )}
 
-      {fallbackNotice && mode !== "idealPostcodes" && mode !== "manual" && (
+      {fallbackNotice && mode !== "idealPostcodes" && (
         <p className="text-xs text-gray-500 dark:text-gray-400">{fallbackNotice}</p>
       )}
 
@@ -579,9 +585,8 @@ const PostcodeFirstAutocomplete = ({
 
       {pendingConfirm && (
         <ConfirmAddressModal
-          address={pendingConfirm}
+          pending={pendingConfirm}
           onConfirm={confirmSelectedAddress}
-          onEdit={editSelectedAddress}
           onCancel={closeConfirm}
         />
       )}
@@ -601,8 +606,8 @@ change their import):
   onSelect         (address) => void
       address = {
         line1, line2, city, region, postal_code, country,
-        latitude, longitude,      // null for unverified manual entries
-        meta: { source: "ideal_postcodes" | "google" | "manual", confidence },
+        latitude, longitude,      // always present — every address is geocoded
+        meta: { source: "ideal_postcodes" | "google", confidence },
       }
   validation       string?  — external validation error to display
   disabled         boolean

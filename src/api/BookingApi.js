@@ -234,49 +234,6 @@ async searchPostcodes(query) {
 }
 
 /**
- * Search for premise-level addresses using Ideal Postcodes API
- * Returns actual house numbers, street names, and building details
- * This is the recommended method for postcode searches
- */
-async searchPostcodeAddresses(query, apiKey) {
-  if (!query || query.trim().length < 2) {
-    return { success: true, data: [] };
-  }
-  if (!apiKey) {
-    return {
-      success: false,
-      message: "Ideal Postcodes API key not configured",
-    };
-  }
-
-  try {
-    const normalized = query.trim().toUpperCase().replace(/\s+/g, " ");
-    const url = new URL("https://api.idealpostcodes.com/v1/autocomplete/addresses");
-    url.searchParams.append("query", normalized);
-    url.searchParams.append("api_key", apiKey);
-    url.searchParams.append("limit", "8");
-
-    const response = await fetch(url.toString());
-
-    if (!response.ok) {
-      if (response.status === 404) {
-        return { success: true, data: [] };
-      }
-      throw new Error(`API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return { success: true, data: data.result || [] };
-  } catch (error) {
-    console.error("[BookingApi] Ideal Postcodes search error:", error);
-    return {
-      success: false,
-      message: error.message || "Failed to search addresses",
-    };
-  }
-}
-
-/**
  * Search premise-level addresses via OUR backend proxy, which holds the
  * Ideal Postcodes API key server-side (bookings/api_views_address.py).
  *
@@ -384,16 +341,15 @@ async lookupPostcode(postcode) {
  */
 validateAddressInServiceArea(address) {
   const SERVICE_AREAS = ["MK", "OX"];
-  // Extra approved districts outside the MK/OX prefix pattern — keep in
-  // sync with settings.SERVICE_AREA_EXTRA_PREFIXES on the backend.
-  const EXTRA_PREFIXES = ["CV47", "SP4"];
-  const RADIUS_KM = 40;
-  // Same anchor points as _SERVICE_AREA_ANCHORS in service_area.py.
-  const ANCHORS = [
-    { lat: 52.0406, lng: -0.7594, name: "Milton Keynes" },
-    { lat: 51.7520, lng: -1.2577, name: "Oxford" },
-    { lat: 52.0303, lng: -0.8884, name: "Buckingham" },
-    { lat: 51.9974, lng: -0.7426, name: "Newport Pagnell" },
+  // Drop 'N Roll operates in Milton Keynes and Oxford ONLY — no extra corridor
+  // districts. Keep in sync with _BASE_ALLOWED_PREFIXES in service_area.py.
+  const EXTRA_PREFIXES = [];
+  // PER-HUB zones: each hub has its own centre AND radius, checked with OR
+  // logic — a point is in-area if it is inside ANY hub's own circle. Keep
+  // in sync with _DEFAULT_HUBS / SERVICE_AREA_HUBS in service_area.py.
+  const HUBS = [
+    { lat: 52.0406, lng: -0.7594, name: "Milton Keynes", radiusKm: 40 },
+    { lat: 51.7520, lng: -1.2577, name: "Oxford", radiusKm: 40 },
   ];
 
   const postcodeTrimmed = (address.postal_code || "")
@@ -422,18 +378,20 @@ validateAddressInServiceArea(address) {
 
   if (hasCoords) {
     let nearestKm = Infinity;
-    let nearestName = "service area";
-    for (const anchor of ANCHORS) {
-      const dKm = this._haversineKm(lat, lng, anchor.lat, anchor.lng);
+    let nearestHub = HUBS[0];
+    let insideAnyHub = false;
+    for (const hub of HUBS) {
+      const dKm = this._haversineKm(lat, lng, hub.lat, hub.lng);
+      if (dKm <= hub.radiusKm) insideAnyHub = true;
       if (dKm < nearestKm) {
         nearestKm = dKm;
-        nearestName = anchor.name;
+        nearestHub = hub;
       }
     }
-    if (nearestKm > RADIUS_KM) {
+    if (!insideAnyHub) {
       return {
         valid: false,
-        message: `This address is ${nearestKm.toFixed(1)}km from ${nearestName}, outside our ${RADIUS_KM}km service radius.`,
+        message: `This address is ${nearestKm.toFixed(1)}km from ${nearestHub.name}, outside its ${nearestHub.radiusKm}km service radius.`,
       };
     }
   } else if (!matchesPrefix) {
