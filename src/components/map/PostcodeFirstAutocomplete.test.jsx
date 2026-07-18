@@ -130,3 +130,53 @@ describe("PostcodeFirstAutocomplete — postcode-only gate", () => {
     expect(onSelect.mock.calls[0][0].detail).toBeUndefined();
   });
 });
+
+describe("PostcodeFirstAutocomplete — paid resolve is cached per session (spec §B)", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    mockAutocomplete.mockReset();
+    mockDetails.mockReset();
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test("re-selecting an already-resolved suggestion does not burn a second paid lookup", async () => {
+    mockAutocomplete.mockResolvedValue({
+      success: true,
+      results: [{ id: "paf_15068916", suggestion: "1 Midsummer Boulevard, MK9 1AA" }],
+    });
+    mockDetails.mockResolvedValue({
+      success: true,
+      in_service_area: true,
+      address: {
+        line1: "1 Midsummer Boulevard",
+        city: "Milton Keynes",
+        postal_code: "MK9 1AA",
+        country: "GB",
+        latitude: 52.04,
+        longitude: -0.76,
+        detail: {},
+        meta: { source: "ideal_postcodes" },
+      },
+    });
+
+    render(<PostcodeFirstAutocomplete label="Pickup Address" onSelect={jest.fn()} />);
+    type("MK9 1AA");
+
+    // First selection — resolves via the API (the paid call)
+    fireEvent.click(await screen.findByText(/1 Midsummer Boulevard, MK9 1AA/));
+    expect(await screen.findByText("Is this correct?")).toBeInTheDocument();
+    expect(mockDetails).toHaveBeenCalledTimes(1);
+    expect(mockDetails).toHaveBeenCalledWith("paf_15068916");
+
+    // User cancels the confirm modal, reopens the dropdown, re-picks the
+    // same suggestion — served from cache, NOT a second paid resolve.
+    fireEvent.click(screen.getByText("Cancel"));
+    fireEvent.focus(screen.getByRole("combobox"));
+    fireEvent.click(await screen.findByText(/1 Midsummer Boulevard, MK9 1AA/));
+
+    expect(await screen.findByText("Is this correct?")).toBeInTheDocument();
+    expect(mockDetails).toHaveBeenCalledTimes(1);
+  });
+});
