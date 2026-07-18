@@ -36,10 +36,11 @@
  *      full premise → confirmation modal ("Is this correct?") → onSelect().
  *   5. If Ideal Postcodes is unavailable (not configured / rate-limited /
  *      upstream error) or returns zero results for a query that still looks
- *      postcode-like, we fall back to Google's PlaceAutocompleteElement
- *      (postcode-only via includedPrimaryTypes, biased to the MK/OX area).
- *      The legacy places.Autocomplete widget is gone — deprecated by Google
- *      and unavailable to new billing accounts since March 2025.
+ *      postcode-like, we fall back to the LEGACY Google Places Autocomplete
+ *      widget (postcode-only, biased to the MK/OX area). Deliberately legacy:
+ *      Places API (New) is not activated on this Google account, so the new
+ *      PlaceAutocompleteElement silently returns nothing — see the fallback
+ *      section below before "upgrading" this again.
  *   6. Every selected address — Ideal OR Google — is checked against the
  *      Milton Keynes / Oxford service area BEFORE it can be confirmed. An
  *      out-of-area address shows a red banner, disables the confirm button,
@@ -298,127 +299,103 @@ const PostcodeFirstAutocomplete = ({
     })
   }, [trimmedQuery, queryIsPostcode, mode])
 
-  // ── Google Places fallback (PlaceAutocompleteElement) ──────────────────
-  // MIGRATION (spec §C): google.maps.places.Autocomplete is unavailable to
-  // new customers since March 2025 and only receives regression fixes. The
-  // replacement, PlaceAutocompleteElement, is a self-contained custom
-  // element (its own input + dropdown) mounted into googleContainerRef —
-  // our text input is hidden while it's active. Its event model also
-  // differs: selection fires "gmp-select" (older builds: "gmp-placeselect")
-  // with a Place that must be hydrated via an explicit fetchFields() call,
-  // and its addressComponents use camelCase longText/shortText instead of
-  // long_name/short_name — normalizeGooglePlace handles both shapes.
+  // ── Google Places fallback (LEGACY places.Autocomplete — deliberate) ────
+  // REVERTED from PlaceAutocompleteElement (2026-07-18): this project's
+  // Google Cloud account has NOT activated Places API (New), so the new
+  // element silently degrades (no suggestions, no errors, no fallback).
+  // The legacy widget remains fully functional for existing customers —
+  // Google grants at least 12 months notice before ending support, and the
+  // console deprecation message is informational only. This is the exact
+  // pre-migration implementation that was verified working, restored
+  // verbatim as the reference behavior. Re-attempt the element migration
+  // ONLY after "Places API (New)" is enabled in the Google Cloud console
+  // and the API key's restrictions include it.
   const places = useMapsLibrary("places")
-  const googleContainerRef = useRef(null)
-
-  /** Convert a (fetched) Place into our shared address shape. Exported for
-   *  tests via PostcodeFirstAutocomplete.normalizeGooglePlace. */
-  const handleGooglePlace = useCallback((place) => {
-    const lat =
-      typeof place.location?.lat === "function" ? place.location.lat() : place.location?.lat
-    const lng =
-      typeof place.location?.lng === "function" ? place.location.lng() : place.location?.lng
-    if (lat === undefined || lat === null || lng === undefined || lng === null) return
-
-    const components = (place.addressComponents || []).reduce((acc, comp) => {
-      const type = comp.types?.[0]
-      const long = comp.longText ?? comp.long_name
-      const short = comp.shortText ?? comp.short_name
-      if (type === "street_number") acc.street_number = long
-      if (type === "route") acc.route = long
-      if (type === "locality") acc.city = long
-      if (type === "postal_town") acc.city = acc.city || long
-      if (type === "administrative_area_level_2") acc.county = long
-      if (type === "administrative_area_level_1") acc.region = long
-      if (type === "postal_code") acc.postal_code = long
-      if (type === "country") acc.country = short
-      if (type === "sublocality" || type === "neighborhood") acc.line2 = long
-      if (!acc.city && type === "administrative_area_level_2") acc.city = long
-      return acc
-    }, {})
-
-    const address = {
-      // A postal_code place has no street/premise — line1 stays empty and
-      // the confirmation modal collects it before allowing confirm.
-      line1: `${components.street_number || ""} ${components.route || ""}`.trim(),
-      line2: components.line2 || "",
-      city: components.city || "",
-      region: components.county || components.region || "",
-      postal_code: components.postal_code || place.displayName || "",
-      country: components.country || "GB",
-      latitude: lat,
-      longitude: lng,
-      detail: {
-        post_town: components.city || "",
-        county: components.county || "",
-      },
-      meta: { source: "google", confidence: 0.8 },
-    }
-
-    // Google's suggestions are only *biased* to MK/OX, so out-of-area picks
-    // are possible. Enforce the service area exactly like the Ideal path —
-    // the client mirror of the backend's authoritative two-tier check.
-    const check = bookingApi.validateAddressInServiceArea(address)
-    setAreaWarning(check.valid ? null : check.message)
-    setPendingConfirm({
-      address,
-      inServiceArea: check.valid,
-      areaMessage: check.valid ? null : check.message,
-    })
-    setIsOpen(false)
-  }, [])
+  const googleAutocompleteRef = useRef(null)
 
   useEffect(() => {
-    if (mode !== "google" || !places || !googleContainerRef.current) return
+    if (mode !== "google" || !places || !inputRef.current) return
 
-    // PlaceAutocompleteElement may be absent on old Maps JS versions —
-    // there is no legacy fallback anymore (Autocomplete is deprecated and
-    // unavailable to new billing accounts), so surface a retry instead.
-    if (!places.PlaceAutocompleteElement) {
-      setFallbackNotice("Address search is temporarily unavailable. Please try again shortly.")
-      return
+    const options = {
+      bounds: new window.google.maps.LatLngBounds(
+        new window.google.maps.LatLng(51.65, -1.35),
+        new window.google.maps.LatLng(52.1, -0.65)
+      ),
+      strictBounds: false, // biased, not hard-limited — service-area check does the real enforcement
+      componentRestrictions: { country: "gb" },
+      // POSTCODE-ONLY: 'postal_code', never 'geocode'/'address', so Google
+      // can't return venue/business/name matches. The selection is a
+      // verified, geocoded postcode; the premise line is collected in the
+      // confirmation modal (see ConfirmAddressModal).
+      types: ["postal_code"],
+      // address_components + geometry here are the same data a separate
+      // Geocoding API call for this place_id would return — requesting
+      // them on the widget avoids burning a second metered call per pick.
+      fields: ["address_components", "geometry", "name"],
     }
 
-    const element = new places.PlaceAutocompleteElement({
-      // POSTCODE-ONLY (spec §A): the new API's equivalent of types:
-      // ['postal_code'] — venue/business/name matches can't appear.
-      includedPrimaryTypes: ["postal_code"],
-      includedRegionCodes: ["gb"],
-      // Bias (not restrict) to the MK/OX service corridor — the service-area
-      // check above does the real enforcement.
-      locationBias: { west: -1.35, south: 51.65, east: -0.65, north: 52.1 },
-    })
-    element.style.width = "100%"
-    googleContainerRef.current.appendChild(element)
+    const autocomplete = new places.Autocomplete(inputRef.current, options)
+    googleAutocompleteRef.current = autocomplete
 
-    const onSelect = async (event) => {
-      try {
-        // gmp-select delivers a PlacePrediction; the older gmp-placeselect
-        // delivered event.place directly. Support both.
-        const place = event.placePrediction ? event.placePrediction.toPlace() : event.place
-        if (!place) return
-        // The new API returns a skeletal Place — fields must be requested
-        // explicitly (this is the metered "details" call, fired only on
-        // selection, never per keystroke).
-        await place.fetchFields({
-          fields: ["addressComponents", "location", "displayName", "formattedAddress"],
-        })
-        handleGooglePlace(place)
-      } catch (err) {
-        console.error("[PostcodeFirstAutocomplete] Google place fetch failed:", err)
-        setFallbackNotice("Couldn't load that address's details. Please try another postcode.")
+    const listener = autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace()
+      if (!place?.geometry?.location) return
+
+      // Extract address_components into the same shape the Ideal Postcodes
+      // path produces, so both providers feed the confirmation modal and
+      // the Address model identically.
+      const components = (place.address_components || []).reduce((acc, comp) => {
+        const type = comp.types[0]
+        if (type === "street_number") acc.street_number = comp.long_name
+        if (type === "route") acc.route = comp.long_name
+        if (type === "locality") acc.city = comp.long_name
+        if (type === "postal_town") acc.city = acc.city || comp.long_name
+        if (type === "administrative_area_level_2") acc.county = comp.long_name
+        if (type === "administrative_area_level_1") acc.region = comp.long_name
+        if (type === "postal_code") acc.postal_code = comp.long_name
+        if (type === "country") acc.country = comp.short_name
+        if (type === "sublocality" || type === "neighborhood") acc.line2 = comp.long_name
+        if (!acc.city && type === "administrative_area_level_2") acc.city = comp.long_name
+        return acc
+      }, {})
+
+      const address = {
+        // A postal_code place has no street/premise — line1 stays empty and
+        // the confirmation modal collects it before allowing confirm.
+        line1: `${components.street_number || ""} ${components.route || ""}`.trim(),
+        line2: components.line2 || "",
+        city: components.city || "",
+        region: components.county || components.region || "",
+        postal_code: components.postal_code || place.name || "",
+        country: components.country || "GB",
+        latitude: place.geometry.location.lat(),
+        longitude: place.geometry.location.lng(),
+        detail: {
+          post_town: components.city || "",
+          county: components.county || "",
+        },
+        meta: { source: "google", confidence: 0.8 },
       }
-    }
 
-    element.addEventListener("gmp-select", onSelect)
-    element.addEventListener("gmp-placeselect", onSelect)
+      // Google's autocomplete is only *biased* to MK/OX (strictBounds: false),
+      // so it can return out-of-area results. Enforce the service area here the
+      // same way the Ideal path does — the client mirror of the backend's
+      // authoritative two-tier check (see BookingApi.validateAddressInServiceArea).
+      const check = bookingApi.validateAddressInServiceArea(address)
+      setAreaWarning(check.valid ? null : check.message)
+      setPendingConfirm({
+        address,
+        inServiceArea: check.valid,
+        areaMessage: check.valid ? null : check.message,
+      })
+      setIsOpen(false)
+    })
 
     return () => {
-      element.removeEventListener("gmp-select", onSelect)
-      element.removeEventListener("gmp-placeselect", onSelect)
-      element.remove()
+      window.google?.maps?.event?.removeListener(listener)
+      googleAutocompleteRef.current = null
     }
-  }, [places, mode, handleGooglePlace])
+  }, [places, mode])
 
   // ── Selecting an Ideal Postcodes suggestion ───────────────────────────
   // Resolving a suggestion is the PAID Ideal Postcodes call (autocomplete
@@ -430,9 +407,10 @@ const PostcodeFirstAutocomplete = ({
 
   const handleSelectSuggestion = useCallback(async (hit) => {
     setIsOpen(false)
-    // The id is used EXACTLY as Ideal Postcodes returned it (e.g.
-    // "paf_15068916") — the backend resolve endpoint requires it verbatim.
-    const addressId = hit.id ?? hit.udprn ?? hit.relative_url
+    // Each autocomplete hit carries {id: "paf_<UDPRN>", udprn: <number>} and
+    // resolves via /v1/udprn/<udprn> upstream. Prefer the numeric udprn; the
+    // backend also accepts the paf_* id and strips the prefix itself.
+    const addressId = hit.udprn ?? hit.id ?? hit.relative_url
 
     let res = resolvedCacheRef.current.get(addressId)
     if (!res) {
@@ -445,11 +423,24 @@ const PostcodeFirstAutocomplete = ({
     }
 
     if (!res.success) {
+      // A structured 404 means THIS suggestion doesn't resolve — that's not
+      // an availability problem, so don't dump the user into the Google
+      // fallback; let them pick a different suggestion.
+      if (res.reason === "not_found" || res.reason === "bad_request") {
+        setFallbackNotice(
+          "That address couldn't be retrieved. Please pick another suggestion."
+        )
+        setIsOpen(true)
+        return
+      }
+      // Availability failures (rate-limited / upstream / not configured):
+      // engage the Google fallback tier.
       setFallbackNotice("Couldn't load that address's details. Switching to Google Maps.")
       setMode("google")
       return
     }
 
+    setFallbackNotice(null) // clear any stale "pick another suggestion" hint
     const inArea = res.in_service_area !== false
     setAreaWarning(inArea ? null : res.service_area_message)
     setPendingConfirm({
@@ -513,16 +504,7 @@ const PostcodeFirstAutocomplete = ({
         {label}
       </label>
 
-      {/* Google fallback mount point — PlaceAutocompleteElement brings its own
-          input + dropdown, so our text input hides while it's active. The
-          container must always be in the DOM (the effect appends into it). */}
-      <div
-        ref={googleContainerRef}
-        data-testid="google-autocomplete-container"
-        className={mode === "google" ? "block" : "hidden"}
-      />
-
-      <div className={mode === "google" ? "hidden" : "relative"}>
+      <div className="relative">
         <input
           id={inputId}
           ref={inputRef}
@@ -626,7 +608,10 @@ const PostcodeFirstAutocomplete = ({
               </div>
             )}
 
-      {fallbackNotice && mode !== "idealPostcodes" && (
+      {/* Rendered in EVERY mode: a not_found on one suggestion keeps the user
+          on the Ideal Postcodes tier with a "pick another" hint — the old
+          mode-gated condition swallowed exactly that message. */}
+      {fallbackNotice && (
         <p className="text-xs text-gray-500 dark:text-gray-400">{fallbackNotice}</p>
       )}
 

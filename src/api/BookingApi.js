@@ -290,6 +290,15 @@ async getPostcodeAddressDetails(addressId) {
     );
     return response.data;
   } catch (error) {
+    // The backend now returns REAL status codes with a structured body:
+    // 404 {success:false, reason:"not_found"} when the id doesn't resolve,
+    // 400 {reason:"bad_request"} for malformed ids. Pass that body through
+    // so the component can branch (pick-another vs Google fallback) instead
+    // of collapsing every failure into upstream_error.
+    const structured = error.response?.data;
+    if (structured && structured.reason) {
+      return structured;
+    }
     console.error("[BookingApi] getPostcodeAddressDetails error:", error);
     return {
       success: false,

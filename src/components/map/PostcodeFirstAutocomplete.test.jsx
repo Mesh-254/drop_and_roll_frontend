@@ -180,3 +180,80 @@ describe("PostcodeFirstAutocomplete — paid resolve is cached per session (spec
     expect(mockDetails).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("PostcodeFirstAutocomplete — resolve failure semantics", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    mockAutocomplete.mockReset();
+    mockDetails.mockReset();
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test("prefers the numeric udprn from the hit when resolving", async () => {
+    mockAutocomplete.mockResolvedValue({
+      success: true,
+      results: [{ id: "paf_15114326", udprn: 15114326, suggestion: "101 Midsummer Boulevard, MK9" }],
+    });
+    mockDetails.mockResolvedValue({
+      success: true,
+      in_service_area: true,
+      address: {
+        line1: "101 Midsummer Boulevard",
+        city: "Milton Keynes",
+        postal_code: "MK9 1AA",
+        country: "GB",
+        latitude: 52.03,
+        longitude: -0.76,
+        detail: {},
+        meta: { source: "ideal_postcodes" },
+      },
+    });
+    render(<PostcodeFirstAutocomplete label="Pickup Address" onSelect={jest.fn()} />);
+    type("MK9");
+    fireEvent.click(await screen.findByText(/101 Midsummer Boulevard/));
+    await screen.findByText("Is this correct?");
+    expect(mockDetails).toHaveBeenCalledWith(15114326);
+  });
+
+  test("a not_found (404) on one suggestion stays on the Ideal tier with a pick-another hint", async () => {
+    mockAutocomplete.mockResolvedValue({
+      success: true,
+      results: [{ id: "paf_18163742", udprn: 18163742, suggestion: "1 Dead Row, OX12" }],
+    });
+    mockDetails.mockResolvedValue({
+      success: false,
+      reason: "not_found",
+      message: "Address not found.",
+    });
+    render(<PostcodeFirstAutocomplete label="Pickup Address" onSelect={jest.fn()} />);
+    type("OX12");
+    fireEvent.click(await screen.findByText(/1 Dead Row/));
+
+    // Stays on Ideal Postcodes — no Google dump, actionable hint instead.
+    expect(
+      await screen.findByText(/pick another suggestion/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Switching to Google Maps/i)).not.toBeInTheDocument();
+  });
+
+  test("an availability failure on resolve still engages the Google fallback", async () => {
+    mockAutocomplete.mockResolvedValue({
+      success: true,
+      results: [{ id: "paf_1", udprn: 1, suggestion: "Somewhere, MK9" }],
+    });
+    mockDetails.mockResolvedValue({
+      success: false,
+      reason: "upstream_error",
+      message: "Address lookup service is temporarily unavailable.",
+    });
+    render(<PostcodeFirstAutocomplete label="Pickup Address" onSelect={jest.fn()} />);
+    type("MK9");
+    fireEvent.click(await screen.findByText(/Somewhere, MK9/));
+
+    expect(
+      await screen.findByText(/Switching to Google Maps/i),
+    ).toBeInTheDocument();
+  });
+});
