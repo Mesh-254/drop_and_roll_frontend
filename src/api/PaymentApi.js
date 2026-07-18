@@ -184,11 +184,18 @@ export class PaymentApi extends ApiBase {
 
   // ── Cancel a PENDING transaction ──────────────────────────────────────────
 
-  async cancelTransaction(txId) {
+  async cancelTransaction(txId, guestEmail, guestIdentifier) {
     try {
-      const resp = await this.axiosInstance.post(
-        `/api/payments/transactions/${txId}/cancel/`, {},
-      );
+      // Guest transactions are only visible to the cancel endpoint with BOTH
+      // guest credentials (the viewset's queryset scoping) — mirror
+      // getTransaction()'s param handling or a guest cancel 404s.
+      let url = `/api/payments/transactions/${txId}/cancel/`;
+      const email = guestEmail || localStorage.getItem("guestEmail");
+      const identifier = guestIdentifier || localStorage.getItem("guestIdentifier");
+      if (email && identifier) {
+        url += `?guest_email=${encodeURIComponent(email)}&guest_identifier=${encodeURIComponent(identifier)}`;
+      }
+      const resp = await this.axiosInstance.post(url, {});
       return { success: true, data: resp.data };
     } catch (err) {
       return this._err("CANCEL_TX_ERROR", err);

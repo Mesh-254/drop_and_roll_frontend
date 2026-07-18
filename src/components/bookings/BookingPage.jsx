@@ -10,14 +10,25 @@ export default function BookingPage() {
     formData,
     quote,
     // Present when the user came here via "Back" from the payment page —
-    // lets BookingModal detect and reuse the still-pending transaction.
+    // BookingModal cancels the stale payment session and a fresh one is
+    // created on the next "Proceed to Payment".
     existingBookingId,
     existingTransactionId,
     guestEmail,
   } = location.state || { formData: {}, quote: {} };
 
-  const handleBack = () => {
-    navigate("/quote"); // Back to quote page
+  // "Back" from the booking modal returns to the quote wizard WITH the full
+  // draft (addresses, parcels, contact info, promo code, active quote) so the
+  // wizard restores every step's values instead of starting blank.
+  const handleBack = (draft) => {
+    navigate("/quote", {
+      state: {
+        quoteWizardState: {
+          formData: draft?.formData || formData || {},
+          quote: draft?.quote || quote || null,
+        },
+      },
+    });
   };
 
   return (

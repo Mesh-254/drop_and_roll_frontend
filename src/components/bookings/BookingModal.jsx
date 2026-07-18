@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   X,
@@ -10,16 +10,62 @@ import {
   AlertCircle,
   Loader2,
   Info,
+  ChevronLeft,
+  Shield,
 } from "lucide-react";
 import ParcelDetails from "./ParcelDetails";
 import { validateAllParcels, formatParcelsForSubmission } from "./parcelValidation";
+// Default API singletons. BookingPage renders this modal without api props —
+// destructuring bookingApi from props alone made it undefined and crashed
+// "Proceed to Payment" with `Cannot read properties of undefined
+// (reading 'createBooking')`. Props can still override (tests, storybook),
+// but the singletons are the default, same as every other component.
+import { bookingApi as defaultBookingApi } from "../../api/BookingApi";
+import { paymentApi as defaultPaymentApi } from "../../api/PaymentApi";
+import { useAuth } from "../../contexts/AuthContext";
 
-const DEBUG = import.meta.env.NODE_ENV === 'development' && false; // Set to true for dev debug logs
+const DEBUG = import.meta.env.NODE_ENV === "development" && false; // Set to true for dev debug logs
+const REQUOTE_DEBOUNCE_MS = 400;
 
 const debugLog = (msg, data) => {
   if (DEBUG) {
     console.log(`[BookingModal] ${msg}`, data);
   }
+};
+
+// The quote wizard and this modal historically used DIFFERENT parcel field
+// names (wizard: weightKg camelCase; modal editor/validation: weight_kg
+// snake_case). Wizard-shaped parcels therefore always failed
+// validateAllParcels here, which is the root of the parcel/quote desync —
+// the modal treated every handed-over parcel as blank. Normalize at the
+// boundary: everything INSIDE the modal is snake_case; Back hands camelCase
+// back to the wizard.
+const toModalParcel = (p, i) => ({
+  id: p.id ?? i + 1,
+  weight_kg: p.weight_kg ?? p.weightKg ?? "",
+  dimensions: {
+    length: p.dimensions?.length ?? "",
+    width: p.dimensions?.width ?? "",
+    height: p.dimensions?.height ?? "",
+  },
+  fragile: Boolean(p.fragile),
+});
+const toWizardParcel = (p, i) => ({
+  id: p.id ?? i + 1,
+  weightKg: String(p.weight_kg ?? p.weightKg ?? ""),
+  dimensions: {
+    length: String(p.dimensions?.length ?? ""),
+    width: String(p.dimensions?.width ?? ""),
+    height: String(p.dimensions?.height ?? ""),
+  },
+  fragile: Boolean(p.fragile),
+});
+
+const formatAddress = (addr) => {
+  if (!addr || !addr.line1) return "—";
+  return [addr.line1, addr.line2, addr.city, addr.region, addr.postal_code]
+    .filter(Boolean)
+    .join(", ");
 };
 
 const ContactInfo = ({ formData, onUpdate, validation, isAuthenticated }) => {
@@ -59,14 +105,57 @@ const ContactInfo = ({ formData, onUpdate, validation, isAuthenticated }) => {
   );
 };
 
+/** Server-computed price breakdown (quote.meta from the pricing engine). */
+const PriceBreakdown = ({ quote, requoteState }) => {
+  const b = quote?.meta || {};
+  const rows = [
+    ["Base fare", b.base_price],
+    [
+      b.extra_parcels > 0
+        ? `Extra parcels (${b.extra_parcels} × £${Number(b.extra_parcel_charge_per || 0).toFixed(2)})`
+        : null,
+      b.extra_parcel_fee,
+    ],
+    [
+      b.extra_distance_miles > 0
+        ? `Distance (${Number(b.extra_distance_miles).toFixed(1)} miles beyond ${Number(
+            b.free_miles || 0,
+          ).toFixed(0)} free)`
+        : null,
+      b.extra_distance_charge,
+    ],
+    [b.insurance_fee > 0 ? "Insurance" : null, b.insurance_fee],
+    [b.discount > 0 ? "Discount" : null, b.discount > 0 ? -b.discount : null],
+  ].filter(([label]) => label);
+
+  return (
+    <div className="mt-3 border-t border-gray-200 dark:border-gray-700 pt-3 space-y-1 text-sm">
+      {rows.map(([label, value]) => (
+        <div key={label} className="flex justify-between text-gray-600 dark:text-gray-400">
+          <span>{label}</span>
+          <span>£{Number(value || 0).toFixed(2)}</span>
+        </div>
+      ))}
+      <div className="flex justify-between font-semibold text-gray-900 dark:text-white pt-1">
+        <span>Total</span>
+        <span className="flex items-center gap-2">
+          {requoteState === "pending" && (
+            <Loader2 size={14} className="animate-spin text-orange-500" />
+          )}
+          £{quote?.final_price ? Number.parseFloat(quote.final_price).toFixed(2) : "0.00"}
+        </span>
+      </div>
+    </div>
+  );
+};
+
 export default function BookingModalEnhanced({
   isOpen,
   onClose,
+  onBack,
   quote,
-  bookingApi,
-  paymentApi,
-  isAuthenticated,
-  user,
+  bookingApi: bookingApiProp,
+  paymentApi: paymentApiProp,
   initialFormData = {},
   existingBookingId,
   existingTransactionId,
@@ -74,11 +163,33 @@ export default function BookingModalEnhanced({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const bookingApi = bookingApiProp || defaultBookingApi;
+  const paymentApi = paymentApiProp || defaultPaymentApi;
+  const { isAuthenticated, user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [validation, setValidation] = useState({});
-  const [parcels, setParcels] = useState(initialFormData.parcels || []);
+  const [parcels, setParcels] = useState(
+    (initialFormData.parcels || []).map(toModalParcel)
+  );
   const [showParcelErrors, setShowParcelErrors] = useState(false);
+
+  // The quote whose id and total are actually used for this draft. Every
+  // parcel mutation recomputes it server-side (a fresh Quote row = a new
+  // draft revision); the displayed total is ALWAYS this server value, never
+  // a client-side estimate.
+  const [activeQuote, setActiveQuote] = useState(quote);
+  // "idle" — total matches the current parcel list; "pending" — recompute in
+  // flight; "error" — recompute failed. Proceed is only enabled on "idle".
+  const [requoteState, setRequoteState] = useState("idle");
+  const [requoteError, setRequoteError] = useState(null);
+  const requoteRequestRef = useRef(0);
+  // The parcel list the CURRENT activeQuote was priced for. Skipping only
+  // when parcels match this (not the initial list) means an edit-then-revert
+  // still recomputes back to the correct total.
+  const lastQuotedParcelsRef = useRef(
+    JSON.stringify((initialFormData.parcels || []).map(toModalParcel))
+  );
 
   const resumeBookingId =
     location.state?.existingBookingId || existingBookingId || null;
@@ -109,11 +220,23 @@ export default function BookingModalEnhanced({
         ...location.state.formData,
       }));
       if (location.state.formData.parcels) {
-        setParcels(location.state.formData.parcels);
+        const normalized = location.state.formData.parcels.map(toModalParcel);
+        setParcels(normalized);
+        lastQuotedParcelsRef.current = JSON.stringify(normalized);
       }
     }
   }, [location.state]);
 
+  useEffect(() => {
+    setActiveQuote(quote);
+  }, [quote]);
+
+  // ── Stale payment-session state machine (spec §C) ─────────────────────────
+  // Payment sessions are immutable once created — an amount can never be
+  // edited onto an existing session. Arriving back here with a still-PENDING
+  // transaction therefore CANCELS it immediately (backend also cancels the
+  // linked pending booking). Any subsequent "Proceed to Payment" creates a
+  // fresh booking + session tied to the current server-computed total.
   useEffect(() => {
     if (!resumeTransactionId || !paymentApi) return;
     let mounted = true;
@@ -128,14 +251,66 @@ export default function BookingModalEnhanced({
         setResumeStatus("unknown");
         return;
       }
-      setResumeStatus(
-        result.data.status === "pending" ? "pending" : "stale"
+      if (result.data.status !== "pending") {
+        setResumeStatus("stale");
+        return;
+      }
+      // Still pending → mark it stale/abandoned NOW, don't wait for expiry.
+      const cancelled = await paymentApi.cancelTransaction(
+        resumeTransactionId,
+        resumeEmail
       );
+      if (!mounted) return;
+      setResumeStatus(cancelled.success ? "cancelled" : "stale");
     })();
     return () => {
       mounted = false;
     };
   }, [resumeTransactionId, resumeEmail, paymentApi]);
+
+  // ── Live re-quote on every parcel mutation (spec §B) ──────────────────────
+  // Debounced 400ms; sends the CURRENT full parcel list to
+  // POST /api/booking/quotes/compute/. Runs only once all parcels are valid
+  // (an in-progress blank parcel isn't quotable yet), and ignores stale
+  // responses so rapid edits can't interleave totals.
+  useEffect(() => {
+    if (!quote?.id) return;
+    if (JSON.stringify(parcels) === lastQuotedParcelsRef.current) return; // already priced
+    const check = validateAllParcels(parcels);
+    if (!check.isValid || parcels.length === 0) {
+      // Not quotable yet — Proceed stays blocked via parcel validation.
+      setRequoteState("idle");
+      return;
+    }
+
+    setRequoteState("pending");
+    setRequoteError(null);
+    const thisRequest = ++requoteRequestRef.current;
+    const timer = setTimeout(async () => {
+      const result = await bookingApi.createQuote({
+        parcels: parcels.map(toWizardParcel),
+        shipmentType: activeQuote?.shipping_type || quote.shipping_type,
+        service: activeQuote?.service_type || quote.service_type,
+        distanceKm: activeQuote?.distance_km ?? quote.distance_km,
+        insuranceAmount: activeQuote?.insurance_amount ?? quote.insurance_amount,
+        discount: activeQuote?.discount_amount ?? quote.discount_amount,
+      });
+      if (thisRequest !== requoteRequestRef.current) return; // stale
+      if (result.success && result.data?.id) {
+        setActiveQuote(result.data);
+        lastQuotedParcelsRef.current = JSON.stringify(parcels);
+        setRequoteState("idle");
+      } else {
+        setRequoteState("error");
+        setRequoteError(
+          result.message || "Couldn't update the price for your changes. Please retry."
+        );
+      }
+    }, REQUOTE_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parcels]);
 
   const updateFormData = useCallback((updates) => {
     setFormData((prev) => ({ ...prev, ...updates }));
@@ -195,6 +370,8 @@ export default function BookingModalEnhanced({
       return;
     }
 
+    if (requoteState !== "idle") return; // total not in sync with parcels
+
     setIsSubmitting(true);
     setSubmitError(null);
 
@@ -204,7 +381,9 @@ export default function BookingModalEnhanced({
       debugLog("Formatted parcels for submission:", formattedParcels);
 
       const payload = {
-        quoteId: quote.id,
+        // The ACTIVE quote id — a fresh server-priced revision whenever
+        // parcels changed. Never the original prop quote after an edit.
+        quoteId: activeQuote.id,
         pickupAddress: formData.pickupAddress,
         dropoffAddress: formData.dropoffAddress,
         promoCode: formData.promoCode || null,
@@ -233,9 +412,13 @@ export default function BookingModalEnhanced({
         navigate(`/pay/${transaction.id}`, {
           state: {
             transaction,
-            quote,
+            quote: activeQuote,
             booking: transaction.booking,
             guestEmail: payload.guestEmail,
+            // The payment page keys its idempotency on this draft revision:
+            // a re-quote produces a new quote id, so a stale amount can
+            // never dedupe against the new session.
+            draftRevision: activeQuote.id,
           },
         });
       } else {
@@ -251,11 +434,39 @@ export default function BookingModalEnhanced({
     }
   };
 
+  // "Back" — return to the quote wizard with the FULL draft state (addresses,
+  // parcels, contact info, promo code, active quote) so nothing is lost.
+  const handleBack = () => {
+    if (typeof onBack === "function") {
+      onBack({
+        formData: { ...formData, parcels: parcels.map(toWizardParcel) },
+        parcels: parcels.map(toWizardParcel),
+        quote: activeQuote,
+      });
+    }
+  };
+
+  // Aggregates for the booking summary
+  const totalWeight = useMemo(
+    () =>
+      parcels.reduce(
+        (sum, p) => sum + (Number.parseFloat(p.weightKg ?? p.weight_kg) || 0),
+        0
+      ),
+    [parcels]
+  );
+  const fragileCount = useMemo(
+    () => parcels.filter((p) => p.fragile).length,
+    [parcels]
+  );
+
   if (!isOpen || !quote) return null;
 
   // Validate parcels for display
   const parcelValidation = validateAllParcels(parcels);
   const hasParcelErrors = !parcelValidation.isValid;
+  const proceedBlocked =
+    isSubmitting || hasParcelErrors || requoteState !== "idle";
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -265,8 +476,8 @@ export default function BookingModalEnhanced({
             <h2 className="text-2xl font-bold">Complete Your Booking</h2>
             <p className="text-orange-100 text-sm">
               Total: GBP{" "}
-              {quote.final_price
-                ? Number.parseFloat(quote.final_price).toFixed(2)
+              {activeQuote?.final_price
+                ? Number.parseFloat(activeQuote.final_price).toFixed(2)
                 : "0.00"}
             </p>
           </div>
@@ -284,7 +495,7 @@ export default function BookingModalEnhanced({
             <div
               role="status"
               className={`flex items-start gap-2 rounded-lg p-3 text-sm border ${
-                resumeStatus === "stale"
+                resumeStatus === "stale" || resumeStatus === "cancelled"
                   ? "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300"
                   : "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300"
               }`}
@@ -297,12 +508,12 @@ export default function BookingModalEnhanced({
               <span>
                 {resumeStatus === "checking" &&
                   "Checking your previous payment session…"}
-                {resumeStatus === "pending" &&
-                  "You're editing a booking you already started. Your original payment session will be reused — no duplicate charge."}
+                {resumeStatus === "cancelled" &&
+                  "Your previous payment session has been closed. A new one, matching your current total, will be created when you proceed."}
                 {resumeStatus === "stale" &&
                   "Your previous payment session is no longer available. A new one will be created when you proceed."}
                 {resumeStatus === "unknown" &&
-                  "You're editing a previously started booking. We couldn't verify the payment session status, but it's safe to continue."}
+                  "You're editing a previously started booking. A fresh payment session will be created when you proceed."}
               </span>
             </div>
           )}
@@ -318,17 +529,62 @@ export default function BookingModalEnhanced({
                   Service:
                 </span>
                 <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                  {quote.service_type?.name}
+                  {activeQuote?.service_type?.name || quote.service_type?.name || "—"}
                 </span>
               </div>
               <div>
                 <span className="text-gray-600 dark:text-gray-400">
-                  Weight:
+                  Shipment:
                 </span>
                 <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                  {quote.weight_kg}kg
+                  {activeQuote?.shipping_type?.name || quote.shipping_type?.name || "—"}
                 </span>
               </div>
+              <div>
+                <span className="text-gray-600 dark:text-gray-400">
+                  Parcels:
+                </span>
+                <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                  {parcels.length}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-600 dark:text-gray-400">
+                  Total weight:
+                </span>
+                <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                  {totalWeight.toFixed(1)}kg
+                </span>
+              </div>
+
+              {parcels.length > 0 && (
+                <div className="md:col-span-2 flex flex-wrap gap-2">
+                  {parcels.map((p, i) => {
+                    const d = p.dimensions || {};
+                    return (
+                      <span
+                        key={p.id ?? i}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-xs text-gray-700 dark:text-gray-300"
+                      >
+                        <Package size={12} className="text-orange-500" />
+                        {Number.parseFloat(p.weightKg ?? p.weight_kg) || 0}kg ·{" "}
+                        {d.length || "?"}×{d.width || "?"}×{d.height || "?"}cm
+                        {p.fragile && (
+                          <Shield size={12} className="text-amber-500" aria-label="Fragile" />
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+
+              {fragileCount > 0 && (
+                <div className="md:col-span-2 text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                  <Shield size={14} />
+                  {fragileCount} fragile {fragileCount === 1 ? "item" : "items"} — handled with
+                  extra care
+                </div>
+              )}
 
               <div className="md:col-span-2">
                 <div className="flex items-start space-x-2">
@@ -338,9 +594,7 @@ export default function BookingModalEnhanced({
                       From:
                     </span>
                     <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                      {initialFormData.pickupAddress?.line1},{" "}
-                      {initialFormData.pickupAddress?.city}{" "}
-                      {formData.pickupPostcode}
+                      {formatAddress(formData.pickupAddress)}
                     </span>
                   </div>
                 </div>
@@ -353,14 +607,23 @@ export default function BookingModalEnhanced({
                       To:
                     </span>
                     <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                      {initialFormData.dropoffAddress?.line1},{" "}
-                      {initialFormData.dropoffAddress?.city}{" "}
-                      {formData.dropoffPostcode}
+                      {formatAddress(formData.dropoffAddress)}
                     </span>
                   </div>
                 </div>
               </div>
+
+              {formData.promoCode && (
+                <div className="md:col-span-2">
+                  <span className="text-gray-600 dark:text-gray-400">Promo code:</span>
+                  <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                    {formData.promoCode}
+                  </span>
+                </div>
+              )}
             </div>
+
+            <PriceBreakdown quote={activeQuote} requoteState={requoteState} />
           </div>
 
           {/* Enhanced Parcel Details Section */}
@@ -369,6 +632,20 @@ export default function BookingModalEnhanced({
             onUpdate={setParcels}
             showErrors={showParcelErrors || hasParcelErrors}
           />
+
+          {requoteState === "error" && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300 flex items-center gap-2">
+              <AlertCircle size={16} />
+              {requoteError}
+              <button
+                type="button"
+                onClick={() => setParcels((p) => [...p])}
+                className="ml-auto underline font-medium"
+              >
+                Retry
+              </button>
+            </div>
+          )}
 
           <ContactInfo
             formData={formData}
@@ -422,14 +699,29 @@ export default function BookingModalEnhanced({
         </div>
 
         <div className="flex justify-between items-center p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-b-2xl">
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            Total:{" "}
-            <span className="font-bold text-gray-900 dark:text-white">
-              GBP{" "}
-              {quote.final_price
-                ? Number.parseFloat(quote.final_price).toFixed(2)
-                : "0.00"}
-            </span>
+          <div className="flex items-center gap-3">
+            {typeof onBack === "function" && (
+              <button
+                onClick={handleBack}
+                disabled={isSubmitting}
+                className="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
+              >
+                <ChevronLeft size={16} className="mr-1" />
+                Back
+              </button>
+            )}
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Total:{" "}
+              <span className="font-bold text-gray-900 dark:text-white">
+                GBP{" "}
+                {activeQuote?.final_price
+                  ? Number.parseFloat(activeQuote.final_price).toFixed(2)
+                  : "0.00"}
+              </span>
+              {requoteState === "pending" && (
+                <span className="ml-2 text-orange-500">updating…</span>
+              )}
+            </div>
           </div>
 
           <div className="flex space-x-3">
@@ -443,17 +735,22 @@ export default function BookingModalEnhanced({
 
             <button
               onClick={handleSubmit}
-              disabled={isSubmitting || hasParcelErrors}
+              disabled={proceedBlocked}
               className={`flex items-center px-6 py-3 text-white font-bold rounded-lg transition-all transform focus:outline-none focus:ring-2 focus:ring-orange-500 ${
-                hasParcelErrors
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-orange-500 hover:bg-orange-600 hover:scale-105'
-              } ${isSubmitting ? 'opacity-75 cursor-not-allowed' : ''}`}
+                proceedBlocked && !isSubmitting
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-orange-500 hover:bg-orange-600 hover:scale-105"
+              } ${isSubmitting ? "opacity-75 cursor-not-allowed" : ""}`}
             >
               {isSubmitting ? (
                 <>
                   <Loader2 size={20} className="mr-2 animate-spin" />
                   Creating Booking...
+                </>
+              ) : requoteState === "pending" ? (
+                <>
+                  <Loader2 size={20} className="mr-2 animate-spin" />
+                  Updating price…
                 </>
               ) : (
                 <>

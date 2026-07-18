@@ -271,10 +271,20 @@ export default function GetQuoteModal({
   onClose,
   initialPickupPostcode,
   initialDropoffPostcode,
+  // Draft restore (spec §B4): set when the user pressed "Back" on the
+  // booking modal. { formData, quote } — the wizard re-opens on the review
+  // step with every field (addresses, parcels, insurance, contact info)
+  // exactly as they left it.
+  initialState = null,
 }) {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
-  const [currentStep, setCurrentStep] = useState(1);
+  // A full draft (has shipmentType + parcels) re-opens on the review step;
+  // a partial one (e.g. routed back from the payment page, which carries no
+  // parcel detail) restarts at step 1 with whatever fields it has.
+  const [currentStep, setCurrentStep] = useState(
+    initialState?.formData?.shipmentType && initialState?.formData?.parcels ? 5 : 1,
+  );
 
   const [shipmentTypes, setShipmentTypes] = useState([]);
   const [services, setServices] = useState([]);
@@ -286,14 +296,17 @@ export default function GetQuoteModal({
   const [lastQuoteData, setLastQuoteData] = useState(null);
 
   const [pickupPostcode, setPickupPostcode] = useState(
-    initialPickupPostcode || "",
+    initialState?.formData?.pickupAddress?.postal_code || initialPickupPostcode || "",
   );
   const [dropoffPostcode, setDropoffPostcode] = useState(
-    initialDropoffPostcode || "",
+    initialState?.formData?.dropoffAddress?.postal_code || initialDropoffPostcode || "",
   );
 
-  // UPDATED: Multi-parcel formData structure
-  const [formData, setFormData] = useState({
+  // UPDATED: Multi-parcel formData structure. When a draft restore is
+  // present (Back from the booking modal), its fields merge over the
+  // defaults so a partial restore (e.g. from the payment page, which has no
+  // parcel detail) still yields a fully-formed state object.
+  const [formData, setFormData] = useState(() => ({
     shipmentType: null,
     service: null,
     parcels: [
@@ -311,10 +324,11 @@ export default function GetQuoteModal({
     distanceKm: 0,
     receiverEmail: isAuthenticated ? user?.email || "" : "",
     receiverPhone: isAuthenticated ? user?.phone || "" : "",
-  });
+    ...(initialState?.formData || {}),
+  }));
 
   const [validation, setValidation] = useState({});
-  const [quote, setQuote] = useState(null);
+  const [quote, setQuote] = useState(initialState?.quote || null);
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
 
   const firstInputRef = useRef(null);
@@ -327,23 +341,24 @@ export default function GetQuoteModal({
     }, 0);
   }, [formData.parcels]);
 
-  // Real-time, debounced (300ms) insurance amount validation with a critical
-  // -error toast (e.g. negative or unreasonably large values).
+  // Debounced (300ms) insurance amount validity. No toast-on-type: the error is
+  // surfaced inline only after the field is blurred or on submit, matching the
+  // parcel fields — no annoying real-time errors while the person is typing.
+  const [insuranceTouched, setInsuranceTouched] = useState(false);
   const insuranceLive = useDebouncedValidation(
     formData.insuranceAmount,
     (v) => validateField(insuranceSchema, v),
     {
-      toastOnError: true,
-      toastId: "insurance-amount",
       skip: !formData.insurance,
     },
   );
   const insuranceError = formData.insurance
-    ? insuranceLive.error || validation.insuranceAmount
+    ? validation.insuranceAmount || (insuranceTouched ? insuranceLive.error : null)
     : null;
   const insuranceValid =
     formData.insurance &&
-    !insuranceError &&
+    !insuranceLive.error &&
+    !validation.insuranceAmount &&
     formData.insuranceAmount !== "" &&
     !insuranceLive.isValidating;
 
@@ -1028,6 +1043,7 @@ export default function GetQuoteModal({
                               insuranceAmount: e.target.value,
                             }))
                           }
+                          onBlur={() => setInsuranceTouched(true)}
                           placeholder="Enter insurance value"
                           aria-invalid={!!insuranceError}
                           aria-describedby={insuranceError ? "insuranceAmount-error" : undefined}
