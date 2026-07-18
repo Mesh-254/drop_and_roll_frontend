@@ -555,6 +555,69 @@ async createQuote(quoteData) {
   }
 
   /**
+   * Resolve a payment-resume capability token from a reminder email link.
+   *
+   * GET /api/booking/bookings/resume/{token}/
+   *
+   * Response is state-driven:
+   *   { state: "payable",   transaction: {...}, ...bookingSummary }
+   *   { state: "expired" | "completed" | "cancelled", ...bookingSummary }
+   * The transaction payload (payable case) is the same inline shape the
+   * booking-create response returns, so the payment page hydrates from it
+   * directly — no follow-up transaction GET.
+   */
+  async resumeBooking(resumeToken) {
+    try {
+      const response = await this.request(
+        `/api/booking/bookings/resume/${encodeURIComponent(resumeToken)}/`,
+        { method: "GET" },
+      );
+      const data = response.data;
+      // Guests arriving from an email link have nothing in localStorage —
+      // persist the credentials the payment-initiation endpoints require.
+      if (data?.guest_email) {
+        localStorage.setItem("guestEmail", data.guest_email);
+      }
+      if (data?.transaction?.guest_identifier) {
+        localStorage.setItem("guestIdentifier", data.transaction.guest_identifier);
+      }
+      return { success: true, data };
+    } catch (error) {
+      return {
+        success: false,
+        code: error.code || "RESUME_ERROR",
+        message:
+          error.response?.data?.detail ||
+          error.message ||
+          "This payment link is invalid or has expired.",
+        status: error.response?.status,
+      };
+    }
+  }
+
+  /**
+   * The authenticated user's payable pending bookings, soonest-to-expire
+   * first, each with its pending transaction inline.
+   *
+   * GET /api/booking/bookings/pending/
+   */
+  async getPendingBookings() {
+    try {
+      const response = await this.request("/api/booking/bookings/pending/", {
+        method: "GET",
+        includeAuth: true,
+      });
+      return { success: true, data: response.data };
+    } catch (error) {
+      return {
+        success: false,
+        code: error.code || "FETCH_ERROR",
+        message: error.message || "Failed to fetch pending bookings",
+      };
+    }
+  }
+
+  /**
    * Get booking history/list for customer
    * @param {number} page - Page number (default 1)
    * @param {number} pageSize - Items per page (default 10)

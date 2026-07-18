@@ -49,6 +49,7 @@ import BookingHistory from "./components/bookings/BookingHistory";
 import ProfilePage from "./components/profile/ProfilePage";
 
 import PaymentPage from "./components/payments/PaymentPage";
+import ResumePaymentPage from "./components/payments/ResumePaymentPage";
 import BulkPaymentPage from "./components/payments/BulkPaymentPage";
 import PaymentSuccess from "./components/payments/PaymentSuccess";
 import PaymentCancel from "./components/payments/PaymentCancel";
@@ -304,6 +305,9 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Reminder-email deep link — literal /pay/resume/... MUST precede /pay/:txId */}
+          <Route path="/pay/resume/:resumeToken" element={<ResumePaymentPage />} />
 
           {/* Dynamic route last — catches /pay/:txId (any UUID) */}
           <Route path="/pay/:txId" element={<PaymentPage />} />
