@@ -26,4 +26,14 @@ export default defineConfig([
       "no-unused-vars": ["error", { varsIgnorePattern: "^[A-Z_]" }],
     },
   },
+  {
+    // Jest test files: register the jest globals (describe/it/expect/jest/...)
+    // so tests don't need per-file /* eslint-env jest */ comments, which flat
+    // config no longer recognizes.
+    files: ["**/*.test.{js,jsx}", "jest.setup.js"],
+    languageOptions: {
+      // commonjs adds `require` for jest.mock factories in otherwise-ESM tests
+      globals: { ...globals.browser, ...globals.jest, ...globals.commonjs },
+    },
+  },
 ]);

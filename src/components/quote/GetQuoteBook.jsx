@@ -163,7 +163,7 @@ const ServiceSelector = ({
   );
 };
 
-const QuoteDisplay = ({ quote, onDownloadPDF, isLoading, formData }) => {
+export const QuoteDisplay = ({ quote, onDownloadPDF, isLoading, formData }) => {
   if (isLoading) {
     return (
       <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6">
@@ -231,25 +231,16 @@ const QuoteDisplay = ({ quote, onDownloadPDF, isLoading, formData }) => {
           </div>
         )}
 
-        {breakdown.extra_distance_km > 0 && (
+        {breakdown.extra_distance_miles > 0 && (
           <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
             <span className="text-gray-700 dark:text-gray-300">
-              Distance Charge ({breakdown.extra_distance_km?.toFixed(1)} km)
+              Distance Charge ({breakdown.extra_distance_miles?.toFixed(1)} miles beyond {breakdown.free_miles?.toFixed(0)} free)
             </span>
             <span className="font-medium text-gray-900 dark:text-white">
               £{breakdown.extra_distance_charge?.toFixed(2) || "0.00"}
             </span>
           </div>
         )}
-
-        <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
-          <span className="text-gray-700 dark:text-gray-300">
-            Service Adjustment ({breakdown.service_type} × {breakdown.service_multiplier?.toFixed(2)}){breakdown.service_minimum_applied ? " - Minimum Applied" : ""}
-          </span>
-          <span className="font-medium text-gray-900 dark:text-white">
-            £{breakdown.service_adjusted_subtotal?.toFixed(2) || "0.00"}
-          </span>
-        </div>
 
         {breakdown.insurance_fee > 0 && (
           <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
