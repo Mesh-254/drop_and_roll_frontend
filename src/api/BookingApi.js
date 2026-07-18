@@ -456,11 +456,29 @@ async createQuote(quoteData) {
       insurance_amount: Number(quoteData.insuranceAmount || 0),
       discount: Number(quoteData.discount || 0),
     };
+
+    // Re-price an existing draft IN PLACE (same quote id, 200 response)
+    // instead of minting a new Quote row per edit. Critical for the
+    // back-from-payment flow: the pending booking's quote FK keeps pointing
+    // at the live price, so resubmitting reuses the booking + transaction
+    // rather than creating duplicates. guest_email authorizes the update
+    // when the quote is attached to a guest booking.
+    if (quoteData.quoteId) {
+      payload.quote_id = quoteData.quoteId;
+      if (quoteData.guestEmail) {
+        payload.guest_email = quoteData.guestEmail.trim();
+      }
+    }
       console.log("Quote payload:", payload);
+      // includeAuth: true — harmless pre-auth (no token, header simply
+      // absent), but REQUIRED for in-place updates of a quote attached to an
+      // authenticated customer's pending booking: the backend's ownership
+      // guard checks request.user, and an anonymous re-price request would be
+      // refused (falling back to a new quote id, breaking booking reuse).
       const response = await this.request("/api/booking/quotes/compute/", {
         method: "POST",
         data: payload,
-        includeAuth: false,
+        includeAuth: true,
       });
 
       return { success: true, data: response.data };

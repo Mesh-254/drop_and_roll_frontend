@@ -5,8 +5,9 @@
 //   • §B: every parcel mutation triggers a debounced server recompute; the
 //     displayed total is the server value and Proceed is disabled while the
 //     recompute is in flight or failed;
-//   • §C: arriving with a still-pending payment session cancels it (stale
-//     sessions are marked abandoned, never silently reused).
+//   • §C: arriving with a still-pending payment session KEEPS it — parcel
+//     edits re-price the same quote in place (quote_id on the recompute) and
+//     proceeding reuses the same booking/transaction, never duplicating.
 
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 
@@ -141,6 +142,9 @@ describe("BookingModal", () => {
       jest.advanceTimersByTime(450);
     });
     await waitFor(() => expect(mockCreateQuote).toHaveBeenCalledTimes(1));
+    // The recompute targets the EXISTING quote for an in-place update —
+    // a stable quote id is what lets the backend reuse the pending booking.
+    expect(mockCreateQuote.mock.calls[0][0].quoteId).toBe("quote-rev-1");
 
     // Server total displayed, Proceed re-enabled, and the NEW revision id is
     // what createBooking submits.
@@ -164,15 +168,24 @@ describe("BookingModal", () => {
     expect(mockCreateBooking).not.toHaveBeenCalled();
   });
 
-  test("§C: a still-pending resumed session is cancelled on arrival", async () => {
+  test("§C: a still-pending resumed session is KEPT for reuse — never cancelled", async () => {
     mockGetTransaction.mockResolvedValue({ success: true, data: { status: "pending" } });
-    mockCancelTransaction.mockResolvedValue({ success: true });
     renderModal({ existingBookingId: "b-old", existingTransactionId: "tx-old" });
 
-    await waitFor(() => expect(mockCancelTransaction).toHaveBeenCalledWith("tx-old", null));
     expect(
-      await screen.findByText(/previous payment session has been closed/i),
+      await screen.findByText(/editing your existing booking/i),
     ).toBeInTheDocument();
+    expect(mockCancelTransaction).not.toHaveBeenCalled();
+  });
+
+  test("§C: a no-longer-pending resumed session shows the stale notice", async () => {
+    mockGetTransaction.mockResolvedValue({ success: true, data: { status: "cancelled" } });
+    renderModal({ existingBookingId: "b-old", existingTransactionId: "tx-old" });
+
+    expect(
+      await screen.findByText(/no longer available/i),
+    ).toBeInTheDocument();
+    expect(mockCancelTransaction).not.toHaveBeenCalled();
   });
 
   test("§B4: Back hands the full draft (parcels + active quote) to onBack", async () => {

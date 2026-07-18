@@ -231,12 +231,14 @@ export default function BookingModalEnhanced({
     setActiveQuote(quote);
   }, [quote]);
 
-  // ── Stale payment-session state machine (spec §C) ─────────────────────────
-  // Payment sessions are immutable once created — an amount can never be
-  // edited onto an existing session. Arriving back here with a still-PENDING
-  // transaction therefore CANCELS it immediately (backend also cancels the
-  // linked pending booking). Any subsequent "Proceed to Payment" creates a
-  // fresh booking + session tied to the current server-computed total.
+  // ── Resume-edit session check (spec: reuse, don't recreate) ───────────────
+  // Arriving back from the payment page with a still-PENDING transaction now
+  // KEEPS it. Parcel edits re-price the SAME quote in place (quote_id on the
+  // recompute), the backend syncs the pending booking + transaction amounts,
+  // and "Proceed to Payment" reuses the same booking/transaction via the
+  // create endpoint's idempotency — no cancelled orphans, no duplicate
+  // bookings, no junk Quote rows. We only verify the session is still
+  // pending so the banner can tell the user what will happen.
   useEffect(() => {
     if (!resumeTransactionId || !paymentApi) return;
     let mounted = true;
@@ -251,17 +253,7 @@ export default function BookingModalEnhanced({
         setResumeStatus("unknown");
         return;
       }
-      if (result.data.status !== "pending") {
-        setResumeStatus("stale");
-        return;
-      }
-      // Still pending → mark it stale/abandoned NOW, don't wait for expiry.
-      const cancelled = await paymentApi.cancelTransaction(
-        resumeTransactionId,
-        resumeEmail
-      );
-      if (!mounted) return;
-      setResumeStatus(cancelled.success ? "cancelled" : "stale");
+      setResumeStatus(result.data.status === "pending" ? "resumable" : "stale");
     })();
     return () => {
       mounted = false;
@@ -294,6 +286,10 @@ export default function BookingModalEnhanced({
         distanceKm: activeQuote?.distance_km ?? quote.distance_km,
         insuranceAmount: activeQuote?.insurance_amount ?? quote.insurance_amount,
         discount: activeQuote?.discount_amount ?? quote.discount_amount,
+        // Re-price the SAME quote in place — the draft (and any pending
+        // booking linked to it) keeps one stable quote id across edits.
+        quoteId: activeQuote?.id ?? quote.id,
+        guestEmail: !isAuthenticated ? formData.guestEmail || resumeEmail || undefined : undefined,
       });
       if (thisRequest !== requoteRequestRef.current) return; // stale
       if (result.success && result.data?.id) {
@@ -495,7 +491,7 @@ export default function BookingModalEnhanced({
             <div
               role="status"
               className={`flex items-start gap-2 rounded-lg p-3 text-sm border ${
-                resumeStatus === "stale" || resumeStatus === "cancelled"
+                resumeStatus === "stale"
                   ? "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300"
                   : "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300"
               }`}
@@ -508,12 +504,12 @@ export default function BookingModalEnhanced({
               <span>
                 {resumeStatus === "checking" &&
                   "Checking your previous payment session…"}
-                {resumeStatus === "cancelled" &&
-                  "Your previous payment session has been closed. A new one, matching your current total, will be created when you proceed."}
+                {resumeStatus === "resumable" &&
+                  "You're editing your existing booking. Any changes update its price, and proceeding returns you to the same payment — nothing is duplicated."}
                 {resumeStatus === "stale" &&
                   "Your previous payment session is no longer available. A new one will be created when you proceed."}
                 {resumeStatus === "unknown" &&
-                  "You're editing a previously started booking. A fresh payment session will be created when you proceed."}
+                  "You're editing a previously started booking. Your payment will match the current total when you proceed."}
               </span>
             </div>
           )}
