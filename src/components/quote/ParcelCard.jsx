@@ -56,47 +56,60 @@ export default function ParcelCard({
     return validation[parcelIndex][field];
   };
 
-  // Bug 3: pristine-field suppression. A blank field is "untouched", not "invalid",
-  // so skip live validation while it's empty — this stops the field from flashing a
-  // required/type error the instant Step 3 mounts. The parent's on-submit validation
-  // (getValidationError) still enforces the required rule when the user hits Next.
+  // Blank field = "untouched", not "invalid": skip validation while empty so the
+  // field never flashes a required/type error the instant Step 3 mounts. The
+  // parent's on-submit validation (getValidationError) still enforces the
+  // required rule when the user hits Next.
   const isBlank = (v) => v === "" || v === null || typeof v === "undefined";
 
-  // Real-time, debounced (300ms) validation as the person types, independent
-  // of the parent's on-submit validation above — whichever fires first wins.
+  // Per-field "touched" state. Inline errors are shown only after the field has
+  // been blurred (or when the parent's on-submit validation flags it on Next) —
+  // never mid-keystroke. This eliminates the annoying real-time errors (and the
+  // false "Length is required" toast) that fired while the user was still typing.
+  const [touched, setTouched] = useState({});
+  const markTouched = (field) => setTouched((t) => ({ ...t, [field]: true }));
+
+  // Debounced (300ms) validity computation. No toast-on-type: surfacing is
+  // gated on blur/submit below, not fired as the person types.
   const weightLive = useDebouncedValidation(
     parcel.weightKg,
     (v) => validateField(weightSchema, v),
-    { toastOnError: true, toastId: `parcel-${parcelIndex}-weight`, skip: isBlank(parcel.weightKg) },
+    { skip: isBlank(parcel.weightKg) },
   );
   const lengthLive = useDebouncedValidation(
     parcel.dimensions.length,
     (v) => validateField(lengthSchema, v),
-    { toastOnError: true, toastId: `parcel-${parcelIndex}-length`, skip: isBlank(parcel.dimensions.length) },
+    { skip: isBlank(parcel.dimensions.length) },
   );
   const widthLive = useDebouncedValidation(
     parcel.dimensions.width,
     (v) => validateField(widthSchema, v),
-    { toastOnError: true, toastId: `parcel-${parcelIndex}-width`, skip: isBlank(parcel.dimensions.width) },
+    { skip: isBlank(parcel.dimensions.width) },
   );
   const heightLive = useDebouncedValidation(
     parcel.dimensions.height,
     (v) => validateField(heightSchema, v),
-    { toastOnError: true, toastId: `parcel-${parcelIndex}-height`, skip: isBlank(parcel.dimensions.height) },
+    { skip: isBlank(parcel.dimensions.height) },
   );
 
-  // Merge: an on-submit error from the parent still shows even before the
-  // debounce settles; once the person edits the field, the live result
-  // (which starts re-validating immediately) takes over.
-  const weightError = weightLive.error || getValidationError("weightKg");
-  const lengthError = lengthLive.error || getValidationError("length");
-  const widthError = widthLive.error || getValidationError("width");
-  const heightError = heightLive.error || getValidationError("height");
+  // Real validity per field (drives the green check) — always reflects the
+  // settled value, independent of whether the field has been blurred yet.
+  const weightOk = !weightLive.error && parcel.weightKg !== "" && !weightLive.isValidating;
+  const lengthOk = !lengthLive.error && parcel.dimensions.length !== "" && !lengthLive.isValidating;
+  const widthOk = !widthLive.error && parcel.dimensions.width !== "" && !widthLive.isValidating;
+  const heightOk = !heightLive.error && parcel.dimensions.height !== "" && !heightLive.isValidating;
 
-  const weightValid = !weightError && parcel.weightKg !== "" && !weightLive.isValidating;
-  const lengthValid = !lengthError && parcel.dimensions.length !== "" && !lengthLive.isValidating;
-  const widthValid = !widthError && parcel.dimensions.width !== "" && !widthLive.isValidating;
-  const heightValid = !heightError && parcel.dimensions.height !== "" && !heightLive.isValidating;
+  // Displayed error: the parent's on-submit error always shows; the live error
+  // only after the field is blurred (touched). While typing → nothing.
+  const weightError = getValidationError("weightKg") || (touched.weight ? weightLive.error : null);
+  const lengthError = getValidationError("length") || (touched.length ? lengthLive.error : null);
+  const widthError = getValidationError("width") || (touched.width ? widthLive.error : null);
+  const heightError = getValidationError("height") || (touched.height ? heightLive.error : null);
+
+  const weightValid = weightOk && !getValidationError("weightKg");
+  const lengthValid = lengthOk && !getValidationError("length");
+  const widthValid = widthOk && !getValidationError("width");
+  const heightValid = heightOk && !getValidationError("height");
 
   const volumetric = volumetricWeightKg(parcel.dimensions);
 
@@ -176,6 +189,7 @@ export default function ParcelCard({
                 step="0.1"
                 value={parcel.weightKg}
                 onChange={(e) => handleWeightChange(e.target.value)}
+                onBlur={() => markTouched("weight")}
                 placeholder="e.g., 2.5"
                 aria-invalid={!!weightError}
                 aria-describedby={weightError ? `weight-${parcelIndex}-error` : undefined}
@@ -231,6 +245,7 @@ export default function ParcelCard({
                     onChange={(e) =>
                       handleDimensionChange("length", e.target.value)
                     }
+                    onBlur={() => markTouched("length")}
                     placeholder="0"
                     aria-invalid={!!lengthError}
                     aria-describedby={lengthError ? `dimensions-${parcelIndex}-error` : undefined}
@@ -270,6 +285,7 @@ export default function ParcelCard({
                     onChange={(e) =>
                       handleDimensionChange("width", e.target.value)
                     }
+                    onBlur={() => markTouched("width")}
                     placeholder="0"
                     aria-invalid={!!widthError}
                     aria-describedby={widthError ? `dimensions-${parcelIndex}-error` : undefined}
@@ -309,6 +325,7 @@ export default function ParcelCard({
                     onChange={(e) =>
                       handleDimensionChange("height", e.target.value)
                     }
+                    onBlur={() => markTouched("height")}
                     placeholder="0"
                     aria-invalid={!!heightError}
                     aria-describedby={heightError ? `dimensions-${parcelIndex}-error` : undefined}

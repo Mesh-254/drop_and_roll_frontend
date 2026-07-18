@@ -39,20 +39,32 @@ export function useDebouncedValidation(value, validate, options = {}) {
   const [result, setResult] = useState({ valid: true, error: null, isValidating: false });
   const lastToastedError = useRef(null);
 
-  // Debounce the raw value.
+  // Debounce the raw value. This effect OWNS the `skip` transition: when the
+  // field is skipped we reset to a clean valid state AND sync debouncedValue to
+  // the current value, so a later un-skip can never validate a stale value.
   useEffect(() => {
-    if (skip) return undefined;
+    if (skip) {
+      setDebouncedValue(value);
+      setResult({ valid: true, error: null, isValidating: false });
+      lastToastedError.current = null;
+      return undefined;
+    }
     setResult((prev) => ({ ...prev, isValidating: true }));
     const handle = setTimeout(() => setDebouncedValue(value), debounceMs);
     return () => clearTimeout(handle);
   }, [value, debounceMs, skip]);
 
-  // Validate the settled value.
+  // Validate ONLY the settled value. Intentionally NOT keyed on `skip`.
+  //
+  // Bug: keying this on `skip` meant that flipping skip true→false (which
+  // happens the instant a blank field receives its first character, since
+  // ParcelCard passes `skip: isBlank(value)`) re-ran validation immediately —
+  // but against the *previous* debouncedValue (still blank), firing a false
+  // "Length is required" toast for a field the user had just typed a valid
+  // value into. The debounce effect above already owns skip; here we wait for
+  // debouncedValue to settle before validating.
   useEffect(() => {
-    if (skip) {
-      setResult({ valid: true, error: null, isValidating: false });
-      return;
-    }
+    if (skip) return;
 
     const outcome = validate(debouncedValue);
     setResult({ ...outcome, isValidating: false });
@@ -68,7 +80,7 @@ export function useDebouncedValidation(value, validate, options = {}) {
     // `validate` is expected to be referentially stable-ish (a zod schema
     // check); re-running on every render would defeat the debounce.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedValue, skip]);
+  }, [debouncedValue]);
 
   return result;
 }
