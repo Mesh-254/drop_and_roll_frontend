@@ -33,6 +33,11 @@ import {
   insuranceSchema,
   PARCEL_LIMITS,
 } from "../../utils/parcelValidation";
+import {
+  isValidUkPhone,
+  normalizeUkPhone,
+  UK_PHONE_ERROR,
+} from "../../utils/ukPhone";
 
 const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
@@ -585,9 +590,8 @@ export default function GetQuoteModal({
         }
         if (!data.receiverPhone) {
           errors.receiverPhone = "Receiver phone is required";
-        } else if (!/^[\+]?[\d\-\s]{10,15}$/.test(data.receiverPhone)) {
-          errors.receiverPhone =
-            "Please enter a valid phone number (digits, +, -, spaces only; e.g., +1234567890)";
+        } else if (!isValidUkPhone(data.receiverPhone)) {
+          errors.receiverPhone = UK_PHONE_ERROR;
         }
         if (validation.quoteError) {
           errors.quoteError = validation.quoteError;
@@ -707,7 +711,8 @@ export default function GetQuoteModal({
             ...formData,
             weightKg: totalWeight, // For backward compatibility
             receiverEmail: formData.receiverEmail,
-            receiverPhone: formData.receiverPhone,
+            receiverPhone:
+              normalizeUkPhone(formData.receiverPhone) || formData.receiverPhone,
           },
         },
       });
@@ -1315,7 +1320,7 @@ export default function GetQuoteModal({
                             e.preventDefault();
                           }
                         }}
-                        placeholder="e.g., +1234567890"
+                        placeholder="e.g., 07123 456789"
                         className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
                       />
                       {validation.receiverPhone && (
