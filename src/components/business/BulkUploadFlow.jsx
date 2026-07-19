@@ -758,6 +758,14 @@ function ErrorBanner({ error }) {
   if (!error) return null;
   const msg =
     typeof error === "string" ? error : error?.message || "An error occurred";
+  // Billing-gate rejections (OVERDUE_INVOICES / CREDIT_LIMIT_EXCEEDED) carry
+  // a destination so the user can go pay instead of dead-ending here.
+  const payUrl =
+    typeof error === "object" &&
+    (error?.code === "OVERDUE_INVOICES" ||
+      error?.code === "CREDIT_LIMIT_EXCEEDED")
+      ? error.invoicesUrl || "/business/invoices"
+      : null;
   return (
     <motion.div
       initial={{ opacity: 0, y: -8 }}
@@ -765,7 +773,17 @@ function ErrorBanner({ error }) {
       className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"
     >
       <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-      <p className="text-sm text-red-700 dark:text-red-400">{msg}</p>
+      <div className="flex-1">
+        <p className="text-sm text-red-700 dark:text-red-400">{msg}</p>
+        {payUrl && (
+          <a
+            href={payUrl}
+            className="inline-block mt-2 px-4 py-2 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-lg"
+          >
+            Pay outstanding invoices
+          </a>
+        )}
+      </div>
     </motion.div>
   );
 }

@@ -148,6 +148,31 @@ export function useBulkUpload() {
     return fieldErrors || JSON.stringify(data);
   };
 
+  /**
+   * Billing-gate rejections (backend _check_business_access) carry a `code`
+   * plus a Pay-Now destination. Return a structured error object for them so
+   * the UI can render a CTA, or null for every other failure (string path).
+   *
+   * Codes: OVERDUE_INVOICES — settle overdue invoice(s) first (D3)
+   *        CREDIT_LIMIT_EXCEEDED — outstanding balance ate the limit (D5)
+   *        BUSINESS_SUSPENDED — admin hard-block
+   */
+  const _billingGateError = (data) => {
+    if (!data || typeof data !== "object") return null;
+    const gateCodes = [
+      "OVERDUE_INVOICES",
+      "CREDIT_LIMIT_EXCEEDED",
+      "BUSINESS_SUSPENDED",
+    ];
+    if (!gateCodes.includes(data.code)) return null;
+    return {
+      message: data.detail,
+      code: data.code,
+      invoicesUrl: data.invoices_url || "/business/invoices",
+      invoices: data.invoices || [],
+    };
+  };
+
   // ─── Validation ─────────────────────────────────────────────────────────────
 
   const validateFile = useCallback(async (file) => {
@@ -163,8 +188,9 @@ export function useBulkUpload() {
       setValidationResult(result);
       setSelectedFile(file);
     } catch (err) {
-      const errorMsg = _extractDrfError(err?.response?.data);
-      setUploadError(`Validation failed: ${errorMsg}`);
+      const data = err?.response?.data;
+      const errorMsg = _extractDrfError(data);
+      setUploadError(_billingGateError(data) || `Validation failed: ${errorMsg}`);
       setSelectedFile(null);
     } finally {
       setIsValidating(false);
@@ -193,8 +219,9 @@ export function useBulkUpload() {
       _startPolling(upload.id);
     } catch (err) {
       if (!isMountedRef.current) return;
-      const errorMsg = _extractDrfError(err?.response?.data);
-      setUploadError(`Upload failed: ${errorMsg}`);
+      const data = err?.response?.data;
+      const errorMsg = _extractDrfError(data);
+      setUploadError(_billingGateError(data) || `Upload failed: ${errorMsg}`);
     } finally {
       if (isMountedRef.current) setIsUploading(false);
     }
