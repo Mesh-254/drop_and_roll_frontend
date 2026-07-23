@@ -1,5 +1,5 @@
 "use client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Menu, X, Upload } from "lucide-react";
 import { NavLink } from "react-router-dom";
@@ -11,9 +11,19 @@ import { useAuthModal } from "../../contexts/AuthModalContext";
 
 export default function Header() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, logout } = useAuth();
   const { openLogin, openRegister } = useAuthModal();
   const [isScrolled, setIsScrolled] = useState(false);
+
+  // The transparent header only works over the landing hero's dark gradient.
+  // On every other route (bulk upload, invoices, history, ...) the page
+  // background is light/gray, so a transparent header with light-on-transparent
+  // content is effectively invisible until the user scrolls and it flips to a
+  // solid background. Treat all interior routes as "solid" from the first
+  // paint so the header is always visible there (spec §6).
+  const isLandingHero = location.pathname === "/";
+  const solidHeader = isScrolled || !isLandingHero;
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showTrackModal, setShowTrackModal] = useState(false);
   const [showQuoteModal, setShowQuoteModal] = useState(false);
@@ -75,7 +85,7 @@ export default function Header() {
     <>
       <header
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          isScrolled
+          solidHeader
             ? "bg-black/95 backdrop-blur-md shadow-lg border-b border-orange-500/20 h-16"
             : "bg-transparent h-20"
         }`}
