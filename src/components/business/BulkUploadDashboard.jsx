@@ -27,6 +27,7 @@ import {
   Loader2,
   Eye,
   CreditCard,
+  CheckCircle2,
   Receipt,
   Download,
   Search,
@@ -498,12 +499,34 @@ function StatCard({ icon: Icon, label, value, isLoading }) {
   );
 }
 
-function UploadRow({ upload, onViewDetail }) {
+export function UploadRow({ upload, onViewDetail }) {
   const navigate = useNavigate();
 
   // Shared with BulkUploadDetail.jsx via utils/bulkUploadValidation.js so
   // status styling can't drift between the dashboard and detail views.
   const isPaymentPending = upload.status === "payment_pending" && upload.payment_path === "prepaid";
+
+  // NET-terms inline pay-now (spec §C): a NET upload finishes as
+  // completed/partial with a linked Receivable. Surface a "Pay now" action here
+  // (instead of forcing the user into /billing) only when the invoice is
+  // actually payable — the same whitelist BillingPage and the pay-via-gateway
+  // endpoint use, so a still-DRAFT or cancelled invoice never shows a dead
+  // button that the backend would reject.
+  const PAYABLE_INVOICE_STATUSES = ["issued", "partial", "overdue"];
+  const outstanding = upload.outstanding != null ? parseFloat(upload.outstanding) : null;
+  const isNetUnpaid =
+    !!upload.receivable_id &&
+    outstanding != null &&
+    outstanding > 0 &&
+    PAYABLE_INVOICE_STATUSES.includes(upload.receivable_status);
+
+  // Settled = a NET invoice paid in full, or a prepaid upload that has cleared
+  // payment (prepaid completes only after the charge succeeds).
+  const isSettled =
+    upload.receivable_status === "paid" ||
+    (upload.payment_path === "prepaid" && upload.status === "completed");
+
+  const awaitingPayment = isPaymentPending || isNetUnpaid;
   const style = getStatusColors(upload.status);
   const statusLabel = getStatusLabel(upload.status);
   const successRate = upload.total_rows > 0 ? Math.round((upload.successful / upload.total_rows) * 100) : 0;
@@ -518,7 +541,7 @@ function UploadRow({ upload, onViewDetail }) {
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       className={`group rounded-xl border p-4 transition-all duration-300 cursor-pointer ${
-        isPaymentPending
+        awaitingPayment
           ? "bg-amber-950/20 hover:bg-amber-900/25 border-amber-800/50"
           : "bg-slate-700/30 hover:bg-slate-700/50 border-slate-700"
       }`}
@@ -572,8 +595,13 @@ function UploadRow({ upload, onViewDetail }) {
         {/* Amount & Date */}
         <div className="sm:col-span-2">
           {amount && (
-            <div className={`text-sm font-semibold mb-1 ${isPaymentPending ? "text-amber-400" : "text-slate-300"}`}>
+            <div className={`text-sm font-semibold mb-1 ${awaitingPayment ? "text-amber-400" : "text-slate-300"}`}>
               £{amount}
+            </div>
+          )}
+          {isNetUnpaid && (
+            <div className="text-xs text-amber-300/90 mb-1">
+              Outstanding: £{outstanding.toFixed(2)}
             </div>
           )}
           <p className="text-xs text-slate-500">{formatDistanceToNow(new Date(upload.created_at), { addSuffix: true })}</p>
@@ -594,6 +622,27 @@ function UploadRow({ upload, onViewDetail }) {
               <CreditCard className="h-3.5 w-3.5" />
               Pay
             </motion.button>
+          )}
+          {isNetUnpaid && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/invoices/${upload.receivable_id}?action=pay`);
+              }}
+              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
+              title={`Pay outstanding balance of £${outstanding.toFixed(2)}`}
+            >
+              <CreditCard className="h-3.5 w-3.5" />
+              Pay now
+            </motion.button>
+          )}
+          {isSettled && !awaitingPayment && (
+            <span className="px-3 py-1.5 bg-green-500/15 text-green-300 rounded-lg text-xs font-semibold flex items-center gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Settled
+            </span>
           )}
           <motion.button
             whileHover={{ scale: 1.05 }}

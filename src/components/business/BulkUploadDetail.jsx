@@ -42,6 +42,8 @@ import {
   ServerCrash,
   Lock,
 } from "lucide-react";
+import toast from "react-hot-toast";
+import bookingApi from "../../api/BookingApi";
 import { useBulkUploadDetail } from "../../hooks/useBulkUploadDetail";
 import { getStatusColors, getStatusLabel } from "../../utils/bulkUploadValidation";
 import BulkUploadProgressBar from "./BulkUploadProgressBar";
@@ -69,6 +71,7 @@ export default function BulkUploadDetail() {
     successfulPage,
     setSuccessfulPage,
     isFetchingSuccessful,
+    skippedRows,
     handleRetryFailed,
     handleDownloadErrorReport,
     isRetrying,
@@ -403,7 +406,7 @@ export default function BulkUploadDetail() {
           {["pending", "processing"].includes(upload.status) && (
             <BulkUploadProgressBar
               pct={upload.progress_pct || 0}
-              label={`Processing: ${(upload.successful || 0) + (upload.failed || 0)} / ${upload.total_rows} rows`}
+              label={`Processing: ${(upload.successful || 0) + (upload.failed || 0) + (upload.skipped || 0)} / ${upload.total_rows} rows`}
               status="processing"
             />
           )}
@@ -527,6 +530,7 @@ export default function BulkUploadDetail() {
                 page={successfulPage}
                 onPageChange={setSuccessfulPage}
                 isFetching={isFetchingSuccessful}
+                skippedRows={skippedRows}
                 onViewBooking={(url) => navigate(url)}
               />
             </motion.div>
@@ -627,7 +631,32 @@ function ErrorsTab({ upload, errorRows, errorMeta, errorPage, onPageChange, isFe
   );
 }
 
-function SuccessfulTab({ upload, amount, rows, meta, page, onPageChange, isFetching, onViewBooking }) {
+function SuccessfulTab({ upload, amount, rows, meta, page, onPageChange, isFetching, skippedRows = [], onViewBooking }) {
+  // Per-row label download in flight (by row id), and the bulk "download all".
+  const [downloadingRow, setDownloadingRow] = useState(null);
+  const [downloadingAll, setDownloadingAll] = useState(false);
+
+  const anyLabelReady = rows.some((r) => r.label_status === "ready");
+
+  const handleRowLabel = async (row) => {
+    if (row.label_status !== "ready" || !row.booking_id) return;
+    setDownloadingRow(row.id ?? row.row_number);
+    const res = await bookingApi.downloadBookingLabel(row.booking_id);
+    setDownloadingRow(null);
+    if (!res.success) toast.error(res.message || "Could not download label.");
+  };
+
+  const handleDownloadAll = async () => {
+    setDownloadingAll(true);
+    const res = await bookingApi.downloadAllBulkLabels(upload.id);
+    setDownloadingAll(false);
+    if (!res.success) {
+      toast.error(res.message || "Could not download labels.");
+    } else if (res.pending) {
+      toast.success(`Downloaded ${res.ready} label${res.ready === 1 ? "" : "s"}; ${res.pending} still generating.`);
+    }
+  };
+
   if (!upload.successful || upload.successful === 0) {
     return (
       <div className="text-center py-12">
@@ -653,11 +682,39 @@ function SuccessfulTab({ upload, amount, rows, meta, page, onPageChange, isFetch
         ]} />
       </div>
 
+      {/* Download All Labels — appears once at least one label is ready. */}
+      {anyLabelReady && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={handleDownloadAll}
+            disabled={downloadingAll}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-orange-600 hover:bg-orange-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors"
+          >
+            {downloadingAll ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            Download All Labels
+          </button>
+        </div>
+      )}
+
       <div className="p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30 rounded-lg flex items-start gap-3">
         <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
         <p className="text-sm text-green-700 dark:text-green-400">
           {upload.successful} booking{upload.successful !== 1 ? "s have" : " has"} been created and are ready for
           scheduling. Tap a row below to jump to it in Booking History.
+          {(upload.skipped || 0) > 0 && (
+            <>
+              {" "}
+              <span className="text-amber-700 dark:text-amber-400">
+                {upload.skipped} row{upload.skipped !== 1 ? "s" : ""} matched an existing booking (duplicate reference)
+                and did not create a new one — see below.
+              </span>
+            </>
+          )}
         </p>
       </div>
 
@@ -681,6 +738,7 @@ function SuccessfulTab({ upload, amount, rows, meta, page, onPageChange, isFetch
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Tracking #</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 hidden md:table-cell">Route</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 dark:text-gray-300">Price</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 w-28">Label</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 w-24">Booking</th>
               </tr>
             </thead>
@@ -693,12 +751,43 @@ function SuccessfulTab({ upload, amount, rows, meta, page, onPageChange, isFetch
                   <td className="px-4 py-3 text-sm font-mono text-gray-500 dark:text-gray-400">{row.row_number}</td>
                   <td className="px-4 py-3 text-sm font-mono text-gray-700 dark:text-gray-300">
                     {row.tracking_number || "—"}
+                    {Array.isArray(row.warnings) && row.warnings.length > 0 && (
+                      <span
+                        title={row.warnings.join("\n")}
+                        className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 align-middle"
+                      >
+                        <AlertTriangle className="h-3 w-3" />
+                        Substituted default
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 hidden md:table-cell">
                     {row.pickup_city || "—"} → {row.dropoff_city || "—"}
                   </td>
                   <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-white">
                     {row.computed_price ? `£${parseFloat(row.computed_price).toFixed(2)}` : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {row.label_status === "ready" ? (
+                      <button
+                        onClick={() => handleRowLabel(row)}
+                        disabled={downloadingRow === (row.id ?? row.row_number)}
+                        title="Download shipping label"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-orange-600 dark:text-orange-400 hover:underline disabled:opacity-60"
+                      >
+                        {downloadingRow === (row.id ?? row.row_number) ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Download className="h-3 w-3" />
+                        )}
+                        Label
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs text-gray-400" title="Label still generating">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Pending
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {row.booking_url ? (
@@ -739,6 +828,53 @@ function SuccessfulTab({ upload, amount, rows, meta, page, onPageChange, isFetch
           >
             Next →
           </button>
+        </div>
+      )}
+
+      {/* Matched existing bookings (skipped duplicate references) — shown
+          distinctly so they are never mistaken for newly-created bookings and
+          never counted in "Bookings Created". */}
+      {skippedRows.length > 0 && (
+        <div className="mt-8">
+          <div className="flex items-center gap-2 mb-3">
+            <h4 className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+              Matched existing bookings ({skippedRows.length})
+            </h4>
+          </div>
+          <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-lg mb-3">
+            <p className="text-sm text-amber-700 dark:text-amber-400">
+              These rows reused a <span className="font-mono">reference</span> already present in this batch, so they
+              matched the booking created by the first occurrence. No new booking was created for them, and they are not
+              billed.
+            </p>
+          </div>
+          <div className="overflow-x-auto border border-amber-200 dark:border-amber-900/30 rounded-lg">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-amber-200 dark:border-amber-900/30 bg-amber-50 dark:bg-amber-900/10">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-300 w-16">Row</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-300">Reference</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-300">Outcome</th>
+                </tr>
+              </thead>
+              <tbody>
+                {skippedRows.map((row) => (
+                  <tr key={row.id ?? row.row_number} className="border-b border-amber-100 dark:border-amber-900/20">
+                    <td className="px-4 py-3 text-sm font-mono text-gray-500 dark:text-gray-400">{row.row_number}</td>
+                    <td className="px-4 py-3 text-sm font-mono text-gray-700 dark:text-gray-300">
+                      {row.row_reference || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-amber-700 dark:text-amber-400">
+                      <span className="inline-flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        Matched existing booking — no new booking created
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

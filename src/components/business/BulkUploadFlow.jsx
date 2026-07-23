@@ -268,6 +268,16 @@ export default function BulkUploadFlow({
     onClose();
   };
 
+  // ── Retry handler (terminal FAILED state) ─────────────────────────────────
+  // Clears all hook state (poller, latestUpload, errors) and returns the wizard
+  // to step 0 WITHOUT closing the modal, so the user can pick a file and try
+  // again. Distinct from handleClose, which also fires onClose().
+  const handleRetry = () => {
+    reset();
+    setCurrentStep(0);
+    setLocalError(null);
+  };
+
   // ── Derive status for Step 3 rendering ───────────────────────────────────
 
   const derivedStatus = deriveStatus(latestUpload, isPolling);
@@ -726,12 +736,24 @@ export default function BulkUploadFlow({
                 </motion.div>
               )}
 
-              {/* ── FAILED ────────────────────────────────────────────────── */}
-              {isFailed && displayError && (
-                <ErrorBanner error={displayError} />
+              {/* ── FAILED — show error + explicit retry (never a spinner) ─── */}
+              {isFailed && (
+                <ErrorBanner
+                  error={
+                    displayError ||
+                    "Failed — please retry. If it keeps failing, contact support."
+                  }
+                />
               )}
-              {isFailed && !displayError && (
-                <ErrorBanner error="Processing failed. Please try again or contact support." />
+              {isFailed && (
+                <button
+                  onClick={handleRetry}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-orange-500
+                             hover:bg-orange-600 text-white text-sm font-semibold rounded-lg
+                             transition-colors"
+                >
+                  Retry Upload <ArrowRight className="h-4 w-4" />
+                </button>
               )}
 
               <div className="flex justify-end">

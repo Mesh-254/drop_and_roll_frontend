@@ -35,6 +35,10 @@ export function useBulkUploadDetail(uploadId) {
   const [successfulPage, setSuccessfulPage] = useState(1);
   const [isFetchingSuccessful, setIsFetchingSuccessful] = useState(false);
 
+  // Skipped rows — duplicate references that matched an existing booking.
+  // Surfaced distinctly so they never read as freshly-created bookings.
+  const [skippedRows, setSkippedRows] = useState([]);
+
   // Retry state
   const [isRetrying, setIsRetrying] = useState(false);
 
@@ -125,6 +129,20 @@ export function useBulkUploadDetail(uploadId) {
     }
   }, [uploadId, successfulPage]);
 
+  // Fetch skipped (matched-existing) rows. Small in practice (duplicate refs),
+  // so one page is fine.
+  const fetchSkippedRows = useCallback(async () => {
+    if (!uploadId) return;
+    try {
+      const response = await BulkUploadApi.getSkipped?.(uploadId, { page: 1, page_size: 200 });
+      if (!response) return;
+      setSkippedRows(response.results || (Array.isArray(response) ? response : []));
+    } catch (err) {
+      console.error("[useBulkUploadDetail] Failed to fetch skipped rows:", err);
+      setSkippedRows([]);
+    }
+  }, [uploadId]);
+
   // Retry failed rows
   const handleRetryFailed = useCallback(async () => {
     if (!uploadId || isRetrying) return;
@@ -160,8 +178,9 @@ export function useBulkUploadDetail(uploadId) {
       fetchUploadDetail();
       fetchErrorRows();
       fetchSuccessfulRows();
+      fetchSkippedRows();
     }
-  }, [uploadId, fetchUploadDetail, fetchErrorRows, fetchSuccessfulRows]);
+  }, [uploadId, fetchUploadDetail, fetchErrorRows, fetchSuccessfulRows, fetchSkippedRows]);
 
   // Live refresh while the upload is still being processed.
   //
@@ -201,6 +220,7 @@ export function useBulkUploadDetail(uploadId) {
     if (wasNonTerminal && isNowTerminal) {
       fetchErrorRows();
       fetchSuccessfulRows();
+      fetchSkippedRows();
     }
     prevStatusRef.current = upload.status;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -240,6 +260,9 @@ export function useBulkUploadDetail(uploadId) {
     successfulPage,
     setSuccessfulPage,
     isFetchingSuccessful,
+
+    // Skipped (matched-existing) rows
+    skippedRows,
 
     // Actions
     handleRetryFailed,

@@ -197,6 +197,24 @@ class BulkUploadApi extends ApiBase {
   }
 
   /**
+   * SKIPPED — Rows that matched an already-created booking (duplicate
+   * reference). These produced NO new booking, so they are surfaced separately
+   * from the created-bookings list. Backed by the generic /rows/ endpoint
+   * filtered to status=skipped.
+   *
+   * @param {string} id
+   * @param {Object} params - { page, page_size }
+   * @returns {Promise<{count:number, page:number, results:Array}>}
+   */
+  async getSkipped(id, params = {}) {
+    const response = await this.axiosInstance.get(
+      `/api/booking/bulk-uploads/${id}/rows/`,
+      { params: { ...params, status: 'skipped' } },
+    );
+    return response.data;
+  }
+
+  /**
    * STATS — Dashboard aggregate statistics + credit info for NET businesses.
    *
    * Response shape:
