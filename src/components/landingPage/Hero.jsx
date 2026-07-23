@@ -1,20 +1,46 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { MapPin, Zap, AlertCircle } from "lucide-react";
-import { useState, useRef, Suspense } from "react";
-import GetQuoteBook from "../quote/GetQuoteBook"; // Adjust path as needed
-import TrackParcelModal from "../track/TrackParcelModal"; // Adjust path as needed
-import { useQuoteContext } from "../../contexts/QuoteContext"; // Adjust path as needed
-import { useAuth } from "../../contexts/AuthContext"; // Adjust path as needed
+import {
+  MapPin,
+  Zap,
+  AlertCircle,
+  Package,
+  Weight,
+  Minus,
+  Plus,
+  ArrowRight,
+} from "lucide-react";
+import { useState, useRef, useEffect, Suspense } from "react";
+import GetQuoteBook from "../quote/GetQuoteBook";
+import TrackParcelModal from "../track/TrackParcelModal";
+import { useQuoteContext } from "../../contexts/QuoteContext";
+import { useAuth } from "../../contexts/AuthContext";
+import bookingApi from "../../api/BookingApi";
+
+// UK postcode format (loose, accepts optional space): e.g. MK9 1AA / OX11AA
+const POSTCODE_RE = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
+const isValidPostcode = (pc) => POSTCODE_RE.test((pc || "").replace(/\s+/g, ""));
 
 export default function Hero() {
   const [quickQuoteData, setQuickQuoteData] = useState({
     pickupPostcode: "",
     dropoffPostcode: "",
+    parcelCount: 1,
+    weightKg: "",
+    serviceTypeId: "",
   });
   const [quickQuoteError, setQuickQuoteError] = useState("");
+  const [errorField, setErrorField] = useState(null); // "pickup" | "dropoff" | null
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Result of the last instant quote. null = none yet.
+  const [quoteResult, setQuoteResult] = useState(null);
+
+  // Service types drive the dropdown AND the booking handoff. Pulled from the
+  // same endpoint the real wizard uses so the list can never drift.
+  const [serviceTypes, setServiceTypes] = useState([]);
+
   const inputRefs = {
     pickup: useRef(null),
     dropoff: useRef(null),
@@ -22,89 +48,153 @@ export default function Hero() {
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [showTrackModal, setShowTrackModal] = useState(false);
   const { setQuickQuotePostcodes } = useQuoteContext();
-  const [prefillPostcodes, setPrefillPostcodes] = useState({
-    pickup: "",
-    dropoff: "",
-  });
+
+  // Everything needed to pre-fill the booking wizard on "Continue to Booking".
+  const [bookingHandoff, setBookingHandoff] = useState(null);
+
   const { isAuthenticated } = useAuth();
 
-  const handleQuickQuoteChange = (field, value) => {
-    setQuickQuoteData((prev) => ({
-      ...prev,
-      [field]: value.toUpperCase(),
-    }));
+  // Load service types once for the dropdown.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const res = await bookingApi.getServiceTypes();
+      if (alive && res.success && Array.isArray(res.data)) {
+        setServiceTypes(res.data);
+        // Default to the first service so the field is never empty.
+        setQuickQuoteData((prev) =>
+          prev.serviceTypeId ? prev : { ...prev, serviceTypeId: res.data[0]?.id || "" },
+        );
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const handleField = (field, value) => {
+    setQuickQuoteData((prev) => ({ ...prev, [field]: value }));
     setQuickQuoteError("");
+    setErrorField(null);
+    // Any input change invalidates the shown quote.
+    setQuoteResult(null);
   };
 
-  const validatePostcode = (postcode) => {
-    // UK postcode validation regex
-    const postcodeRegex = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
-    return postcodeRegex.test(postcode.replace(/\s+/g, ""));
+  const handlePostcodeChange = (field, value) =>
+    handleField(field, value.toUpperCase());
+
+  const adjustParcels = (delta) =>
+    setQuickQuoteData((prev) => {
+      const next = Math.min(20, Math.max(1, (Number(prev.parcelCount) || 1) + delta));
+      setQuoteResult(null);
+      return { ...prev, parcelCount: next };
+    });
+
+  const failValidation = (message, field = null) => {
+    setQuickQuoteError(message);
+    setErrorField(field);
+    if (field && inputRefs[field]?.current) inputRefs[field].current.focus();
+    return false;
+  };
+
+  const validate = () => {
+    const { pickupPostcode, dropoffPostcode, weightKg } = quickQuoteData;
+    if (!pickupPostcode.trim()) return failValidation("Please enter a collection postcode", "pickup");
+    if (!isValidPostcode(pickupPostcode)) return failValidation("Invalid collection postcode (e.g. MK9 1AA)", "pickup");
+    if (!dropoffPostcode.trim()) return failValidation("Please enter a delivery postcode", "dropoff");
+    if (!isValidPostcode(dropoffPostcode)) return failValidation("Invalid delivery postcode (e.g. OX1 1AA)", "dropoff");
+    const w = Number.parseFloat(weightKg);
+    if (!weightKg || Number.isNaN(w) || w <= 0) return failValidation("Enter a total weight in kg");
+    if (w > 1000) return failValidation("Total weight can't exceed 1000 kg");
+    return true;
   };
 
   const handleQuickQuoteSubmit = async (e) => {
     e.preventDefault();
     setQuickQuoteError("");
+    setErrorField(null);
+    if (!validate()) return;
 
-    // Validate postcodes
-    if (!quickQuoteData.pickupPostcode.trim()) {
-      setQuickQuoteError("Please enter collection postcode");
-      inputRefs.pickup.current?.focus();
-      return;
-    }
-
-    if (!quickQuoteData.dropoffPostcode.trim()) {
-      setQuickQuoteError("Please enter delivery postcode");
-      inputRefs.dropoff.current?.focus();
-      return;
-    }
-
-    if (!validatePostcode(quickQuoteData.pickupPostcode)) {
-      setQuickQuoteError("Invalid collection postcode format (e.g., MK9 1AA)");
-      inputRefs.pickup.current?.focus();
-      return;
-    }
-
-    if (!validatePostcode(quickQuoteData.dropoffPostcode)) {
-      setQuickQuoteError("Invalid delivery postcode format (e.g., OX1 1AA)");
-      inputRefs.dropoff.current?.focus();
-      return;
-    }
+    const cleanPickup = quickQuoteData.pickupPostcode.replace(/\s+/g, "").toUpperCase();
+    const cleanDropoff = quickQuoteData.dropoffPostcode.replace(/\s+/g, "").toUpperCase();
 
     setIsSubmitting(true);
+    setQuoteResult(null);
 
-    const cleanPickup = quickQuoteData.pickupPostcode.replace(/\s+/g, "");
-    const cleanDropoff = quickQuoteData.dropoffPostcode.replace(/\s+/g, "");
-
-    // Set postcodes in context and open modal
-    setQuickQuotePostcodes(cleanPickup, cleanDropoff);
-
-    // NEW: Pass to modal
-    setPrefillPostcodes({ pickup: cleanPickup, dropoff: cleanDropoff });
-
-    setShowQuoteModal(true);
+    const res = await bookingApi.getInstantQuote({
+      pickupPostalCode: cleanPickup,
+      dropoffPostalCode: cleanDropoff,
+      parcelCount: quickQuoteData.parcelCount,
+      weightKg: quickQuoteData.weightKg,
+      serviceTypeId: quickQuoteData.serviceTypeId || null,
+    });
 
     setIsSubmitting(false);
+
+    if (res.success) {
+      setQuoteResult({ ok: true, ...res.data });
+      // Stash postcodes in the shared context (kept for parity with the
+      // existing hero → wizard bridge).
+      setQuickQuotePostcodes(cleanPickup, cleanDropoff);
+      return;
+    }
+
+    // Out-of-area is a distinct, non-error state; map field errors to inputs.
+    if (res.outOfArea) {
+      setQuoteResult({ ok: false, outOfArea: true, message: res.message });
+    } else {
+      failValidation(
+        res.message,
+        res.field === "pickup_postal_code" ? "pickup" : res.field === "dropoff_postal_code" ? "dropoff" : null,
+      );
+    }
+  };
+
+  // Carry the exact quote inputs into the real booking wizard. We pre-fill the
+  // service, parcel weights and postcodes; shipmentType is intentionally left
+  // unset so the wizard opens at step 1 (its shipment-type step) rather than
+  // jumping to review — the visitor still picks Parcels/Cargo and adds parcel
+  // dimensions, which the 10-second widget never collected.
+  const handleContinueToBooking = () => {
+    const cleanPickup = quickQuoteData.pickupPostcode.replace(/\s+/g, "").toUpperCase();
+    const cleanDropoff = quickQuoteData.dropoffPostcode.replace(/\s+/g, "").toUpperCase();
+    const service = serviceTypes.find((s) => s.id === quickQuoteData.serviceTypeId) || null;
+
+    const parcels = Array.from({ length: quickQuoteData.parcelCount }, (_, i) => ({
+      id: i + 1,
+      // Spread the entered total across the first parcel; the rest start empty
+      // so the user only tops up dimensions. Weight is what drives the price and
+      // the total is preserved on parcel #1.
+      weightKg: i === 0 ? String(quickQuoteData.weightKg) : "",
+      dimensions: { length: "", width: "", height: "" },
+      fragile: false,
+    }));
+
+    setBookingHandoff({
+      pickup: cleanPickup,
+      dropoff: cleanDropoff,
+      initialState: {
+        formData: {
+          service,
+          parcels,
+        },
+      },
+    });
+    setShowQuoteModal(true);
   };
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.2,
-        delayChildren: 0.3,
-      },
-    },
+    visible: { opacity: 1, transition: { staggerChildren: 0.2, delayChildren: 0.3 } },
   };
-
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.8 },
-    },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.8 } },
+  };
+
+  const openBlankModal = () => {
+    setBookingHandoff(null);
+    setShowQuoteModal(true);
   };
 
   return (
@@ -112,18 +202,12 @@ export default function Hero() {
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         <motion.div
-          animate={{
-            x: [0, 100, 0],
-            y: [0, 50, 0],
-          }}
+          animate={{ x: [0, 100, 0], y: [0, 50, 0] }}
           transition={{ duration: 20, repeat: Infinity }}
           className="absolute top-20 right-20 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl"
         />
         <motion.div
-          animate={{
-            x: [0, -100, 0],
-            y: [0, -50, 0],
-          }}
+          animate={{ x: [0, -100, 0], y: [0, -50, 0] }}
           transition={{ duration: 25, repeat: Infinity }}
           className="absolute bottom-20 left-20 w-96 h-96 bg-orange-500/5 rounded-full blur-3xl"
         />
@@ -155,21 +239,15 @@ export default function Hero() {
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <div className="text-3xl font-bold text-orange-500 font-montserrat">
-                  500+
-                </div>
+                <div className="text-3xl font-bold text-orange-500 font-montserrat">500+</div>
                 <p className="text-sm text-gray-400">Daily Deliveries</p>
               </div>
               <div className="space-y-2">
-                <div className="text-3xl font-bold text-orange-500 font-montserrat">
-                  99.8%
-                </div>
+                <div className="text-3xl font-bold text-orange-500 font-montserrat">99.8%</div>
                 <p className="text-sm text-gray-400">On-Time Rate</p>
               </div>
               <div className="space-y-2">
-                <div className="text-3xl font-bold text-orange-500 font-montserrat">
-                  24/7
-                </div>
+                <div className="text-3xl font-bold text-orange-500 font-montserrat">24/7</div>
                 <p className="text-sm text-gray-400">Support</p>
               </div>
             </div>
@@ -179,7 +257,7 @@ export default function Hero() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => setShowQuoteModal(true)}
+                onClick={openBlankModal}
                 className="px-8 py-4 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold shadow-lg hover:shadow-orange-500/40 transition-all duration-300"
               >
                 Get Quote & Book
@@ -202,9 +280,7 @@ export default function Hero() {
             className="hidden lg:flex items-center justify-center"
           >
             <motion.div
-              animate={{
-                y: [0, -20, 0],
-              }}
+              animate={{ y: [0, -20, 0] }}
               transition={{ duration: 4, repeat: Infinity }}
               className="relative w-full h-96 flex items-center justify-center"
             >
@@ -219,17 +295,11 @@ export default function Hero() {
         </div>
 
         {/* Quick Quote Card - Floating Glass Effect */}
-        <motion.div
-          variants={itemVariants}
-          whileHover={{ y: -5 }}
-          className="relative mt-12"
-        >
+        <motion.div variants={itemVariants} whileHover={{ y: -5 }} className="relative mt-12">
           <div className="rounded-3xl border-2 border-orange-500/30 bg-gradient-to-br from-gray-900/50 via-black/50 to-gray-900/50 backdrop-blur-xl p-8 shadow-2xl hover:border-orange-500/50 transition-all duration-300">
             {/* Glow Effect */}
             <motion.div
-              animate={{
-                opacity: [0.5, 0.8, 0.5],
-              }}
+              animate={{ opacity: [0.5, 0.8, 0.5] }}
               transition={{ duration: 3, repeat: Infinity }}
               className="absolute inset-0 bg-gradient-to-r from-orange-500/10 to-transparent rounded-3xl blur-xl"
             />
@@ -241,14 +311,13 @@ export default function Hero() {
                 Get an instant quote in 10 seconds
               </h3>
               <p className="text-gray-400 text-sm mb-6">
-                We deliver across Milton Keynes, Oxford & surrounding areas
+                We deliver across Milton Keynes, Oxford &amp; surrounding areas
               </p>
 
               {/* Form */}
               <form onSubmit={handleQuickQuoteSubmit} className="space-y-4">
-                {/* Input Group */}
+                {/* Postcodes */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Pickup Postcode */}
                   <div className="relative">
                     <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
                       <MapPin size={16} className="text-green-400" />
@@ -258,15 +327,14 @@ export default function Hero() {
                       ref={inputRefs.pickup}
                       type="text"
                       value={quickQuoteData.pickupPostcode}
-                      onChange={(e) =>
-                        handleQuickQuoteChange("pickupPostcode", e.target.value)
-                      }
+                      onChange={(e) => handlePostcodeChange("pickupPostcode", e.target.value)}
                       placeholder="MK9 1AA"
-                      className="w-full px-4 py-3 rounded-lg bg-gray-800/50 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                      className={`w-full px-4 py-3 rounded-lg bg-gray-800/50 border text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors ${
+                        errorField === "pickup" ? "border-red-500" : "border-gray-700"
+                      }`}
                     />
                   </div>
 
-                  {/* Dropoff Postcode */}
                   <div className="relative">
                     <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
                       <MapPin size={16} className="text-red-400" />
@@ -276,15 +344,82 @@ export default function Hero() {
                       ref={inputRefs.dropoff}
                       type="text"
                       value={quickQuoteData.dropoffPostcode}
-                      onChange={(e) =>
-                        handleQuickQuoteChange(
-                          "dropoffPostcode",
-                          e.target.value,
-                        )
-                      }
+                      onChange={(e) => handlePostcodeChange("dropoffPostcode", e.target.value)}
                       placeholder="OX1 1AA"
+                      className={`w-full px-4 py-3 rounded-lg bg-gray-800/50 border text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors ${
+                        errorField === "dropoff" ? "border-red-500" : "border-gray-700"
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                {/* Parcels / weight / service */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Parcel count stepper */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                      <Package size={16} className="text-orange-400" />
+                      Parcels
+                    </label>
+                    <div className="flex items-center rounded-lg bg-gray-800/50 border border-gray-700 overflow-hidden">
+                      <button
+                        type="button"
+                        aria-label="Decrease parcels"
+                        onClick={() => adjustParcels(-1)}
+                        className="px-3 py-3 text-gray-300 hover:text-white hover:bg-gray-700/50 transition-colors"
+                      >
+                        <Minus size={16} />
+                      </button>
+                      <span className="flex-1 text-center text-white font-semibold" aria-live="polite">
+                        {quickQuoteData.parcelCount}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="Increase parcels"
+                        onClick={() => adjustParcels(1)}
+                        className="px-3 py-3 text-gray-300 hover:text-white hover:bg-gray-700/50 transition-colors"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Weight */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                      <Weight size={16} className="text-orange-400" />
+                      Total weight (kg)
+                    </label>
+                    <input
+                      type="number"
+                      min="0.1"
+                      step="0.1"
+                      inputMode="decimal"
+                      value={quickQuoteData.weightKg}
+                      onChange={(e) => handleField("weightKg", e.target.value)}
+                      placeholder="5"
                       className="w-full px-4 py-3 rounded-lg bg-gray-800/50 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
                     />
+                  </div>
+
+                  {/* Service type */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                      <Zap size={16} className="text-orange-400" />
+                      Service
+                    </label>
+                    <select
+                      value={quickQuoteData.serviceTypeId}
+                      onChange={(e) => handleField("serviceTypeId", e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg bg-gray-800/50 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                    >
+                      {serviceTypes.length === 0 && <option value="">Standard</option>}
+                      {serviceTypes.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
@@ -312,11 +447,7 @@ export default function Hero() {
                     <>
                       <motion.div
                         animate={{ rotate: 360 }}
-                        transition={{
-                          duration: 1,
-                          repeat: Infinity,
-                          ease: "linear",
-                        }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                         className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
                       />
                       Calculating...
@@ -324,11 +455,71 @@ export default function Hero() {
                   ) : (
                     <>
                       <Zap size={20} />
-                      Get Quote
+                      Get Instant Quote
                     </>
                   )}
                 </motion.button>
               </form>
+
+              {/* ── Result ─────────────────────────────────────────────── */}
+              {quoteResult?.ok && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-6 rounded-2xl border border-orange-500/40 bg-black/40 p-6"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+                    <div>
+                      <p className="text-sm text-gray-400 mb-1">Estimated price</p>
+                      <div className="text-4xl font-bold text-white font-montserrat">
+                        {quoteResult.currency} {Number(quoteResult.price).toFixed(2)}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        ~{Number(quoteResult.distance_km).toFixed(1)} km ·{" "}
+                        {quickQuoteData.parcelCount} parcel
+                        {quickQuoteData.parcelCount > 1 ? "s" : ""} ·{" "}
+                        {quickQuoteData.weightKg} kg
+                      </p>
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      type="button"
+                      onClick={handleContinueToBooking}
+                      className="px-6 py-3 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold shadow-lg transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap"
+                    >
+                      Continue to Booking
+                      <ArrowRight size={18} />
+                    </motion.button>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-3">
+                    Final price is confirmed at checkout. Logged-in business
+                    accounts may see account-specific rates.
+                  </p>
+                </motion.div>
+              )}
+
+              {quoteResult && !quoteResult.ok && quoteResult.outOfArea && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-6 flex items-start gap-3 rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-5 text-yellow-200"
+                >
+                  <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold">Not currently serviceable</p>
+                    <p className="text-sm text-yellow-200/80 mt-1">{quoteResult.message}</p>
+                    <p className="text-sm text-yellow-200/80 mt-2">
+                      We currently cover Milton Keynes, Oxford &amp; surrounding
+                      areas. Need somewhere else?{" "}
+                      <a href="/#contact" className="underline hover:text-yellow-100">
+                        Contact us
+                      </a>
+                      .
+                    </p>
+                  </div>
+                </motion.div>
+              )}
             </div>
           </div>
         </motion.div>
@@ -347,17 +538,15 @@ export default function Hero() {
             isOpen={showQuoteModal}
             onClose={() => {
               setShowQuoteModal(false);
-              // Optional: clear prefill after close
-              setTimeout(
-                () => setPrefillPostcodes({ pickup: "", dropoff: "" }),
-                300,
-              );
+              setTimeout(() => setBookingHandoff(null), 300);
             }}
-            initialPickupPostcode={prefillPostcodes.pickup}
-            initialDropoffPostcode={prefillPostcodes.dropoff}
+            initialPickupPostcode={bookingHandoff?.pickup || ""}
+            initialDropoffPostcode={bookingHandoff?.dropoff || ""}
+            initialState={bookingHandoff?.initialState || null}
           />
         </Suspense>
       )}
+
       {/* Track Parcel Modal */}
       {showTrackModal && (
         <Suspense

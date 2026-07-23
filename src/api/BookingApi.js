@@ -63,6 +63,59 @@ export class BookingApi extends ApiBase {
     }
   }
 
+  /**
+   * Trigger a browser download of a PDF, parsing the server's
+   * Content-Disposition filename (never hard-coded). Uses the shared axios
+   * instance directly so response headers are visible (super.request hides
+   * them). Returns { success, ready, pending } — the X-Labels-* counts let the
+   * caller tell the user "N of M labels ready".
+   */
+  async _downloadPdf(url, fallbackName) {
+    try {
+      const response = await this.axiosInstance({
+        url,
+        method: "GET",
+        responseType: "blob",
+      });
+      const cd = response.headers?.["content-disposition"] || "";
+      const match = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(cd);
+      const filename = match ? decodeURIComponent(match[1].replace(/"/g, "").trim()) : fallbackName;
+
+      const blobUrl = window.URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+
+      return {
+        success: true,
+        ready: Number(response.headers?.["x-labels-ready"]) || undefined,
+        pending: Number(response.headers?.["x-labels-pending"]) || undefined,
+      };
+    } catch (error) {
+      // 409 → labels still generating; body is a Blob when responseType=blob.
+      let message = "Download failed. Please try again.";
+      const status = error?.response?.status;
+      if (status === 409) message = "Labels are still generating — try again in a moment.";
+      return { success: false, status, message };
+    }
+  }
+
+  /** Download a single booking's shipping-label PDF. */
+  async downloadBookingLabel(bookingId) {
+    if (!bookingId) return { success: false, message: "Missing booking id." };
+    return this._downloadPdf(`/api/booking/bookings/${bookingId}/label/`, `label-${bookingId}.pdf`);
+  }
+
+  /** Download the merged "all labels" PDF for a completed bulk upload. */
+  async downloadAllBulkLabels(uploadId) {
+    if (!uploadId) return { success: false, message: "Missing upload id." };
+    return this._downloadPdf(`/api/booking/bulk-uploads/${uploadId}/labels/`, `labels-${uploadId}.pdf`);
+  }
+
   // /**
   //  * Record a failed delivery attempt for a booking.
   //  * Sends reason, notes, and return_to_hub status to backend.
@@ -160,6 +213,68 @@ export class BookingApi extends ApiBase {
         success: false,
         code: error.code || "FETCH_ERROR",
         message: error.message || "Failed to fetch service types",
+      };
+    }
+  }
+
+  /**
+   * Stateless instant price quote for the homepage widget.
+   * POST /api/booking/quotes/instant/ — postcode-only, no auth, no DB writes.
+   *
+   * Normalizes the three server outcomes into one shape:
+   *   { success: true,  data }                        → price ready (in area)
+   *   { success: false, outOfArea: true, field, message } → 200 in_service_area:false
+   *   { success: false, field, reason, message, status } → 400/429 (bad postcode, rate limit, ...)
+   */
+  async getInstantQuote({
+    pickupPostalCode,
+    dropoffPostalCode,
+    parcelCount = 1,
+    weightKg,
+    serviceTypeId = null,
+    shippingTypeId = null,
+  }) {
+    try {
+      const { data } = await this.request("/api/booking/quotes/instant/", {
+        method: "POST",
+        includeAuth: false,
+        data: {
+          pickup_postal_code: pickupPostalCode,
+          dropoff_postal_code: dropoffPostalCode,
+          parcel_count: parcelCount,
+          weight_kg: weightKg,
+          ...(serviceTypeId ? { service_type_id: serviceTypeId } : {}),
+          ...(shippingTypeId ? { shipping_type_id: shippingTypeId } : {}),
+        },
+      });
+      // 200 but out of service area is a valid answer, not a price.
+      if (data && data.in_service_area === false) {
+        return {
+          success: false,
+          outOfArea: true,
+          field: data.field || null,
+          message: data.detail || "That route is outside our service area.",
+        };
+      }
+      return { success: true, data };
+    } catch (error) {
+      const body = error?.data || {};
+      if (error?.status === 429) {
+        return {
+          success: false,
+          rateLimited: true,
+          message: "Too many quotes in a short time — please wait a moment and try again.",
+        };
+      }
+      return {
+        success: false,
+        field: body.field || null,
+        reason: body.reason || error?.code || "QUOTE_ERROR",
+        message:
+          body.detail ||
+          error?.message ||
+          "Couldn't calculate a live price right now — start a booking and we'll confirm pricing at checkout.",
+        status: error?.status,
       };
     }
   }
@@ -654,7 +769,7 @@ async createQuote(quoteData) {
     try {
       console.log(`[BookingAPI] Fetching booking history (page: ${page})`);
       const response = await super.request(
-        `/api/booking/bookings/?page=${page}&page_size=${pageSize}`,
+        `/api/booking/bookings/?page=${page}&page_size=${pageSize}&ordering=-created_at`,
         {
           method: "GET",
         }
