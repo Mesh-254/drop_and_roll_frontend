@@ -109,6 +109,22 @@ class BusinessApi extends ApiBase {
     const response = await this.axiosInstance.get(`/api/business/net-requests/${id}/`);
     return response.data;
   }
+
+  /**
+   * Fetch the admin-managed NET terms PACKAGES (Starter / Pro / Enterprise …)
+   * that drive the "Apply for NET Payment Terms" modal cards.
+   * GET /api/business/net-terms-packages/
+   * @returns {Promise<Array<{
+   *   id: string, slug: string, label: string,
+   *   credit_limit: string, fee_percentage: string,
+   *   net_terms_slug: string, net_terms_label: string, net_terms_days: number,
+   *   is_default: boolean, display_order: number
+   * }>>}
+   */
+  async getNetTermsPackages() {
+    const response = await this.axiosInstance.get('/api/business/net-terms-packages/');
+    return response.data;
+  }
 }
 
 export default new BusinessApi();

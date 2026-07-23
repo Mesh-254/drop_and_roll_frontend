@@ -1,7 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, AlertCircle, CheckCircle2, Loader2, Clock } from 'lucide-react';
 import BusinessApi from '../../api/BusinessApi';
+
+// Fallback cards, used only if GET /net-terms-packages/ fails or returns empty
+// (e.g. offline, or the admin table is empty mid-migration). The live source of
+// truth is the admin-managed NetTermsPackage catalogue — see mapPackage below.
+// Values mirror the backend TIER_DEFAULTS seed so the fallback is never wrong.
+const FALLBACK_PACKAGES = [
+  { id: 'starter', name: 'Starter', limit: '£5,000', terms: 'NET 7', rate: '1.5%', popular: false },
+  { id: 'pro', name: 'Pro', limit: '£25,000', terms: 'NET 30', rate: '1.0%', popular: true },
+  { id: 'enterprise', name: 'Enterprise', limit: '£100,000', terms: 'NET 60', rate: '0.5%', popular: false },
+];
+
+// Map an API NetTermsPackage into the card shape the modal renders.
+// slug → id (submitted as requested_package), so the frontend never hardcodes
+// tier ids. Money/fee/terms come straight from admin.
+function mapPackage(p) {
+  return {
+    id: p.slug,
+    name: p.label,
+    limit: `£${Number(p.credit_limit).toLocaleString('en-GB', { maximumFractionDigits: 0 })}`,
+    terms: (p.net_terms_label || '').toUpperCase(), // "Net 30" → "NET 30"
+    rate: `${Number(p.fee_percentage)}%`, // "1.50" → "1.5%"
+    popular: Boolean(p.is_default),
+  };
+}
 
 /**
  * NetTermsRequestForm — Modal for submitting NET terms requests.
@@ -38,32 +62,33 @@ export default function NetTermsRequestForm({ onClose, onSuccess, existingReques
   // submission form even though existingRequest?.status is still 'rejected'.
   const [isReapplying, setIsReapplying] = useState(false);
 
-  const packages = [
-    {
-      id: 'starter',
-      name: 'Starter',
-      limit: '£5,000',
-      terms: 'NET 7',
-      rate: '1.5%',
-      popular: false,
-    },
-    {
-      id: 'pro',
-      name: 'Pro',
-      limit: '£25,000',
-      terms: 'NET 30',
-      rate: '1.0%',
-      popular: true,
-    },
-    {
-      id: 'enterprise',
-      name: 'Enterprise',
-      limit: '£100,000',
-      terms: 'NET 60',
-      rate: '0.5%',
-      popular: false,
-    },
-  ];
+  // Package cards are now admin-managed (NetTermsPackage). Fetch them on mount;
+  // fall back to FALLBACK_PACKAGES so the modal always renders.
+  const [packages, setPackages] = useState(FALLBACK_PACKAGES);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await BusinessApi.getNetTermsPackages();
+        if (cancelled || !Array.isArray(data) || data.length === 0) return;
+        const mapped = data.map(mapPackage);
+        setPackages(mapped);
+        // Keep the selected tier valid against the live list: prefer the current
+        // selection, else the admin-flagged default, else the first card.
+        setFormData((prev) => {
+          if (mapped.some((p) => p.id === prev.requested_package)) return prev;
+          const fallback = mapped.find((p) => p.popular) || mapped[0];
+          return { ...prev, requested_package: fallback.id };
+        });
+      } catch {
+        // Keep FALLBACK_PACKAGES; the modal stays usable offline / on error.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // ── Pending state ─────────────────────────────────────────────────────────
   if (existingRequest?.status === 'pending' && !isReapplying) {
