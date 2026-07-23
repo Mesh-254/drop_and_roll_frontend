@@ -103,6 +103,7 @@ class DriverAPI extends ApiBase {
       };
     }
 
+    const cacheKey = `job:${jobId}`;
     try {
       console.log(
         `[DriverAPI] Fetching job details for ID: ${jobId} from /api/bookings/bookings/${jobId}/`,
@@ -110,9 +111,17 @@ class DriverAPI extends ApiBase {
       const response = await super.request(`/api/booking/bookings/${jobId}/`, {
         method: "GET",
       });
+      // Read-through cache so the detail page opens offline for any job the
+      // driver has already viewed (mirrors getAssignedJobs for the list).
+      await this._cacheRead(cacheKey, response.data);
       return { success: true, data: response.data };
     } catch (error) {
       console.error(`[DriverAPI] Error fetching job ${jobId}:`, error);
+      const cached = await this._readCache(cacheKey);
+      if (cached) {
+        console.warn(`[DriverAPI] Serving cached job ${jobId} (offline)`);
+        return { success: true, data: cached, stale: true };
+      }
       return {
         success: false,
         code: error.code || "FETCH_ERROR",
@@ -310,6 +319,9 @@ class DriverAPI extends ApiBase {
     if (proofData.location) {
       formData.append("location", JSON.stringify(proofData.location));
     }
+    // Device capture time — preserves delivery chronology when the POD syncs
+    // later (see ProofOfDelivery.recorded_at). Falls back to now for a live post.
+    formData.append("recorded_at", proofData.recorded_at || new Date().toISOString());
     if (clientActionId) formData.append("client_action_id", clientActionId);
 
     const response = await super.request(
@@ -324,12 +336,16 @@ class DriverAPI extends ApiBase {
   }
 
   async submitProofOfDelivery(bookingId, proofData) {
+    // Stamp the capture time NOW (not at sync time) so a POD queued offline
+    // keeps its true delivery chronology when it eventually syncs.
+    proofData = { ...proofData, recorded_at: proofData.recorded_at || new Date().toISOString() };
     console.log(
       `[DriverAPI] Submitting proof for booking ${bookingId}`,
       {
         hasPhoto: !!proofData.photo,
         hasNotes: !!proofData.notes,
         hasLocation: !!proofData.location,
+        recordedAt: proofData.recorded_at,
       }
     );
 
@@ -340,7 +356,7 @@ class DriverAPI extends ApiBase {
       const { clientActionId } = await enqueueAction({
         type: ACTION_TYPES.POD_SUBMIT,
         bookingId,
-        payload: { notes: proofData.notes, location: proofData.location },
+        payload: { notes: proofData.notes, location: proofData.location, recorded_at: proofData.recorded_at },
         photoBlob: proofData.photo || null,
       });
       console.log(
@@ -365,7 +381,7 @@ class DriverAPI extends ApiBase {
         const { clientActionId } = await enqueueAction({
           type: ACTION_TYPES.POD_SUBMIT,
           bookingId,
-          payload: { notes: proofData.notes, location: proofData.location },
+          payload: { notes: proofData.notes, location: proofData.location, recorded_at: proofData.recorded_at },
           photoBlob: proofData.photo || null,
         });
         console.warn(
@@ -781,6 +797,21 @@ class DriverAPI extends ApiBase {
         data: { locations },
       },
     );
+    return response.data;
+  }
+
+  // Flush a batch of queued offline STATUS transitions in one request. The
+  // server applies each event independently + atomically and returns a
+  // per-event result (applied | duplicate_ignored | conflict) — never a
+  // batch-level pass/fail — so the sync engine reconciles the local queue
+  // item-by-item. Events for the same booking carry a client sequence number
+  // so the server can apply them in the order the driver performed them,
+  // regardless of array/network arrival order.
+  async _syncStatusBatchRaw(events) {
+    const response = await this.request("/api/driver/sync/", {
+      method: "POST",
+      data: { events },
+    });
     return response.data;
   }
 

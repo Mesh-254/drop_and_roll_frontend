@@ -11,6 +11,7 @@ import {
   FileImage,
   Trash2,
 } from "lucide-react";
+import { compressImage } from "../../utils/imageCompression";
 
 // Lazy-load exifr to reduce initial load time
 // const exifr = lazy(() => import("exifr"));
@@ -357,11 +358,17 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
     }
     setLoading(true);
     try {
+      // Compress before it enters the (possibly offline) queue so a spotty-
+      // connection sync isn't uploading a multi-MB raw capture.
+      const compressedPhoto = await compressImage(photo);
       const proofData = {
-        photo,
+        photo: compressedPhoto,
         notes: notes.trim(),
         location,
         booking: jobId,
+        // Device capture time — preserved through the offline queue so the
+        // delivery timestamp is correct even if this POD syncs later.
+        recorded_at: new Date().toISOString(),
       };
       console.log("[ProofOfDelivery] Sending proofData:", {
         hasPhoto: !!proofData.photo,

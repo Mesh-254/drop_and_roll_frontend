@@ -577,6 +577,10 @@ export default function DriverDashboard() {
     { name: "Overview", icon: Home, key: "overview" },
     { name: "Jobs", icon: Briefcase, key: "jobs" },
     { name: "Map", icon: MapPin, key: "map" },
+    // The Earnings tab had a full render branch (EarningsChart), header, state
+    // and a getEarnings() fetch, but no nav entry — so it was unreachable. Add
+    // the missing item so drivers can actually open it.
+    { name: "Earnings", icon: DollarSign, key: "earnings" },
     { name: "Documents", icon: FileText, key: "documents" },
     { name: "Profile", icon: User, key: "profile" },
   ];

@@ -20,6 +20,7 @@
 
 import { ACTION_TYPES, getQueue, getPhotoBlob, markSyncing, markSucceeded, markFailed, getBufferedLocations, clearLocationPings } from "./offlineQueueManager";
 import { isOnline, watchConnectivity } from "./network";
+import { flushStatusBatch } from "./batchSync";
 
 const MAX_RETRIES_BEFORE_GIVING_UP = 8;
 const BASE_BACKOFF_MS = 2000;
@@ -130,6 +131,20 @@ export async function flush() {
     if (!online) {
       emit({ type: "flush_skipped_offline" });
       return;
+    }
+
+    // Drain STATUS transitions through the batch endpoint first — one request,
+    // server-enforced per-booking ordering, per-event applied/duplicate/conflict
+    // reconciliation. Resolved + conflicted items are removed from the queue
+    // here; a network-level batch failure re-queues them so the per-action loop
+    // below retries them individually. POD/failure/issue actions are never
+    // batched (they carry blobs / distinct endpoints) and flow through the loop.
+    try {
+      await flushStatusBatch(apiRef, emit);
+    } catch (err) {
+      // flushStatusBatch already re-queues on network failure; a throw here is
+      // unexpected but must not abort the per-action fallback below.
+      emit({ type: "batch_sync_error", error: err?.message });
     }
 
     const queue = await getQueue();
