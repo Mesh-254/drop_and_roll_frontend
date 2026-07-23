@@ -124,6 +124,22 @@ export class PaymentApi extends ApiBase {
     }
   }
 
+  /**
+   * Fetch the static bank-transfer receiving-account details (§5).
+   *
+   * GET /api/payments/bank-transfer-details/
+   * Returns { enabled, account_name, sort_code, account_number, bank_name, note }.
+   * When enabled=false the Bank Transfer tab is hidden.
+   */
+  async getBankTransferDetails() {
+    try {
+      const resp = await this.axiosInstance.get("/api/payments/bank-transfer-details/");
+      return { success: true, data: resp.data };
+    } catch (err) {
+      return this._err("BANK_TRANSFER_DETAILS_ERROR", err);
+    }
+  }
+
   // ── PayPal capture ────────────────────────────────────────────────────────
 
   /**

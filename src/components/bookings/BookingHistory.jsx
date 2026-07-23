@@ -191,7 +191,11 @@ export default function BookingHistory() {
         dayjs(booking.created_at).isBefore(dayjs(filters.dateTo)));
 
     return matchesSearch && matchesStatus && matchesDate;
-  });
+  })
+    // Defensive newest-first sort. The backend already returns bookings ordered
+    // by -created_at (see getBookingHistory), but sorting here keeps history
+    // correct even if a future endpoint change regresses that ordering.
+    .sort((a, b) => dayjs(b.created_at).valueOf() - dayjs(a.created_at).valueOf());
 
   const filteredQuotes = quotes.filter((quote) => {
     const matchesSearch =

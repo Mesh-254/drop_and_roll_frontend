@@ -22,13 +22,16 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { AlertCircle, CheckCircle, Clock, Loader2 } from "lucide-react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { AlertCircle, CheckCircle, Clock, Loader2, Lock, UserX } from "lucide-react";
 import bookingApi from "../../api/BookingApi";
+import { useAuth } from "../../contexts/AuthContext";
 
 export default function ResumePaymentPage() {
   const { resumeToken } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { isAuthenticated } = useAuth();
   const [status, setStatus] = useState({ loading: true, error: null, result: null });
   // One owner for the fetch — StrictMode double-mount must not fire it twice.
   const requestRef = useRef(null);
@@ -59,12 +62,25 @@ export default function ResumePaymentPage() {
         });
         return;
       }
+
+      // §1/§2: the booking belongs to a REAL account and the caller is logged
+      // out — send them through login, preserving THIS page as `next`. After
+      // auth they return here and the re-fetch (now carrying the token) resolves
+      // to the owner's payment page. Only redirect once: if we come back still
+      // authenticated but blocked, fall through to a clear error instead of
+      // looping.
+      if (data.state === "auth_required" && !isAuthenticated) {
+        const next = encodeURIComponent(location.pathname);
+        navigate(`/login?next=${next}`, { replace: true });
+        return;
+      }
+
       setStatus({ loading: false, error: null, result: data });
     })();
     return () => {
       mounted = false;
     };
-  }, [resumeToken, navigate]);
+  }, [resumeToken, navigate, isAuthenticated, location.pathname]);
 
   if (status.loading) {
     return (
@@ -90,7 +106,47 @@ export default function ResumePaymentPage() {
     );
   }
 
-  const { state, final_price: finalPrice, pickup, dropoff } = status.result || {};
+  const { state, final_price: finalPrice, pickup, dropoff, owner_hint: ownerHint } = status.result || {};
+
+  if (state === "forbidden_owner") {
+    return (
+      <Shell>
+        <UserX className="w-12 h-12 text-red-400 mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-white text-center mb-2">
+          This Booking Belongs to a Different Account
+        </h2>
+        <p className="text-slate-400 text-center mb-2">
+          You're signed in as a different account than the one that created this
+          booking{ownerHint ? <>, which is registered to <span className="text-slate-200">{ownerHint}</span></> : null}.
+        </p>
+        <p className="text-slate-400 text-center mb-6">
+          Sign in with that account to complete the payment.
+        </p>
+        <CenteredButton onClick={() => navigate(`/login?next=${encodeURIComponent(location.pathname)}`)}>
+          Switch Account
+        </CenteredButton>
+      </Shell>
+    );
+  }
+
+  if (state === "auth_required") {
+    // Reached only if we returned here still unable to resolve ownership.
+    return (
+      <Shell>
+        <Lock className="w-12 h-12 text-orange-400 mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-white text-center mb-2">
+          Sign In to Continue
+        </h2>
+        <p className="text-slate-400 text-center mb-6">
+          This booking is tied to a registered account. Please sign in to view
+          and complete its payment.
+        </p>
+        <CenteredButton onClick={() => navigate(`/login?next=${encodeURIComponent(location.pathname)}`)}>
+          Sign In
+        </CenteredButton>
+      </Shell>
+    );
+  }
 
   if (state === "completed") {
     return (

@@ -39,6 +39,7 @@ import paymentApi from "../../api/PaymentApi";
 import receivableApi from "../../api/ReceivableApi";
 import {
   ArrowLeft,
+  Layers,
   FileText,
   Download,
   CreditCard,
@@ -52,6 +53,8 @@ import {
   Clock,
   Info,
   ExternalLink,
+  Copy,
+  Check,
 } from "lucide-react";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
@@ -159,8 +162,74 @@ function StripePayForm({ clientSecret, transactionId, amount, currency, onSucces
   );
 }
 
+// ─── Copy-to-clipboard field (bank transfer, §5) ────────────────────────────────
+// Bank transfers fail reconciliation constantly due to typos, so every field the
+// customer must re-key gets a one-tap copy affordance.
+
+function CopyField({ label, value }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(String(value));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard unavailable (insecure context) — non-fatal, value is visible.
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-between gap-3 py-2.5 border-b border-slate-700/50 last:border-0">
+      <div className="min-w-0">
+        <p className="text-xs text-slate-400 uppercase tracking-wide">{label}</p>
+        <p className="text-sm font-medium text-white truncate">{value}</p>
+      </div>
+      <button
+        type="button"
+        onClick={handleCopy}
+        aria-label={`Copy ${label}`}
+        className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium transition"
+      >
+        {copied ? <><Check className="w-3.5 h-3.5 text-green-400" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+      </button>
+    </div>
+  );
+}
+
+// ─── Bank transfer panel (§5) ───────────────────────────────────────────────────
+// No live charge, so NO "Pay" button — just the receiving-account details plus the
+// exact reference (the invoice number) the customer must use, all copyable.
+
+function BankTransferPanel({ invoice, details }) {
+  return (
+    <div className="space-y-4">
+      <div className="bg-slate-700/40 border border-slate-600 rounded-xl p-4">
+        <CopyField label="Bank" value={details.bank_name} />
+        <CopyField label="Account name" value={details.account_name} />
+        <CopyField label="Sort code" value={details.sort_code} />
+        <CopyField label="Account number" value={details.account_number} />
+        {/* The reference is the invoice number — the single thing reconciliation matches on. */}
+        <CopyField label="Payment reference (use this exactly)" value={invoice.invoice_number} />
+        <div className="flex items-center justify-between gap-3 pt-2.5">
+          <div>
+            <p className="text-xs text-slate-400 uppercase tracking-wide">Amount</p>
+            <p className="text-sm font-semibold text-orange-300">
+              {invoice.currency} {parseFloat(invoice.outstanding || 0).toFixed(2)}
+            </p>
+          </div>
+        </div>
+      </div>
+      <p className="text-xs text-slate-400 flex items-start gap-1.5">
+        <Info className="w-4 h-4 shrink-0 mt-0.5" />
+        {details.note}
+      </p>
+    </div>
+  );
+}
+
 // ─── Payment panel ────────────────────────────────────────────────────────────
-// FIX-INV-1: Now supports both Stripe and PayPal
+// FIX-INV-1: supports Stripe and PayPal. §5: adds Bank Transfer when configured.
 
 function PaymentPanel({ invoice, onPaid }) {
   // phase: idle | gateway_select | loading | ready_stripe | ready_paypal | success | error
@@ -168,8 +237,18 @@ function PaymentPanel({ invoice, onPaid }) {
   const [selectedGateway, setSelectedGateway] = useState("stripe");
   const [payData, setPayData] = useState(null);
   const [err, setErr] = useState(null);
+  // §5: bank-transfer details, fetched once. null until loaded; enabled=false hides the tab.
+  const [bankDetails, setBankDetails] = useState(null);
 
   const outstanding = parseFloat(invoice.outstanding);
+
+  useEffect(() => {
+    let alive = true;
+    paymentApi.getBankTransferDetails().then((res) => {
+      if (alive && res.success && res.data?.enabled) setBankDetails(res.data);
+    });
+    return () => { alive = false; };
+  }, []);
 
   const handleInitiatePayment = async (gateway) => {
     setPhase("loading");
@@ -221,11 +300,12 @@ function PaymentPanel({ invoice, onPaid }) {
   if (phase === "idle") {
     return (
       <div className="space-y-3">
-        {/* Gateway toggle */}
+        {/* Gateway toggle — Bank Transfer appears only when configured (§5) */}
         <div className="flex gap-2">
           {[
             { id: "stripe", label: "💳 Card" },
             { id: "paypal", label: "🔵 PayPal" },
+            ...(bankDetails ? [{ id: "bank", label: "🏦 Bank" }] : []),
           ].map(({ id, label }) => (
             <button
               key={id}
@@ -234,7 +314,9 @@ function PaymentPanel({ invoice, onPaid }) {
                 selectedGateway === id
                   ? id === "paypal"
                     ? "border-blue-500 bg-blue-500/10 text-blue-300"
-                    : "border-orange-500 bg-orange-500/10 text-orange-300"
+                    : id === "bank"
+                      ? "border-emerald-500 bg-emerald-500/10 text-emerald-300"
+                      : "border-orange-500 bg-orange-500/10 text-orange-300"
                   : "border-slate-600 text-slate-400 hover:border-slate-500"
               }`}
             >
@@ -243,6 +325,10 @@ function PaymentPanel({ invoice, onPaid }) {
           ))}
         </div>
 
+        {/* Bank Transfer: no live charge, so show details instead of a pay button */}
+        {selectedGateway === "bank" && bankDetails ? (
+          <BankTransferPanel invoice={invoice} details={bankDetails} />
+        ) : (
         <button
           onClick={() => handleInitiatePayment(selectedGateway)}
           className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl
@@ -255,6 +341,7 @@ function PaymentPanel({ invoice, onPaid }) {
             <><CreditCard className="w-5 h-5" /> Pay Outstanding: {invoice.currency} {outstanding.toFixed(2)}</>
           )}
         </button>
+        )}
       </div>
     );
   }
@@ -441,27 +528,54 @@ export default function InvoiceDetailPage() {
 
   const isPayable = ["issued", "partial", "overdue"].includes(invoice.status);
   const outstanding = parseFloat(invoice.outstanding || 0);
+  const isBulkInvoice = !!invoice.bulk_upload;
+
+  // Back navigation is origin-aware, NOT history.back() — a user can land here
+  // from an email/direct link where history has nowhere sensible to go (spec §5).
+  // If the caller passed an explicit return route (in-app navigation), honor it;
+  // otherwise a bulk invoice returns to its upload, a normal one to billing.
+  const handleBack = () => {
+    const from = location.state?.from;
+    if (from) return navigate(from);
+    if (isBulkInvoice) return navigate(`/bulk-upload/${invoice.bulk_upload}`);
+    return navigate("/billing");
+  };
 
   return (
-    <div className="min-h-screen bg-slate-900 py-10 px-4">
+    // §1 FIX: the site Header is `fixed top-0` at h-20 (80px) / h-16 scrolled,
+    // z-50. `py-10` (40px) let the invoice heading + back arrow render UNDER the
+    // nav. Every other full page under this header uses pt-20; the title sits
+    // right at the top here so we use pt-24 for breathing room.
+    <div className="min-h-screen bg-slate-900 px-4 pt-24 pb-10">
       <div className="max-w-2xl mx-auto space-y-6">
 
-        {/* Header */}
-        <div className="flex items-center gap-3">
+        {/* Header — back button gets its own fixed cell so it can never overlap
+            the title; the title block is allowed to shrink/truncate; the badges
+            wrap onto their own line on narrow viewports (spec §5). */}
+        <div className="flex items-start gap-3">
           <button
-            onClick={() => navigate("/billing")}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+            onClick={handleBack}
+            aria-label="Back"
+            className="flex-shrink-0 p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div>
-            <h1 className="text-2xl font-bold text-white">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-bold text-white truncate">
               Invoice {invoice.invoice_number}
             </h1>
-            <p className="text-sm text-slate-400">{invoice.business_name}</p>
+            <p className="text-sm text-slate-400 truncate">{invoice.business_name}</p>
+            {/* Bulk-vs-single distinction (spec §4) */}
+            {isBulkInvoice && (
+              <span className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-500/15 text-orange-300 border border-orange-500/40">
+                <Layers className="w-3.5 h-3.5" />
+                Bulk Payment
+                {invoice.booking_count != null && ` · ${invoice.booking_count} booking${invoice.booking_count !== 1 ? "s" : ""}`}
+              </span>
+            )}
           </div>
           <span
-            className={`ml-auto px-3 py-1 rounded-full text-xs font-semibold border ${
+            className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold border ${
               STATUS_STYLES[invoice.status] || STATUS_STYLES.draft
             }`}
           >

@@ -20,6 +20,7 @@ import { GoogleOAuthProvider } from "@react-oauth/google";
 import { Toaster } from "react-hot-toast";
 import ErrorBoundary from "./components/common/ErrorBoundary";
 import { AuthModalProvider, useAuthModal } from "./contexts/AuthModalContext";
+import { useAuth } from "./contexts/AuthContext";
 import AuthModal from "./components/auth/AuthModal";
 import { QuoteProvider } from "./contexts/QuoteContext";
 import Header from "./components/common/Header";
@@ -117,6 +118,7 @@ function AdminRedirect() {
  */
 function AuthModalRoute({ view }) {
   const { openLogin, openRegister, isOpen } = useAuthModal();
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -124,16 +126,35 @@ function AuthModalRoute({ view }) {
     else openRegister();
   }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // When the modal closes (user logged in or dismissed), go home.
+  // When the modal closes, honour a ?next= deep link (e.g. the reminder-email
+  // resume page: /login?next=/pay/resume/<token>). Only follow `next` once the
+  // user is actually authenticated — a dismissed modal still just goes home, so
+  // `next` can never be used to bounce an un-authed visitor into a gated page.
   useEffect(() => {
-    if (!isOpen) navigate("/", { replace: true });
-  }, [isOpen, navigate]);
+    if (isOpen) return;
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next");
+    if (next && isAuthenticated && isSafeInternalPath(next)) {
+      navigate(next, { replace: true });
+    } else {
+      navigate("/", { replace: true });
+    }
+  }, [isOpen, isAuthenticated, navigate]);
 
   return (
     <MainLayout>
       <HomePage />
     </MainLayout>
   );
+}
+
+/**
+ * Only allow same-origin, path-only redirects for `next` — never an absolute
+ * URL or protocol-relative "//evil.com", so the login redirect can't be turned
+ * into an open redirect.
+ */
+function isSafeInternalPath(value) {
+  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//");
 }
 
 function App() {
