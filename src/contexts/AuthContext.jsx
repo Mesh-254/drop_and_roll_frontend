@@ -3,6 +3,11 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { authApi } from "../api/AuthApi";
 import BusinessApi from "../api/BusinessApi";
+import {
+  SESSION_EXPIRED_EVENT,
+  AUTH_BROADCAST_KEY,
+  resetExpiryGuard,
+} from "../lib/authSession";
 
 const AuthContext = createContext();
 
@@ -22,6 +27,40 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     checkAuthStatus();
+  }, []);
+
+  // Centralized reaction to session expiry. The axios interceptor (ApiBase)
+  // detects the dead refresh token, clears storage, and fires these signals —
+  // here we flip React auth state so ProtectedRoute shows the login modal.
+  // Nothing else in the app should handle 401-driven logout.
+  useEffect(() => {
+    const clearAuthState = () => {
+      setUser(null);
+      setIsAuthenticated(false);
+      setBusinessProfile(null);
+    };
+
+    // This tab: our own API call hit an expired session.
+    const onExpired = () => clearAuthState();
+
+    // Other tabs: expiry/logout happened elsewhere. localStorage is shared, so
+    // this tab's tokens are already gone — just sync the React state so an
+    // in-progress action in this tab doesn't silently keep using a dead session.
+    const onStorage = (e) => {
+      if (e.key !== AUTH_BROADCAST_KEY || !e.newValue) return;
+      try {
+        if (JSON.parse(e.newValue)?.type === "logout") clearAuthState();
+      } catch {
+        // ignore malformed broadcast payloads
+      }
+    };
+
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
   const checkAuthStatus = async () => {
@@ -80,6 +119,8 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem("guestEmail"); // Clear guest email
       localStorage.removeItem("guestIdentifier");
       if (response.success) {
+        // Re-arm the expiry debounce so a FUTURE session expiry fires again.
+        resetExpiryGuard();
         if (rememberMe) {
           localStorage.setItem("remember_me", "true");
           localStorage.setItem("user_data", JSON.stringify(response.data));
@@ -162,6 +203,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("guestIdentifier");
 
     if (result.success) {
+      resetExpiryGuard(); // re-arm expiry debounce on a fresh session
       if (result.data.user) {
         setUser(result.data.user);
         setIsAuthenticated(true);
