@@ -383,7 +383,7 @@ export default function BulkUploadDetail() {
                 <p className="text-sm text-red-600 dark:text-red-400/80 mt-1">
                   {upload.total_rows > 0
                     ? "Every row in this file failed validation. Review the errors below, fix the file, and re-upload."
-                    : "The upload encountered errors during processing. Please check the details and try again."}
+                    : "This upload couldn't be completed — processing timed out before any rows were created. No charge was made. Please re-upload to try again."}
                 </p>
               </div>
             </div>

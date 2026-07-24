@@ -49,8 +49,11 @@ const baseUpload = {
 
 function renderRow(overrides = {}) {
   const onViewDetail = jest.fn();
-  render(<UploadRow upload={{ ...baseUpload, ...overrides }} onViewDetail={onViewDetail} />);
-  return { onViewDetail };
+  const onReupload = jest.fn();
+  render(
+    <UploadRow upload={{ ...baseUpload, ...overrides }} onViewDetail={onViewDetail} onReupload={onReupload} />,
+  );
+  return { onViewDetail, onReupload };
 }
 
 beforeEach(() => mockNavigate.mockClear());
@@ -106,4 +109,32 @@ test("prepaid completed upload shows Settled, no pay control", () => {
   renderRow({ payment_path: "prepaid", status: "completed" });
   expect(screen.getByText(/Settled/i)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /Pay/i })).not.toBeInTheDocument();
+});
+
+// ── Terminal-failure states (reaper output): failed / cancelled ──────────────
+
+test("failed upload shows a static state, not a stuck '% complete' bar", () => {
+  renderRow({ status: "failed", total_rows: 0, successful: 0, failed: 0 });
+  expect(screen.getByText(/Didn't finish processing/i)).toBeInTheDocument();
+  // The misleading "0% complete" progress label must be gone.
+  expect(screen.queryByText(/% complete/i)).not.toBeInTheDocument();
+});
+
+test("cancelled (abandoned draft) shows 'Never submitted', not a progress bar", () => {
+  renderRow({ status: "cancelled", total_rows: 0, successful: 0, failed: 0 });
+  expect(screen.getByText(/Never submitted/i)).toBeInTheDocument();
+  expect(screen.queryByText(/% complete/i)).not.toBeInTheDocument();
+});
+
+test("failed upload exposes a Re-upload action that calls onReupload", () => {
+  const { onReupload } = renderRow({ status: "failed", total_rows: 0 });
+  const btn = screen.getByRole("button", { name: /Re-upload/i });
+  fireEvent.click(btn);
+  expect(onReupload).toHaveBeenCalledTimes(1);
+});
+
+test("non-terminal upload still shows the progress bar", () => {
+  renderRow({ status: "processing", total_rows: 10, successful: 5, failed: 0 });
+  expect(screen.getByText(/% complete/i)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Re-upload/i })).not.toBeInTheDocument();
 });

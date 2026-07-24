@@ -34,6 +34,7 @@ import {
   Filter,
   ChevronLeft,
   ChevronRight,
+  RotateCcw,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "../../contexts/AuthContext";
@@ -384,6 +385,12 @@ export default function BulkUploadDashboard() {
                     key={upload.id}
                     upload={upload}
                     onViewDetail={() => navigate(`/bulk-upload/${upload.id}`)}
+                    onReupload={() => {
+                      // Reuse the exact "New Upload" behaviour so a failed /
+                      // cancelled upload has a one-click path back into the wizard.
+                      reset();
+                      setShowUploadModal(true);
+                    }}
                   />
                 ))}
               </div>
@@ -499,8 +506,13 @@ function StatCard({ icon: Icon, label, value, isLoading }) {
   );
 }
 
-export function UploadRow({ upload, onViewDetail }) {
+export function UploadRow({ upload, onViewDetail, onReupload }) {
   const navigate = useNavigate();
+
+  // A failed/cancelled upload is TERMINAL. Never leave the "X% complete" bar or
+  // an indefinite spinner sitting on it — that reads as still-in-progress to the
+  // business user. Show a static state line + a one-click re-upload instead.
+  const isTerminalFailure = upload.status === "failed" || upload.status === "cancelled";
 
   // Shared with BulkUploadDetail.jsx via utils/bulkUploadValidation.js so
   // status styling can't drift between the dashboard and detail views.
@@ -579,17 +591,29 @@ export function UploadRow({ upload, onViewDetail }) {
           </div>
         </div>
 
-        {/* Progress Bar */}
+        {/* Progress Bar (or static terminal-failure state) */}
         <div className="sm:col-span-2">
-          <div className="w-full bg-slate-600 rounded-full h-1.5 overflow-hidden">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${successRate}%` }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
-              className="h-full bg-gradient-to-r from-orange-500 to-orange-600"
-            />
-          </div>
-          <p className="text-xs text-slate-400 mt-1">{successRate}% complete</p>
+          {isTerminalFailure ? (
+            <p
+              className={`text-xs font-medium ${
+                upload.status === "failed" ? "text-red-300" : "text-gray-400"
+              }`}
+            >
+              {upload.status === "failed" ? "Didn't finish processing" : "Never submitted"}
+            </p>
+          ) : (
+            <>
+              <div className="w-full bg-slate-600 rounded-full h-1.5 overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${successRate}%` }}
+                  transition={{ duration: 0.8, ease: "easeOut" }}
+                  className="h-full bg-gradient-to-r from-orange-500 to-orange-600"
+                />
+              </div>
+              <p className="text-xs text-slate-400 mt-1">{successRate}% complete</p>
+            </>
+          )}
         </div>
 
         {/* Amount & Date */}
@@ -643,6 +667,20 @@ export function UploadRow({ upload, onViewDetail }) {
               <CheckCircle2 className="h-3.5 w-3.5" />
               Settled
             </span>
+          )}
+          {isTerminalFailure && onReupload && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onReupload();
+              }}
+              className="px-3 py-1.5 bg-red-500/15 hover:bg-red-500/25 text-red-300 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Re-upload
+            </motion.button>
           )}
           <motion.button
             whileHover={{ scale: 1.05 }}
