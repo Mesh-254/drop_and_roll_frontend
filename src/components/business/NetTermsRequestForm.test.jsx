@@ -41,14 +41,13 @@ import NetTermsRequestForm from "./NetTermsRequestForm";
 const noop = () => {};
 
 // One admin package with values that could NOT come from the hardcoded fallback
-// (Gold / Net 90 / £50,000 / 0.75%), proving the cards are DB-driven.
+// (Gold / Net 90 / £50,000), proving the cards are DB-driven.
 const API_PACKAGES = [
   {
     id: "abc",
     slug: "gold",
     label: "Gold",
     credit_limit: "50000.00",
-    fee_percentage: "0.75",
     net_terms_slug: "net_90",
     net_terms_label: "Net 90",
     net_terms_days: 90,
@@ -72,11 +71,13 @@ test("renders package cards from the admin API, not the hardcoded fallback", asy
   await renderForm();
 
   expect(BusinessApi.getNetTermsPackages).toHaveBeenCalledTimes(1);
-  // Admin-sourced label / terms / limit / fee are on screen…
+  // Admin-sourced label / terms / limit are on screen…
   expect(await screen.findByText("Gold")).toBeInTheDocument();
   expect(screen.getByText(/NET 90/)).toBeInTheDocument();
   expect(screen.getByText(/£50,000/)).toBeInTheDocument();
-  expect(screen.getByText(/0\.75%/)).toBeInTheDocument();
+  // Fee was removed from the cards — no "Fee:" line, no percentage rendered.
+  expect(screen.queryByText(/Fee:/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/%/)).not.toBeInTheDocument();
   // …and the hardcoded fallback tiers are NOT.
   expect(screen.queryByText("Starter")).not.toBeInTheDocument();
   expect(screen.queryByText("Enterprise")).not.toBeInTheDocument();

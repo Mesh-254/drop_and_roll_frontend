@@ -8,21 +8,20 @@ import BusinessApi from '../../api/BusinessApi';
 // truth is the admin-managed NetTermsPackage catalogue — see mapPackage below.
 // Values mirror the backend TIER_DEFAULTS seed so the fallback is never wrong.
 const FALLBACK_PACKAGES = [
-  { id: 'starter', name: 'Starter', limit: '£5,000', terms: 'NET 7', rate: '1.5%', popular: false },
-  { id: 'pro', name: 'Pro', limit: '£25,000', terms: 'NET 30', rate: '1.0%', popular: true },
-  { id: 'enterprise', name: 'Enterprise', limit: '£100,000', terms: 'NET 60', rate: '0.5%', popular: false },
+  { id: 'starter', name: 'Starter', limit: '£5,000', terms: 'NET 7', popular: false },
+  { id: 'pro', name: 'Pro', limit: '£25,000', terms: 'NET 30', popular: true },
+  { id: 'enterprise', name: 'Enterprise', limit: '£100,000', terms: 'NET 60', popular: false },
 ];
 
 // Map an API NetTermsPackage into the card shape the modal renders.
 // slug → id (submitted as requested_package), so the frontend never hardcodes
-// tier ids. Money/fee/terms come straight from admin.
+// tier ids. Money/terms come straight from admin.
 function mapPackage(p) {
   return {
     id: p.slug,
     name: p.label,
     limit: `£${Number(p.credit_limit).toLocaleString('en-GB', { maximumFractionDigits: 0 })}`,
     terms: (p.net_terms_label || '').toUpperCase(), // "Net 30" → "NET 30"
-    rate: `${Number(p.fee_percentage)}%`, // "1.50" → "1.5%"
     popular: Boolean(p.is_default),
   };
 }
@@ -402,9 +401,6 @@ export default function NetTermsRequestForm({ onClose, onSuccess, existingReques
                     </p>
                     <p>
                       <strong>Terms:</strong> {pkg.terms}
-                    </p>
-                    <p>
-                      <strong>Fee:</strong> {pkg.rate}
                     </p>
                   </div>
                 </button>

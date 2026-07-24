@@ -116,7 +116,7 @@ class BusinessApi extends ApiBase {
    * GET /api/business/net-terms-packages/
    * @returns {Promise<Array<{
    *   id: string, slug: string, label: string,
-   *   credit_limit: string, fee_percentage: string,
+   *   credit_limit: string,
    *   net_terms_slug: string, net_terms_label: string, net_terms_days: number,
    *   is_default: boolean, display_order: number
    * }>>}
