@@ -8,9 +8,64 @@ import {
 } from "../offline/offlineQueueManager";
 import { db } from "../offline/db";
 
+// Refresh-survival flag: set when the driver has EXPLICITLY gone live, so a page
+// refresh (which tears the component down and back up) can auto-resume tracking
+// without the driver re-tapping. Short TTL so a stale flag from a day-old tab
+// doesn't silently start tracking.
+const LIVE_TRACKING_FLAG = "dnr_live_tracking_active";
+const LIVE_TRACKING_TTL_MS = 5 * 60 * 1000; // 5 min
+
 class DriverAPI extends ApiBase {
   constructor() {
     super(); // Initialize ApiBase
+  }
+
+  // ── Live-tracking refresh-survival flag ────────────────────────────────────
+  /** Mark that live tracking is active (persists across a refresh). */
+  markLiveTrackingActive() {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(LIVE_TRACKING_FLAG, String(Date.now()));
+    }
+  }
+
+  /** Clear the flag — call on EXPLICIT stop / logout, never on unmount. */
+  clearLiveTrackingActive() {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(LIVE_TRACKING_FLAG);
+    }
+  }
+
+  /** True if tracking was live and the flag isn't stale (survives a refresh). */
+  isLiveTrackingActive() {
+    if (typeof window === "undefined") return false;
+    const raw = localStorage.getItem(LIVE_TRACKING_FLAG);
+    if (!raw) return false;
+    const ts = Number(raw);
+    if (Number.isNaN(ts) || Date.now() - ts > LIVE_TRACKING_TTL_MS) {
+      localStorage.removeItem(LIVE_TRACKING_FLAG);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * De-duplicated access-token refresh, shared with the axios interceptor's
+   * rotating-refresh logic (ApiBase._refreshTokenOnce). Await this before opening
+   * a WebSocket so the socket never handshakes with an already-expired token —
+   * without duplicating any refresh code in the WS layer.
+   */
+  async refreshAccessTokenOnce() {
+    return this._refreshTokenOnce();
+  }
+
+  /** Build the per-driver WS URL from the backend env (http→ws, https→wss). */
+  driverWsUrl(driverId) {
+    const base =
+      import.meta.env.VITE_NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
+    const wsBase = base.replace(/^http/i, "ws"); // http→ws, https→wss
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("access_token") : "";
+    return `${wsBase}/ws/driver/${driverId}/?token=${token}`;
   }
 
   /**
@@ -946,6 +1001,11 @@ class DriverAPI extends ApiBase {
       );
       return; // Prevent multiple watchers
     }
+
+    // Tracking is going live — persist the flag so a refresh auto-resumes it.
+    // NOTE: stopLocationTracking() does NOT clear this (it runs on unmount too);
+    // only an explicit driver-off / logout clears it via clearLiveTrackingActive().
+    this.markLiveTrackingActive();
 
     // Shared success handler
     const handlePosition = async (position) => {
