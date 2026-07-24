@@ -1,4 +1,5 @@
 import axios from "axios";
+import { markSessionExpired } from "../lib/authSession";
 
 export class ApiBase {
   constructor() {
@@ -73,21 +74,33 @@ export class ApiBase {
           originalRequest.includeAuth !== false
         ) {
           originalRequest._retry = true;
-          console.log("[ApiBase] 401 detected, attempting token refresh");
           try {
-            const newToken = await this.refreshToken();
-            this.setTokens(newToken); // Update token in localStorage
+            // Single-flight: many requests can 401 at the same instant. They all
+            // await ONE refresh so the rotating refresh token is spent exactly
+            // once — sending it twice would hit a blacklisted token (rotation +
+            // BLACKLIST_AFTER_ROTATION) and log the user out spuriously.
+            const newToken = await this._refreshTokenOnce();
             originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
             return this.axiosInstance(originalRequest);
           } catch (refreshError) {
-            console.error("Token refresh failed:", refreshError);
-            // Only logout if refresh token is invalid
-            if (refreshError.status === 401) {
+            // Distinguish "refresh token is dead" (2h sliding window closed →
+            // real expiry) from a transient network/5xx blip (keep tokens, let
+            // the user retry). The old code checked refreshError.status, which
+            // is undefined on axios errors, so this branch never fired.
+            const status = refreshError?.response?.status;
+            const noRefreshToken =
+              refreshError?.message === "No refresh token available";
+            if (status === 401 || status === 400 || noRefreshToken) {
+              // Centralized expiry: clear tokens atomically, then signal the
+              // React layer + other tabs. markSessionExpired() debounces, so
+              // concurrent 401s produce a single logout/redirect cycle.
               this.logout();
+              markSessionExpired();
               return Promise.reject(
                 new Error("Session expired, please log in again")
               );
             }
+            // Transient failure — do NOT log out.
             return Promise.reject(refreshError);
           }
         }
@@ -133,6 +146,27 @@ export class ApiBase {
     }
   }
 
+  /**
+   * De-duplicated refresh. Concurrent callers share the in-flight promise, so
+   * the rotating refresh token is exchanged exactly once. Resolves to the new
+   * access token; persists BOTH the new access and the rotated refresh token.
+   */
+  _refreshTokenOnce() {
+    if (!this._refreshInFlight) {
+      this._refreshInFlight = this.refreshToken()
+        .then(({ access, refresh }) => {
+          // Persist the rotated refresh token too — the previous one is
+          // blacklisted the moment this refresh succeeds.
+          this.setTokens(access, refresh);
+          return access;
+        })
+        .finally(() => {
+          this._refreshInFlight = null;
+        });
+    }
+    return this._refreshInFlight;
+  }
+
   async refreshToken() {
     const refreshToken =
       typeof window !== "undefined"
@@ -141,19 +175,13 @@ export class ApiBase {
     if (!refreshToken) {
       throw new Error("No refresh token available");
     }
-    try {
-      // Correct JWT refresh endpoint
-      const response = await this.axiosInstance.post(
-        "/api/auth/jwt/refresh/",
-        {
-          refresh: refreshToken,
-        }
-      );
-      const newAccessToken = response.data.access;
-      return newAccessToken;
-    } catch (error) {
-      throw error;
-    }
+    const response = await this.axiosInstance.post("/api/auth/jwt/refresh/", {
+      refresh: refreshToken,
+    });
+    // ROTATE_REFRESH_TOKENS is on, so the response carries a NEW refresh token.
+    // Return both — the caller MUST store the rotated refresh token or the next
+    // refresh will fail against the now-blacklisted old one.
+    return { access: response.data.access, refresh: response.data.refresh };
   }
 
   setTokens(accessToken, refreshToken) {
