@@ -23,11 +23,12 @@ import {
   Eye,
   AlertCircle,
   Activity,
-  Zap,
 } from "lucide-react";
 import { PerformanceMetrics } from "./performance-metrics";
 import { ActiveJobsOverviewCard } from "./active-jobs-overview-card";
-import { EarningsChart } from "./earnings-chart";
+// EarningsChart import removed — earnings feature disabled for now. Re-add this
+// import (and the render/fetch/state below) to restore. getEarnings() is left
+// intact in driver-api.js for that re-enablement.
 import { DeliveryStatusUpdates } from "./delivery-status-updates";
 import { JobDetailPage } from "./job-detail-page";
 import { OfflineStatusBar } from "./offline/OfflineStatusBar";
@@ -42,14 +43,9 @@ export default function DriverDashboard() {
   const [jobs, setJobs] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [uploading, setUploading] = useState(false);
-  const [earnings, setEarnings] = useState({
-    today: 0,
-    weekly: 0,
-    monthly: 0,
-    chartData: [],
-    available: 0,
-    pending: 0,
-  });
+  // Earnings state removed — earnings feature disabled for now (see fetchData).
+  // Re-add `const [earnings, setEarnings] = useState({ today: 0, weekly: 0,
+  // monthly: 0, chartData: [], available: 0, pending: 0 })` to restore.
   const [ratings, setRatings] = useState([]);
   const [metrics, setMetrics] = useState({
     // totalDeliveries: 0,
@@ -152,7 +148,10 @@ export default function DriverDashboard() {
             driverApi.locationWatcher
           ) {
             driverApi.stopLocationTracking();
-            toast.info("Tracking deactivated");
+            // react-hot-toast has no `.info` — calling it threw a TypeError that
+            // the catch below turned into a permanent 10s "Tracking check failed"
+            // retry loop. Use the base toast with an icon, as elsewhere here.
+            toast("Tracking deactivated", { icon: "📴" });
           }
         }
       } catch (err) {
@@ -187,53 +186,135 @@ export default function DriverDashboard() {
     return () => {
       clearInterval(pollIntervalRef.current);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      if (wsRef.current) wsRef.current.close();
+      // NOTE: the WS is owned and closed by the per-driver WS effect (with code
+      // 1000). Closing it here too fired a spurious non-1000 close → reconnect on
+      // unmount, so it's intentionally not touched here.
     };
   }, []);
 
-  // New: WS for real-time tracking toggle (per-driver group)
+  // Refresh-survival: if the driver was live before a reload, resume tracking on
+  // mount without requiring a re-tap. Cleared only on explicit stop/logout, so a
+  // plain refresh (unmount → remount) lands here and picks tracking back up.
   useEffect(() => {
     if (!profile?.id) return;
+    if (driverApi.isLiveTrackingActive() && !driverApi.locationWatcher) {
+      driverApi.startLocationTracking();
+      setManualTrackingEnabled(true);
+      setTrackingStatus("tracking");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id]);
 
-    const token = localStorage.getItem("access_token");
-    wsRef.current = new WebSocket(
-      `ws://127.0.0.1:8000/ws/driver/${profile.id}/?token=${token}`,
-    );
-    wsRef.current.onopen = () =>
-      console.log("[DriverDashboard] Per-driver WS connected");
-    wsRef.current.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === "tracking.toggle") {
-        if (data.enabled) {
-          driverApi.startLocationTracking();
-          toast.success("Tracking enabled via server update");
-        } else {
-          driverApi.stopLocationTracking();
-          toast.info("Tracking disabled via server update");
+  // Per-driver WS (tracking-toggle channel) with a REAL reconnect loop.
+  // The old version created a bare socket in onclose but never re-attached its
+  // handlers ("// Re-add listeners" was a comment, not code), so after the first
+  // drop — e.g. a refresh (code 1006) — the socket was permanently dead. This
+  // rebuilds a fully-wired socket, backs off exponentially, pauses while offline,
+  // refreshes the token before each attempt, and stays quiet on expected closes.
+  useEffect(() => {
+    // The WS group is keyed by DriverProfile.id (see /ws/driver/<id>/ consumer),
+    // NOT the user id. profile.driver_profile carries that id; without it the
+    // handshake is rejected 4003 and reconnects forever, so don't open at all.
+    if (!profile?.driver_profile) return;
+
+    let closedByCleanup = false;
+    let reconnectTimer = null;
+    let attempt = 0;
+    const MAX_BACKOFF_MS = 30000;
+
+    const scheduleReconnect = () => {
+      if (closedByCleanup) return;
+      // Don't stack reconnects while the device is offline — the 'online' event
+      // (handleOnline) fires an immediate retry when connectivity returns.
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+      const delay = Math.min(MAX_BACKOFF_MS, 1000 * 2 ** attempt);
+      attempt += 1;
+      reconnectTimer = setTimeout(connect, delay);
+    };
+
+    async function connect() {
+      if (closedByCleanup) return;
+      // Refresh the access token first so the handshake never uses a stale one.
+      // Shares the axios interceptor's de-duped rotating refresh — no duplicate
+      // token logic in the WS layer. If refresh fails the token is truly dead and
+      // reconnecting would just 4401-loop, so stop and let the API layer redirect.
+      try {
+        await driverApi.refreshAccessTokenOnce();
+      } catch {
+        return;
+      }
+      if (closedByCleanup) return;
+
+      const ws = new WebSocket(driverApi.driverWsUrl(profile.driver_profile));
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        attempt = 0; // reset backoff after a good connection
+      };
+
+      ws.onmessage = (event) => {
+        let data;
+        try {
+          data = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+        if (data.type === "tracking.toggle") {
+          if (data.enabled) {
+            driverApi.startLocationTracking();
+            setManualTrackingEnabled(true);
+            toast.success("Tracking enabled via server update");
+          } else {
+            driverApi.stopLocationTracking();
+            driverApi.clearLiveTrackingActive();
+            setManualTrackingEnabled(false);
+            toast("Tracking disabled via server update", { icon: "📴" });
+          }
+        }
+      };
+
+      ws.onclose = (event) => {
+        // Clean/intentional close (unmount, or server code 1000) → no reconnect.
+        if (closedByCleanup || event.code === 1000) return;
+        // Everything else (1006 refresh/drop, 4401 token-expiry) → reconnect.
+        // The token refresh at the top of connect() handles the expiry case.
+        scheduleReconnect();
+      };
+
+      // The raw WS error Event carries nothing actionable and previously spammed
+      // the console; onclose drives reconnect, so swallow it quietly.
+      ws.onerror = () => {};
+    }
+
+    const handleOnline = () => {
+      // Connectivity is back — retry now instead of waiting out the backoff.
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      attempt = 0;
+      const sock = wsRef.current;
+      if (!closedByCleanup && (!sock || sock.readyState > WebSocket.OPEN)) {
+        connect();
+      }
+    };
+    window.addEventListener("online", handleOnline);
+
+    connect();
+
+    return () => {
+      closedByCleanup = true;
+      window.removeEventListener("online", handleOnline);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (wsRef.current) {
+        try {
+          wsRef.current.close(1000, "component unmounted");
+        } catch {
+          /* noop */
         }
       }
     };
-
-    wsRef.current.onclose = (event) => {
-      console.log("[DriverDashboard] Per-driver WS disconnected:", event);
-      if (event.code === 1006 || event.code !== 1000) {
-        setTimeout(() => {
-          // Reconnect
-          wsRef.current = new WebSocket(
-            `ws://127.0.0.1:8000/ws/driver/${profile.id}/?token=${localStorage.getItem("access_token")}`,
-          );
-          // Re-add listeners
-        }, 5000); // 5s delay
-      }
-    };
-
-    wsRef.current.onerror = (error) =>
-      console.error("[DriverDashboard] Per-driver WS error:", error);
-
-    return () => {
-      if (wsRef.current) wsRef.current.close();
-    };
-  }, [profile?.id]);
+  }, [profile?.driver_profile]);
 
   const stopRoutePoll = useCallback(() => {
     if (routePollIntervalRef.current) {
@@ -374,6 +455,9 @@ export default function DriverDashboard() {
   const stopTracking = async () => {
     try {
       driverApi.stopLocationTracking();
+      // Explicit driver-off: clear the refresh-survival flag so a later reload
+      // does NOT auto-resume (only startLocationTracking re-sets it).
+      driverApi.clearLiveTrackingActive();
       setIsTracking(false);
       setTrackingStatus("idle");
       toast.success("Location tracking stopped");
@@ -419,11 +503,13 @@ export default function DriverDashboard() {
 
     setLoading(true);
     try {
-      const [profResp, jbsResp, earnsResp, ratsResp, metricsResp, docsResp] =
+      // Earnings fetch removed for now — getEarnings() no longer fires on dashboard
+      // load (it was failing silently and logging a warning). The other calls stay
+      // independent members of this Promise.all, so dropping one does not affect them.
+      const [profResp, jbsResp, ratsResp, metricsResp, docsResp] =
         await Promise.all([
           driverApi.getProfile(),
           driverApi.getAssignedJobs(1, 10, "all"),
-          driverApi.getEarnings(),
           driverApi.getRatings(),
           driverApi.getMetrics(),
           driverApi.getDocuments(),
@@ -440,33 +526,7 @@ export default function DriverDashboard() {
         jbsResp.ordered_bookings || (Array.isArray(jbsResp) ? jbsResp : []);
       setJobs(jobsData); // Set to array of jobs
 
-      // Handle earnings response
-      if (!earnsResp.success) {
-        console.warn("[DriverDashboard] Failed to fetch earnings:", {
-          message: earnsResp.message || "No error message provided",
-          status: earnsResp.status || "No status provided",
-          response: earnsResp,
-        });
-      }
-      const earningsData = earnsResp.success
-        ? earnsResp.data || {
-            today: 0,
-            weekly: 0,
-            monthly: 0,
-            chartData: [],
-            available: 0,
-            pending: 0,
-          }
-        : {
-            today: 0,
-            weekly: 0,
-            monthly: 0,
-            chartData: [],
-            available: 0,
-            pending: 0,
-          };
-      // console.log("[DriverDashboard] Earnings data:", earningsData);
-      setEarnings(earningsData);
+      // Earnings response handling removed — earnings feature disabled for now.
 
       // Handle ratings response
       if (!ratsResp.success) {
@@ -508,11 +568,9 @@ export default function DriverDashboard() {
         setMetrics({
           // totalDeliveries: m.total_deliveries, // Successful jobs (delivered)
           completedToday: m.completed_today,
-          earningsToday: earningsData.today,
-          earningsWeek: earningsData.weekly,
-          earningsMonth: earningsData.monthly,
+          // earnings* / pendingPayouts omitted — earnings feature disabled for now.
+          // PerformanceMetrics does not render these; metrics-state defaults keep them 0.
           averageRating: m.average_rating,
-          pendingPayouts: earningsData.pending,
           activeJobs: m.active_jobs,
           totalJobs: m.total_jobs,
           failedJobs: m.failed_jobs, // Added
@@ -596,6 +654,10 @@ export default function DriverDashboard() {
       return;
     }
     try {
+      // Explicit logout ends tracking for good — stop the watcher AND clear the
+      // refresh-survival flag so the next session doesn't auto-resume.
+      driverApi.stopLocationTracking();
+      driverApi.clearLiveTrackingActive();
       await driverApi.logout();
       toast.success("Logged out successfully");
       navigate("/login");
@@ -625,10 +687,14 @@ export default function DriverDashboard() {
               Live Tracking
             </h3>
             <div className="flex gap-2 w-full sm:w-auto">
+              {/* GPS location sharing — a DIFFERENT control from the "Work Offline"
+                  data-queue toggle in the OfflineStatusBar. Labelled explicitly so a
+                  driver never confuses "am I broadcasting my position" with "am I
+                  queueing actions for a dead zone". min-h-[44px] for tap target. */}
               <button
                 onClick={toggleManualTracking}
                 disabled={toggleLoading}
-                className={`flex-1 sm:flex-none px-4 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                className={`flex-1 sm:flex-none min-h-[44px] px-4 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
                   toggleLoading
                     ? "bg-gray-400 text-white cursor-not-allowed opacity-60"
                     : manualTrackingEnabled
@@ -636,9 +702,11 @@ export default function DriverDashboard() {
                       : "bg-slate-600 text-white hover:bg-slate-700 active:scale-95"
                 }`}
               >
-                <Zap className="w-4 h-4" />
+                <MapPin className="w-4 h-4" />
                 <span>
-                  {manualTrackingEnabled ? "Manual ON" : "Manual OFF"}
+                  {manualTrackingEnabled
+                    ? "Sharing Location"
+                    : "Location Off"}
                 </span>
               </button>
             </div>
@@ -661,10 +729,10 @@ export default function DriverDashboard() {
             </div>
             <div className="p-3 bg-muted rounded-lg">
               <p className="text-xs text-muted-foreground mb-1">
-                Manual Override
+                Location Sharing
               </p>
               <p className="font-semibold text-foreground text-sm">
-                {manualTrackingEnabled ? "ON" : "OFF"}
+                {manualTrackingEnabled ? "On" : "Off"}
               </p>
             </div>
             <div className="p-3 bg-muted rounded-lg">
@@ -868,7 +936,10 @@ export default function DriverDashboard() {
 
           {activeTab === "earnings" && (
             <div className="space-y-5 max-w-none">
-              <EarningsChart earnings={earnings} detailed />
+              {/* EarningsChart removed — earnings feature disabled for now.
+                  Re-add <EarningsChart earnings={earnings} detailed /> plus the
+                  getEarnings() fetch + earnings state to restore. The Recent
+                  Ratings card below is unrelated to earnings and stays. */}
               <div className="bg-card border border-border rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-foreground mb-4">
                   Recent Ratings
