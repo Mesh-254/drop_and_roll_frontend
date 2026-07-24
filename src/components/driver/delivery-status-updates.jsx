@@ -20,6 +20,7 @@ import {
   RefreshCw,
   Camera, // NEW: For QR scan button
   User,
+  Phone, // Used as the call button icon for customer/receiver phone (lines ~809/848)
 } from "lucide-react";
 import { driverApi } from "../../api/driver-api";
 import { QRScannerModal } from "./QRScannerModal"; // NEW: QR Scanner component
