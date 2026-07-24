@@ -20,6 +20,7 @@ import { GoogleLogin } from "@react-oauth/google";
 import toast from "react-hot-toast";
 import { useAuth } from "../../contexts/AuthContext";
 import TurnstileWidget from "./TurnstileWidget";
+import { wasSessionExpired, consumeRedirectPath } from "../../lib/authSession";
 
 export default function LoginForm({ onClose, onSwitchToRegister }) {
   const [email, setEmail] = useState("");
@@ -37,6 +38,10 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
   const navigate = useNavigate();
   const location = useLocation();
   const firstInputRef = useRef(null);
+  // Only true when this form was reached via a session-expiry redirect, so the
+  // "your session expired" notice never shows on a normal/first-time login.
+  // Captured on mount so it survives the consumeRedirectPath() call on submit.
+  const [expiredNotice] = useState(() => wasSessionExpired());
 
   // Pre-fill email if navigated here with state (e.g. from register or error redirect).
   useEffect(() => {
@@ -73,9 +78,15 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
         });
       return;
     }
+    // Redirect-back priority: (1) an expiry-captured route, so the user lands
+    // exactly where they were kicked out — not the default dashboard; (2) a
+    // router-state `from` (page-route deep-link flow); (3) role default.
+    const expiredRedirect = wasSessionExpired() ? consumeRedirectPath() : null;
     const from = location.state?.from?.pathname;
     if (onClose) onClose();
-    navigate(from || getRedirectPath(userRole), { replace: true });
+    navigate(expiredRedirect || from || getRedirectPath(userRole), {
+      replace: true,
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -186,6 +197,18 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
         <h2 className="text-3xl font-bold text-white mb-1">Welcome back</h2>
         <p className="text-gray-300 text-sm">Sign in to your account</p>
       </div>
+
+      {/* Session-expiry notice — distinct, non-alarming, and only shown when the
+          user was redirected here by an expiry (never on a normal login). Kept
+          separate from the red error banner below. */}
+      {expiredNotice && !errors.general && (
+        <div className="bg-amber-500/15 border border-amber-500/40 rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-amber-100 text-sm">
+            Your session expired — please log in again.
+          </p>
+        </div>
+      )}
 
       {/* General error */}
       {errors.general && (
