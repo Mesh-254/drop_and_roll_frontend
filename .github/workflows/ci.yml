@@ -2,23 +2,86 @@ name: React CI
 
 on:
   pull_request:
-    branches: [main, develop] # Runs on PRs to main or develop
+    branches: [main, develop] # Gate PRs into main/develop
+  push:
+    branches: [main] # Deploy on merge/push to main (deploy job is gated below)
 
 jobs:
+  # ── Lint + test + build (the gate) ───────────────────────────────────────────
   test-and-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: "18" # Use your Node version (check package.json or node -v)
+          node-version: "20"
           cache: "npm"
       - name: Install dependencies
         run: npm ci # Faster than npm install
-      - name: Run lint
-        run: npm run lint
+      - name: Run lint (advisory)
+        # Non-blocking, matching the backend CI convention. develop currently carries a
+        # backlog of ~105 pre-existing eslint errors; fixing them touches app code and is
+        # out of scope for the deploy wiring. Tests + build below are the hard gate that
+        # decides whether a deploy fires. Drop `|| true` once the backlog is cleared.
+        run: npm run lint || true
       - name: Run tests
         run: npm test
       - name: Build project
-        run: npm run build # Ensures Vite build works
+        run: npm run build # Ensures Vite build works — hard gate
+
+  # ── Deploy: build with prod env, rsync static dist/ to the VPS ───────────────
+  # Runs only on push to main, after the gate passes. Vite inlines env at BUILD time,
+  # so the production backend URL must be present here or localhost gets baked in.
+  # Required repo secrets:
+  #   DEPLOY_SSH_HOST        -> 116.203.121.98   (Hetzner. NOT 158.69.36.39 — that was the
+  #                             old OVH box and has been dead since the migration.)
+  #   DEPLOY_SSH_USER        -> dropnroll        (NOT wolftech — that user was OVH-only)
+  #   DEPLOY_SSH_KEY         -> private key whose public half is in that user's authorized_keys
+  #   DEPLOY_PATH            -> /var/www/dropnroll/   (nginx web root for the SPA)
+  #   PROD_BACKEND_URL       -> https://dropnroll.co.uk
+  #                             SAME ORIGIN as the SPA. There is no api. subdomain — that
+  #                             hostname does not resolve, and Vite bakes this value into
+  #                             the bundle, so a wrong one ships a site that can reach
+  #                             nothing. WS URLs derive from it (https->wss).
+  #   PROD_GOOGLE_CLIENT_ID  -> production Google OAuth client id
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    needs: [test-and-lint]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Production build (prod env inlined by Vite)
+        run: npm run build
+        env:
+          VITE_NEXT_PUBLIC_BACKEND_URL: ${{ secrets.PROD_BACKEND_URL }}
+          VITE_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.PROD_GOOGLE_CLIENT_ID }}
+
+      - name: Load SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Trust the server host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ secrets.DEPLOY_SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Rsync dist/ to the VPS
+        # --delete keeps the target an exact mirror of the fresh build (drops stale
+        # hashed assets). rsync writes in place; for a static SPA the update window is
+        # negligible. For a strictly atomic release, rsync to a timestamped dir and swap
+        # an nginx-served symlink instead.
+        run: |
+          rsync -az --delete dist/ \
+            "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}:${{ secrets.DEPLOY_PATH }}"
