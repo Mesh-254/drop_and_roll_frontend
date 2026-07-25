@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import driverApi from "../../api/driver-api";
 import { useCallback } from "react";
+import { trackingWsUrl } from "../../utils/wsUrl";
 
 const VEHICLE_ICONS = {
   bike: "🏍️",
@@ -404,13 +405,10 @@ export default function AdminLiveTrackingDashboard() {
         return;
       }
 
-      // Use backend server URL (default to localhost:8000 for Django dev server)
-      // const backendHost =
-      //   import.meta.env.VITE_NEXT_PUBLIC_BACKEND_URL || "localhost:8000";
-      // const protocol = backendHost.includes("https") ? "wss" : "ws";
-      // const wsUrl = `${protocol}://${backendHost}/ws/tracking/`;
-      const wsUrl = "ws://127.0.0.1:8000/ws/tracking/";
-      console.log(`[DriverAPI] Using hardcoded WS URL for testing: ${wsUrl}`);
+      // Derive the tracking WS URL from the backend env (http→ws, https→wss). Never a
+      // hardcoded localhost. See src/utils/wsUrl.js (unit-tested) — replaces the old
+      // `ws://127.0.0.1:8000/ws/tracking/` literal that broke prod.
+      const wsUrl = trackingWsUrl(import.meta.env.VITE_NEXT_PUBLIC_BACKEND_URL);
 
       console.log("[AdminDashboard] Connecting to WebSocket:", wsUrl);
       wsRef.current = new WebSocket(`${wsUrl}?token=${token}`);
