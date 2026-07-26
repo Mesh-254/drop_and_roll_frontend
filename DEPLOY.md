@@ -10,12 +10,12 @@ origin** as the API. There is no Node process in production and no `api.` subdom
   https://dropnroll.co.uk/api/, /ws/  → 127.0.0.1:8000      (daphne, backend repo)
 ```
 
-| Fact | Value |
-|---|---|
-| Host | `116.203.121.98` (Hetzner, `ubuntu-16gb-nbg1`) |
-| Deploy user | `dropnroll` |
-| Web root | `/var/www/dropnroll` |
-| nginx site | `/etc/nginx/sites-available/dropnroll_http.conf` |
+| Fact        | Value                                            |
+| ----------- | ------------------------------------------------ |
+| Host        | `116.203.121.98` (Hetzner, `ubuntu-16gb-nbg1`)   |
+| Deploy user | `dropnroll`                                      |
+| Web root    | `/var/www/dropnroll`                             |
+| nginx site  | `/etc/nginx/sites-available/dropnroll_http.conf` |
 
 nginx serves the SPA with a `try_files $uri /index.html` catch-all, so client-side routes
 resolve on hard refresh. **No nginx reload is needed after a deploy** — the files are read
@@ -59,18 +59,34 @@ prefix.
 
 PRs to `main`/`develop` run the gate only; nothing deploys.
 
-> ⚠️ **The deploy job's secrets currently point at a dead host** (`158.69.36.39`, user
-> `wolftech` — an OVH box from a previous provider). They must be repointed at the Hetzner
-> box before the automated path works. Values below are what they *should* be.
+After the gate, the job builds with the production env inlined, sanity-checks the artifact,
+rsyncs, then verifies the live site actually serves the bundle it references. It is
+`concurrency`-grouped so two pushes cannot rsync into the same web root at once — with
+`--delete`, a half-finished mirror is a broken site.
 
-| Secret | Correct value |
-|---|---|
-| `DEPLOY_SSH_HOST` | `116.203.121.98` |
-| `DEPLOY_SSH_USER` | `dropnroll` |
-| `DEPLOY_SSH_KEY` | private key; public half in `dropnroll`'s `~/.ssh/authorized_keys` |
-| `DEPLOY_PATH` | `/var/www/dropnroll/` |
-| `PROD_BACKEND_URL` | `https://dropnroll.co.uk` ← **not** `api.dropnroll.co.uk` |
-| `PROD_GOOGLE_CLIENT_ID` | production Google OAuth client id |
+> ⚠️ **Every value the app needs must be a secret here.** Vite inlines env at build time, so
+> an omitted one is not "missing config" at runtime — it is baked in as `undefined` and the
+> feature silently does nothing. `PROD_STRIPE_PUBLISHABLE_KEY`, `PROD_GOOGLE_MAPS_API_KEY`
+> and `PROD_TURNSTILE_SITE_KEY` were previously absent from the job, so the build shipped
+> without them.
+
+| Secret                        | Value                                                                                                                                           |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DEPLOY_SSH_HOST`             | `116.203.121.98`                                                                                                                                |
+| `DEPLOY_SSH_USER`             | `dropnroll`                                                                                                                                     |
+| `DEPLOY_SSH_KEY`              | private key; public half in `dropnroll`'s `~/.ssh/authorized_keys`                                                                              |
+| `PROD_BACKEND_URL`            | `https://dropnroll.co.uk` ← **not** `api.dropnroll.co.uk`                                                                                       |
+| `PROD_GOOGLE_CLIENT_ID`       | production Google OAuth client id                                                                                                               |
+| `PROD_STRIPE_PUBLISHABLE_KEY` | `pk_live_…` — **required**; the build rejects `pk_test_` and rejects it being unset                                                             |
+| `PROD_GOOGLE_MAPS_API_KEY`    | browser key, referrer-restricted in the Google Cloud console                                                                                    |
+| `PROD_TURNSTILE_SITE_KEY`     | real site key. Leave **unset** to keep the widget hidden until `TURNSTILE_SECRET_KEY` is set on the backend — the widget alone verifies nothing |
+
+`DEPLOY_PATH` is a workflow constant (`/var/www/dropnroll/`), not a secret: it is not
+sensitive, and `secrets` values are masked in the log, which hurts when an rsync path is
+wrong.
+
+These are all public values that ship in the bundle. They live in secrets so they can be
+rotated without a commit, not because they are confidential.
 
 `rsync --delete` mirrors `dist/` exactly, dropping stale hashed assets. For a static SPA the
 in-place update window is negligible; for strictly atomic releases, rsync to a timestamped
@@ -86,8 +102,15 @@ local `.env` — otherwise you ship a build pointed at `127.0.0.1`.
 ```bash
 export VITE_NEXT_PUBLIC_BACKEND_URL=https://dropnroll.co.uk
 export VITE_PUBLIC_GOOGLE_CLIENT_ID=<prod client id>
+export VITE_STRIPE_PUBLISHABLE_KEY=pk_live_<...>
+export VITE_GOOGLE_MAPS_API_KEY=<browser key>
+export VITE_TURNSTILE_SITE_KEY=<real site key>   # omit to keep the widget hidden
 ./deploy.sh
 ```
+
+The build refuses to run if any of these is missing or still carries a development value,
+so a hand-deploy cannot quietly ship a localhost bundle. Easier still: keep them in
+`.env.production` (gitignored) and just run `./deploy.sh`.
 
 ## Verify after deploy
 
