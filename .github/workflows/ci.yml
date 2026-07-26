@@ -27,28 +27,61 @@ jobs:
         run: npm run lint || true
       - name: Run tests
         run: npm test
-      - name: Build project
-        run: npm run build # Ensures Vite build works — hard gate
 
-  # ── Deploy: build with prod env, rsync static dist/ to the VPS ───────────────
-  # Runs only on push to main, after the gate passes. Vite inlines env at BUILD time,
-  # so the production backend URL must be present here or localhost gets baked in.
-  # Required repo secrets:
-  #   DEPLOY_SSH_HOST        -> 116.203.121.98   (Hetzner. NOT 158.69.36.39 — that was the
-  #                             old OVH box and has been dead since the migration.)
-  #   DEPLOY_SSH_USER        -> dropnroll        (NOT wolftech — that user was OVH-only)
-  #   DEPLOY_SSH_KEY         -> private key whose public half is in that user's authorized_keys
-  #   DEPLOY_PATH            -> /var/www/dropnroll/   (nginx web root for the SPA)
-  #   PROD_BACKEND_URL       -> https://dropnroll.co.uk
-  #                             SAME ORIGIN as the SPA. There is no api. subdomain — that
-  #                             hostname does not resolve, and Vite bakes this value into
-  #                             the bundle, so a wrong one ships a site that can reach
-  #                             nothing. WS URLs derive from it (https->wss).
-  #   PROD_GOOGLE_CLIENT_ID  -> production Google OAuth client id
+      # Compile check, not a release build. `npm run build` runs in mode "production", and
+      # vite.config.js refuses a production build carrying development configuration — with
+      # no .env in a CI checkout that guard would fail this step on every PR. Feeding it
+      # production-SHAPED placeholders keeps the guard meaningful (it still enforces an
+      # https non-local origin and non-test keys) while verifying the real production build
+      # path compiles. The artifact is discarded; only deploy-frontend builds for release.
+      - name: Build project (hard gate)
+        run: npm run build
+        env:
+          VITE_NEXT_PUBLIC_BACKEND_URL: https://ci-placeholder.invalid
+          VITE_PUBLIC_GOOGLE_CLIENT_ID: ci-placeholder.apps.googleusercontent.com
+          VITE_STRIPE_PUBLISHABLE_KEY: pk_live_ci_placeholder
+          VITE_TURNSTILE_SITE_KEY: 0x4AAAAAAAci_placeholder
+          VITE_GOOGLE_MAPS_API_KEY: ci-placeholder-maps-key
+
+  # ── Deploy: build with prod env, rsync static dist/ to the box ────────────────
+  # Runs only on push to main, after the gate passes.
+  #
+  # Vite INLINES env at BUILD time, so every value the app needs must be present HERE.
+  # Anything omitted is not "missing config" at runtime — it is baked in as undefined and
+  # the feature silently does nothing.
+  #
+  # Required repo secrets (Settings > Secrets and variables > Actions):
+  #   DEPLOY_SSH_HOST            -> 116.203.121.98
+  #   DEPLOY_SSH_USER            -> dropnroll
+  #   DEPLOY_SSH_KEY             -> PRIVATE key whose public half is in that user's
+  #                                 ~/.ssh/authorized_keys (whole PEM, BEGIN/END included)
+  #   PROD_BACKEND_URL           -> https://dropnroll.co.uk
+  #                                 SAME ORIGIN as the SPA. There is no api. subdomain —
+  #                                 that hostname does not resolve. WS URLs derive from
+  #                                 this (https->wss).
+  #   PROD_GOOGLE_CLIENT_ID      -> production Google OAuth client id
+  #   PROD_STRIPE_PUBLISHABLE_KEY-> pk_live_... (NOT pk_test_ — the build will reject it)
+  #   PROD_GOOGLE_MAPS_API_KEY   -> browser key, referrer-restricted in Google Cloud
+  #   PROD_TURNSTILE_SITE_KEY    -> real site key (the build rejects Cloudflare's
+  #                                 always-passes test key). Leave UNSET to keep the widget
+  #                                 hidden until TURNSTILE_SECRET_KEY is set on the backend
+  #                                 — the widget alone verifies nothing without it.
+  #
+  # These are all public values that ship in the bundle; they live in secrets so they can
+  # be rotated without a commit, not because they are confidential.
   deploy-frontend:
     runs-on: ubuntu-latest
     needs: [test-and-lint]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Serialize releases: two pushes landing together would otherwise rsync into the same
+    # web root at once, and --delete makes a half-finished mirror a broken site.
+    concurrency:
+      group: deploy-frontend-production
+      cancel-in-progress: false
+    env:
+      # Not a secret (it is in DEPLOY.md), and keeping it out of `secrets` means it is not
+      # masked in the logs, which matters when an rsync path is wrong.
+      DEPLOY_PATH: /var/www/dropnroll/
     steps:
       - uses: actions/checkout@v4
 
@@ -66,6 +99,18 @@ jobs:
         env:
           VITE_NEXT_PUBLIC_BACKEND_URL: ${{ secrets.PROD_BACKEND_URL }}
           VITE_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.PROD_GOOGLE_CLIENT_ID }}
+          VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.PROD_STRIPE_PUBLISHABLE_KEY }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.PROD_GOOGLE_MAPS_API_KEY }}
+          VITE_TURNSTILE_SITE_KEY: ${{ secrets.PROD_TURNSTILE_SITE_KEY }}
+
+      # Cheap insurance against shipping an empty or partial build: rsync --delete would
+      # mirror it and take the live site down.
+      - name: Sanity-check the artifact
+        run: |
+          set -euo pipefail
+          test -s dist/index.html || { echo "!! dist/index.html missing or empty"; exit 1; }
+          ls dist/assets/*.js >/dev/null 2>&1 || { echo "!! no JS emitted"; exit 1; }
+          echo "artifact OK ($(du -sh dist | cut -f1))"
 
       - name: Load SSH key
         uses: webfactory/ssh-agent@v0.9.0
@@ -73,15 +118,29 @@ jobs:
           ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
 
       - name: Trust the server host key
+        # Trust-on-first-use each run. Acceptable here because the very next step would
+        # fail on a key mismatch anyway; pin a known_hosts secret if you want stricter.
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H "${{ secrets.DEPLOY_SSH_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Rsync dist/ to the VPS
-        # --delete keeps the target an exact mirror of the fresh build (drops stale
-        # hashed assets). rsync writes in place; for a static SPA the update window is
-        # negligible. For a strictly atomic release, rsync to a timestamped dir and swap
-        # an nginx-served symlink instead.
+      - name: Rsync dist/ to the box
+        # --delete keeps the target an exact mirror of the fresh build (drops stale hashed
+        # assets). rsync writes in place; for a static SPA the update window is negligible.
+        # For a strictly atomic release, rsync to a timestamped dir and swap an
+        # nginx-served symlink instead. nginx needs no reload — it reads from disk.
         run: |
           rsync -az --delete dist/ \
-            "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}:${{ secrets.DEPLOY_PATH }}"
+            "${{ secrets.DEPLOY_SSH_USER }}@${{ secrets.DEPLOY_SSH_HOST }}:${DEPLOY_PATH}"
+
+      - name: Verify the deployed site
+        # Confirms the SPA is being served AND that the bundle it references actually
+        # exists — a truncated rsync leaves index.html pointing at absent assets, which
+        # renders a blank page with a 404 in the console and nothing in any server log.
+        run: |
+          set -euo pipefail
+          html=$(curl -fsS --max-time 15 https://dropnroll.co.uk/)
+          asset=$(echo "$html" | grep -oE '/assets/[A-Za-z0-9._-]+\.js' | head -1)
+          test -n "$asset" || { echo "!! no JS asset referenced in index.html"; exit 1; }
+          curl -fsS --max-time 20 -o /dev/null "https://dropnroll.co.uk${asset}"
+          echo "deployed site OK (serving ${asset})"
