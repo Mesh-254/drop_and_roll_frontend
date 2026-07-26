@@ -63,10 +63,15 @@ export function collectProductionEnvProblems(env) {
     );
   }
 
-  if (
-    env.VITE_STRIPE_PUBLISHABLE_KEY &&
-    env.VITE_STRIPE_PUBLISHABLE_KEY.startsWith("pk_test_")
-  ) {
+  // Required, not merely non-test: PaymentPage and InvoiceDetailPage both call
+  // loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) at module scope. Unset means
+  // loadStripe(undefined), which fails and takes both payment routes with it — a deploy
+  // that looks green while nobody can pay.
+  if (!env.VITE_STRIPE_PUBLISHABLE_KEY) {
+    problems.push(
+      "VITE_STRIPE_PUBLISHABLE_KEY is not set — loadStripe(undefined) breaks the payment and invoice pages.",
+    );
+  } else if (env.VITE_STRIPE_PUBLISHABLE_KEY.startsWith("pk_test_")) {
     problems.push(
       "VITE_STRIPE_PUBLISHABLE_KEY is a pk_test_ key — production needs the pk_live_ key.",
     );

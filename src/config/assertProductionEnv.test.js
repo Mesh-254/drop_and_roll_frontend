@@ -87,6 +87,14 @@ describe("production env guard", () => {
     test("allows an unset Turnstile key (widget hidden, not silently bypassed)", () => {
       expect(problemsFor({ VITE_TURNSTILE_SITE_KEY: "" })).toEqual([]);
     });
+
+    test("rejects an unset Stripe key", () => {
+      // Both payment routes call loadStripe(...) at module scope, so unset is not
+      // "payments disabled", it is "the payment pages throw".
+      expect(problemsFor({ VITE_STRIPE_PUBLISHABLE_KEY: "" }).join()).toMatch(
+        /not set/,
+      );
+    });
   });
 
   describe("server-side secrets given a VITE_ prefix", () => {
