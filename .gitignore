@@ -22,7 +22,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment config. Vite loads .env, .env.local, .env.[mode] and .env.[mode].local, so
+# `.env.*` is needed — only the exact name `.env` was ignored before, leaving
+# .env.production (the file most likely to hold real production values) committable.
+# The negation keeps the placeholders-only template tracked.
 .env
+.env.*
+!.env.example
+
 package-lock.json
 yarn.lock
 package.json
