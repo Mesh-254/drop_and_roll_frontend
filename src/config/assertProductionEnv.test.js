@@ -120,6 +120,65 @@ describe("production env guard", () => {
     });
   });
 
+  describe("Google Maps browser key", () => {
+    test("rejects a missing key", () => {
+      // GetQuoteBook.jsx passes it to <APIProvider apiKey={...}> and the admin dashboard
+      // builds the Maps script URL from it. Empty takes out the address step of the
+      // booking flow, which is the revenue path.
+      expect(problemsFor({ VITE_GOOGLE_MAPS_API_KEY: "" }).join()).toMatch(
+        /VITE_GOOGLE_MAPS_API_KEY is not set/,
+      );
+    });
+
+    test("accepts a real browser key", () => {
+      expect(
+        problemsFor({
+          VITE_GOOGLE_MAPS_API_KEY: "AIzaSyAnotherPlausibleBrowserKey00000000",
+        }),
+      ).toEqual([]);
+    });
+  });
+
+  describe(".env.example placeholders", () => {
+    // The whole file is placeholders. Copying it to .env.production is the obvious way to
+    // "set" production values, and every presence check then passes on strings that are
+    // not credentials.
+    test.each([
+      ["VITE_GOOGLE_MAPS_API_KEY", "your-google-maps-browser-key"],
+      [
+        "VITE_PUBLIC_GOOGLE_CLIENT_ID",
+        "your-google-oauth-client-id.apps.googleusercontent.com",
+      ],
+      ["VITE_STRIPE_PUBLISHABLE_KEY", "pk_live_your-stripe-publishable-key"],
+    ])("rejects %s left as %s", (name, value) => {
+      expect(problemsFor({ [name]: value }).join()).toMatch(/placeholder/);
+    });
+
+    test("names the offending variable, not just 'a placeholder'", () => {
+      expect(
+        problemsFor({
+          VITE_GOOGLE_MAPS_API_KEY: "your-google-maps-browser-key",
+        }).join(),
+      ).toMatch(/VITE_GOOGLE_MAPS_API_KEY/);
+    });
+
+    test("ignores a placeholder in an unprefixed variable", () => {
+      // loadEnv returns the whole environment; only VITE_ names reach the bundle.
+      expect(problemsFor({ SOME_BACKEND_THING: "your-placeholder" })).toEqual(
+        [],
+      );
+    });
+
+    test("does not flag a legitimate value containing the word", () => {
+      // The pattern is `your-`, hyphenated, not the bare word.
+      expect(
+        problemsFor({
+          VITE_NEXT_PUBLIC_BACKEND_URL: "https://youryard.dropnroll.co.uk",
+        }),
+      ).toEqual([]);
+    });
+  });
+
   test("reports every problem at once, not just the first", () => {
     const problems = problemsFor({
       VITE_NEXT_PUBLIC_BACKEND_URL: "http://127.0.0.1:8000",

@@ -24,6 +24,18 @@ const LOCAL_ADDRESS_RE = /localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]/;
 const SERVER_SECRET_RE = /^VITE_.*(SECRET|PASSWORD|PRIVATE|IDEAL_POSTCODES)/i;
 
 /**
+ * The shape every placeholder in .env.example takes ("your-google-maps-browser-key").
+ * Copying that file to .env.production and building from it produces a bundle that passes
+ * every presence check and works for nothing — the placeholder is a non-empty string, so
+ * only its content gives it away.
+ *
+ * `\b` is wrong here: the placeholders appear as `pk_test_your-stripe-publishable-key`,
+ * and `_` is a word character, so there is no boundary before `your`. Match on anything
+ * that is not alphanumeric instead.
+ */
+const PLACEHOLDER_RE = /(^|[^a-z0-9])your-/i;
+
+/**
  * @param {Record<string, string>} env - full env map (loadEnv(mode, cwd, "")).
  * @returns {string[]} human-readable problems; empty means the build may proceed.
  */
@@ -54,6 +66,17 @@ export function collectProductionEnvProblems(env) {
     );
   }
 
+  // Passed straight into <APIProvider apiKey={...}> in GetQuoteBook.jsx and into the Maps
+  // script URL on the admin live-tracking dashboard. Unset means the quote-and-book flow
+  // — the revenue path — renders Google's "this page can't load Google Maps correctly"
+  // overlay instead of the address step, on a build that deploys perfectly.
+  if (!env.VITE_GOOGLE_MAPS_API_KEY) {
+    problems.push(
+      "VITE_GOOGLE_MAPS_API_KEY is not set — the quote/booking address step and the admin " +
+        "live-tracking map both fail to load.",
+    );
+  }
+
   if (
     env.VITE_TURNSTILE_SITE_KEY &&
     env.VITE_TURNSTILE_SITE_KEY.startsWith(TURNSTILE_TEST_KEY_PREFIX)
@@ -77,10 +100,16 @@ export function collectProductionEnvProblems(env) {
     );
   }
 
-  for (const name of Object.keys(env)) {
+  for (const [name, value] of Object.entries(env)) {
     if (SERVER_SECRET_RE.test(name)) {
       problems.push(
         `${name} looks like a server-side secret; anything VITE_-prefixed is inlined into the public bundle.`,
+      );
+    }
+    if (name.startsWith("VITE_") && PLACEHOLDER_RE.test(String(value ?? ""))) {
+      problems.push(
+        `${name} is still the .env.example placeholder ("${value}") — it is a real string, ` +
+          "so every presence check passes and nothing works.",
       );
     }
   }
