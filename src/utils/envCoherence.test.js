@@ -25,29 +25,60 @@ const EXAMPLE_PATH = path.join(REPO_ROOT, ".env.example");
 const ENV_PATH = path.join(REPO_ROOT, ".env");
 
 /** Names Vite provides itself — never declared in a .env file. */
-const VITE_BUILTINS = new Set(["MODE", "BASE_URL", "PROD", "DEV", "SSR", "NODE_ENV"]);
+const VITE_BUILTINS = new Set([
+  "MODE",
+  "BASE_URL",
+  "PROD",
+  "DEV",
+  "SSR",
+  "NODE_ENV",
+]);
 
 function walk(dir, acc = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === "node_modules" || entry.name === "__tests__" || entry.name.startsWith(".")) continue;
+    if (
+      entry.name === "node_modules" ||
+      entry.name === "__tests__" ||
+      entry.name.startsWith(".")
+    )
+      continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) walk(full, acc);
     // Skip test files: they are not shipped, and this very file mentions
     // `import.meta.env.VITE_*` in its prose, which the scanner would otherwise read as a
     // variable named "VITE_".
-    else if (/\.(js|jsx|mjs|ts|tsx)$/.test(entry.name) && !/\.test\.(js|jsx|mjs|ts|tsx)$/.test(entry.name)) {
+    else if (
+      /\.(js|jsx|mjs|ts|tsx)$/.test(entry.name) &&
+      !/\.test\.(js|jsx|mjs|ts|tsx)$/.test(entry.name)
+    ) {
       acc.push(full);
     }
   }
   return acc;
 }
 
-/** Every `import.meta.env.X` read in src/, excluding Vite's own builtins. */
+/**
+ * Strip comments so prose about env vars is not mistaken for a read.
+ *
+ * Several modules legitimately document `import.meta.env.VITE_*` in a JSDoc block; matching
+ * that yields a phantom variable literally named "VITE_". Stripping comments is the general
+ * fix — narrower filename exclusions only postpone the problem to the next file that
+ * explains itself well.
+ */
+function stripComments(text) {
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+}
+
+/** Every `import.meta.env.X` actually read in src/, excluding Vite's own builtins. */
 function referencedVars() {
   const found = new Set();
   for (const file of walk(SRC_DIR)) {
-    const text = fs.readFileSync(file, "utf8");
-    for (const m of text.matchAll(/import\.meta\.env\.([A-Za-z_][A-Za-z0-9_]*)/g)) {
+    const text = stripComments(fs.readFileSync(file, "utf8"));
+    for (const m of text.matchAll(
+      /import\.meta\.env\.([A-Za-z_][A-Za-z0-9_]*)/g,
+    )) {
       if (!VITE_BUILTINS.has(m[1])) found.add(m[1]);
     }
   }
@@ -98,13 +129,17 @@ describe("frontend env coherence", () => {
 
   test("every VITE_ var read by src/ is documented in .env.example", () => {
     const { documented } = parseEnv(EXAMPLE_PATH);
-    const missing = [...referencedVars()].filter((name) => !documented.has(name)).sort();
+    const missing = [...referencedVars()]
+      .filter((name) => !documented.has(name))
+      .sort();
     expect(missing).toEqual([]);
   });
 
   test("only VITE_-prefixed vars are read from import.meta.env", () => {
     // Vite silently drops non-VITE_ names, so reading one always yields undefined.
-    const bad = [...referencedVars()].filter((name) => !name.startsWith("VITE_")).sort();
+    const bad = [...referencedVars()]
+      .filter((name) => !name.startsWith("VITE_"))
+      .sort();
     expect(bad).toEqual([]);
   });
 
@@ -135,7 +170,9 @@ describe("frontend env coherence", () => {
     ];
     const { documented: exampleDocs } = parseEnv(EXAMPLE_PATH);
     const { documented: envDocs } = parseEnv(ENV_PATH);
-    const present = forbidden.filter((n) => exampleDocs.has(n) || envDocs.has(n));
+    const present = forbidden.filter(
+      (n) => exampleDocs.has(n) || envDocs.has(n),
+    );
     expect(present).toEqual([]);
   });
 
@@ -153,7 +190,10 @@ describe("frontend env coherence", () => {
 
   maybe("local .env has no blank values for required vars", () => {
     const { set } = parseEnv(ENV_PATH);
-    const blank = [...set.entries()].filter(([, v]) => v === "").map(([k]) => k).sort();
+    const blank = [...set.entries()]
+      .filter(([, v]) => v === "")
+      .map(([k]) => k)
+      .sort();
     expect(blank).toEqual([]);
   });
 });
