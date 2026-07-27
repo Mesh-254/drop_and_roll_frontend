@@ -34,6 +34,24 @@ const VITE_BUILTINS = new Set([
   "NODE_ENV",
 ]);
 
+/**
+ * Feature flags whose empty value is a real setting, not a var someone forgot to fill.
+ *
+ * The blank check below exists to catch `VITE_GOOGLE_MAPS_API_KEY=` — a name that is
+ * present, so the missing-vars check passes, while the feature it configures is dead. But
+ * a few vars branch on truthiness by design, and "" is how you turn them off. Listing a
+ * name here is a claim about the code, so each entry names the branch that makes it true.
+ *
+ * Keep this set small. If a name is here and the code does NOT tolerate an empty value,
+ * the blank check silently stops protecting it.
+ */
+const BLANK_MEANS_OFF = new Set([
+  // TurnstileWidget.jsx:19 — `TURNSTILE_ENABLED = Boolean(SITE_KEY)`, and the component
+  // renders null without one, so the bot check is simply off. assertProductionEnv.js:81
+  // agrees: it only objects to Cloudflare's always-passes TEST key, never to absence.
+  "VITE_TURNSTILE_SITE_KEY",
+]);
+
 function walk(dir, acc = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (
@@ -191,7 +209,7 @@ describe("frontend env coherence", () => {
   maybe("local .env has no blank values for required vars", () => {
     const { set } = parseEnv(ENV_PATH);
     const blank = [...set.entries()]
-      .filter(([, v]) => v === "")
+      .filter(([name, v]) => v === "" && !BLANK_MEANS_OFF.has(name))
       .map(([k]) => k)
       .sort();
     expect(blank).toEqual([]);

@@ -96,21 +96,43 @@ directory and swap an nginx-served symlink.
 
 `deploy.sh` is an emergency hand-deploy from a workstation. It builds the **current branch**
 (it no longer does `git checkout main`, which used to silently discard your work) and rsyncs
-`dist/` to the web root. Export the `VITE_*` production values first, or keep them in a
-local `.env` — otherwise you ship a build pointed at `127.0.0.1`.
+`dist/` to the web root.
+
+Put the production values in `.env.production` (gitignored) and run it:
 
 ```bash
-export VITE_NEXT_PUBLIC_BACKEND_URL=https://dropnroll.co.uk
-export VITE_PUBLIC_GOOGLE_CLIENT_ID=<prod client id>
-export VITE_STRIPE_PUBLISHABLE_KEY=pk_live_<...>
-export VITE_GOOGLE_MAPS_API_KEY=<browser key>
-export VITE_TURNSTILE_SITE_KEY=<real site key>   # omit to keep the widget hidden
+# .env.production — layered on top of .env for mode=production
+VITE_NEXT_PUBLIC_BACKEND_URL=https://dropnroll.co.uk
+VITE_PUBLIC_GOOGLE_CLIENT_ID=<prod client id>
+VITE_STRIPE_PUBLISHABLE_KEY=pk_live_<...>
+VITE_GOOGLE_MAPS_API_KEY=<browser key>
+VITE_TURNSTILE_SITE_KEY=<real site key>   # omit to keep the widget hidden
+```
+
+```bash
 ./deploy.sh
 ```
 
-The build refuses to run if any of these is missing or still carries a development value,
-so a hand-deploy cannot quietly ship a localhost bundle. Easier still: keep them in
-`.env.production` (gitignored) and just run `./deploy.sh`.
+Keeping them in a file rather than exporting them is the point: `.env.production` is what
+the *build* reads, so what you check is what you ship. Your everyday `.env` is still loaded
+underneath, so `.env.production` only needs the values that differ from local dev — in
+practice the `pk_live_` Stripe key and the real Turnstile site key.
+
+`scripts/resolve-build-env.mjs` validates that resolved set before the build starts, using
+the same `loadEnv()` and the same guard as `vite.config.js`. If a value is missing or still
+a development one (`localhost`, `pk_test_`, a Turnstile test key, an `.env.example`
+placeholder), the deploy stops before it touches the live site. To override a single value
+for one run without editing a file — shell env wins over both files:
+
+```bash
+VITE_STRIPE_PUBLISHABLE_KEY=pk_live_<...> ./deploy.sh
+```
+
+To see exactly what the build would resolve, without building or deploying:
+
+```bash
+node scripts/resolve-build-env.mjs production
+```
 
 ## Verify after deploy
 

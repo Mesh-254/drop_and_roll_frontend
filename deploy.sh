@@ -15,14 +15,21 @@ DEPLOY_USER="${DEPLOY_USER:-dropnroll}"
 DEPLOY_HOST="${DEPLOY_HOST:-116.203.121.98}"
 DEPLOY_PATH="${DEPLOY_PATH:-/var/www/dropnroll/}"
 
-# Vite INLINES these at build time; they are not read at runtime. Missing values do not
-# error, they silently bake `undefined` (or a localhost default) into the bundle and the
-# site ships pointing at nothing. So refuse to build rather than produce a broken artifact.
-: "${VITE_NEXT_PUBLIC_BACKEND_URL:?set it, e.g. https://dropnroll.co.uk (same origin as the SPA, NOT api.dropnroll.co.uk)}"
-: "${VITE_PUBLIC_GOOGLE_CLIENT_ID:?set it to the production Google OAuth client id}"
+# Vite INLINES VITE_* at build time; they are not read at runtime. A missing or
+# development value does not error, it silently bakes `undefined` (or localhost, or a
+# pk_test_ key) into the bundle and the site ships pointing at nothing.
+#
+# This is deliberately NOT a bash `${VAR:?}` check any more. Those read the shell
+# environment, but the values live in .env / .env.production, which are Vite files that
+# bash never opens — so the old guard aborted on a correctly configured checkout and would
+# have passed on a shell that merely had the name exported. scripts/resolve-build-env.mjs
+# asks Vite instead: same loadEnv(), same file precedence, same guard vite.config.js runs.
+# A failure here is the failure `npm run build` would hit, seconds earlier and before the
+# rsync. Shell overrides still work — loadEnv layers process.env on top of the files.
+BACKEND_URL="$(node scripts/resolve-build-env.mjs production)"
 
 echo "Building from branch: $(git branch --show-current)"
-echo "  backend URL: ${VITE_NEXT_PUBLIC_BACKEND_URL}"
+echo "  backend URL: ${BACKEND_URL}"
 npm run build
 
 # Guard against shipping an empty or failed build over the live site: --delete would
