@@ -128,6 +128,32 @@ for one run without editing a file — shell env wins over both files:
 VITE_STRIPE_PUBLISHABLE_KEY=pk_live_<...> ./deploy.sh
 ```
 
+### Demo deploy before the live Stripe account exists
+
+To put the site in front of a client while Stripe is still in test mode:
+
+```bash
+ALLOW_TEST_STRIPE_KEY=1 ./deploy.sh
+```
+
+That is the only check with an escape hatch, and it is narrow on purpose:
+
+- It must be typed on the command line. Putting `ALLOW_TEST_STRIPE_KEY=1` in `.env` or
+  `.env.production` does nothing — the flag is read from `process.env`, never from the
+  loaded env map, so it cannot become a permanent silent downgrade.
+- The value must be exactly `1`. `true`, `yes` and `0` are all ignored.
+- It relaxes the `pk_test_` check and nothing else. A localhost origin, a missing Maps key,
+  a `VITE_`-prefixed secret and an `.env.example` placeholder all still stop the deploy.
+- An *absent* Stripe key is still fatal. `loadStripe(undefined)` throws at module scope and
+  takes the payment and invoice pages with it, which no demo wants either.
+- A banner prints at the start of the build and again after the rsync, so the state of the
+  live site is the last thing on screen.
+
+**What a test-mode key actually means on a public site:** Stripe test mode rejects real
+cards. Anyone who is not your client hits a payment step that cannot complete, and no
+booking takes money. Treat a demo deploy as a window, not a state to leave the site in.
+Redeploy with `pk_live_` in `.env.production` before it takes real traffic.
+
 To see exactly what the build would resolve, without building or deploying:
 
 ```bash

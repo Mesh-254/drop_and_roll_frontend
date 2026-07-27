@@ -36,10 +36,40 @@ const SERVER_SECRET_RE = /^VITE_.*(SECRET|PASSWORD|PRIVATE|IDEAL_POSTCODES)/i;
 const PLACEHOLDER_RE = /(^|[^a-z0-9])your-/i;
 
 /**
+ * The one deliberate escape hatch: a client demo needs the site up before the live Stripe
+ * account exists. Set ALLOW_TEST_STRIPE_KEY=1 and a pk_test_ key stops being fatal.
+ *
+ * Three properties make this safe to have at all, and all three are load-bearing:
+ *
+ *   1. It is read from process.env by the CALLER, never from the loadEnv map. Put it in
+ *      .env.production and it does nothing — see vite.config.js. An escape hatch that can
+ *      live in a file is not an escape hatch, it is a permanent silent downgrade that
+ *      outlives the demo it was added for.
+ *   2. It must be exactly "1". Not "true", not "yes", not any truthy string. Someone has
+ *      to mean it.
+ *   3. It relaxes THIS check and nothing else. A localhost origin, a missing Maps key, a
+ *      leaked secret and an .env.example placeholder all stay fatal with the flag set.
+ *
+ * A test-mode key on a public site is not cosmetic: Stripe test mode rejects real cards,
+ * so anyone who is not the client gets a payment step that cannot succeed.
+ */
+export const TEST_STRIPE_OVERRIDE_VAR = "ALLOW_TEST_STRIPE_KEY";
+
+/** The banner assertProductionEnv prints when the hatch is used. */
+export const TEST_STRIPE_OVERRIDE_WARNING =
+  `\n!! ${TEST_STRIPE_OVERRIDE_VAR}=1 — building with a pk_test_ Stripe key.\n` +
+  "!! Test mode REJECTS real cards: every visitor who is not demoing hits a payment\n" +
+  "!! step that cannot complete. Bookings will not take money.\n" +
+  "!! Demo builds only. Rebuild with the pk_live_ key before the site takes traffic.\n";
+
+/**
  * @param {Record<string, string>} env - full env map (loadEnv(mode, cwd, "")).
+ * @param {{allowTestStripeKey?: boolean}} [options] - see TEST_STRIPE_OVERRIDE_VAR. Passed
+ *   in by the caller from process.env, deliberately not read off `env`.
  * @returns {string[]} human-readable problems; empty means the build may proceed.
  */
-export function collectProductionEnvProblems(env) {
+export function collectProductionEnvProblems(env, options = {}) {
+  const { allowTestStripeKey = false } = options;
   const problems = [];
   const backendUrl = env.VITE_NEXT_PUBLIC_BACKEND_URL;
 
@@ -94,9 +124,13 @@ export function collectProductionEnvProblems(env) {
     problems.push(
       "VITE_STRIPE_PUBLISHABLE_KEY is not set — loadStripe(undefined) breaks the payment and invoice pages.",
     );
-  } else if (env.VITE_STRIPE_PUBLISHABLE_KEY.startsWith("pk_test_")) {
+  } else if (
+    env.VITE_STRIPE_PUBLISHABLE_KEY.startsWith("pk_test_") &&
+    !allowTestStripeKey
+  ) {
     problems.push(
-      "VITE_STRIPE_PUBLISHABLE_KEY is a pk_test_ key — production needs the pk_live_ key.",
+      "VITE_STRIPE_PUBLISHABLE_KEY is a pk_test_ key — production needs the pk_live_ key.\n" +
+        `    For a client demo before the live account exists: ${TEST_STRIPE_OVERRIDE_VAR}=1 ./deploy.sh`,
     );
   }
 
@@ -117,9 +151,25 @@ export function collectProductionEnvProblems(env) {
   return problems;
 }
 
-/** Throws with an actionable message if the production env is unfit to build from. */
-export function assertProductionEnv(env) {
-  const problems = collectProductionEnvProblems(env);
+/**
+ * Throws with an actionable message if the production env is unfit to build from.
+ *
+ * @param {Record<string, string>} env
+ * @param {{allowTestStripeKey?: boolean}} [options]
+ */
+export function assertProductionEnv(env, options = {}) {
+  const problems = collectProductionEnvProblems(env, options);
+
+  // Printed whether or not other problems exist, and before the throw: if the build is
+  // about to fail for an unrelated reason, the operator should still see that the hatch
+  // is open, not discover it on the next run.
+  if (
+    options.allowTestStripeKey &&
+    String(env.VITE_STRIPE_PUBLISHABLE_KEY ?? "").startsWith("pk_test_")
+  ) {
+    console.warn(TEST_STRIPE_OVERRIDE_WARNING);
+  }
+
   if (!problems.length) return;
 
   throw new Error(

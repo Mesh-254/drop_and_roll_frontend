@@ -12,7 +12,12 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
 
   if (mode === "production") {
-    assertProductionEnv(env);
+    assertProductionEnv(env, {
+      // Read from process.env, NOT from `env`. loadEnv would happily pick this name up out
+      // of .env.production, and a hatch that can be written to a file is a permanent
+      // downgrade nobody remembers enabling. It has to be typed on the command line.
+      allowTestStripeKey: process.env.ALLOW_TEST_STRIPE_KEY === "1",
+    });
   }
 
   return {

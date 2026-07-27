@@ -12,6 +12,8 @@ import {
   collectProductionEnvProblems,
   assertProductionEnv,
   TURNSTILE_TEST_KEY_PREFIX,
+  TEST_STRIPE_OVERRIDE_VAR,
+  TEST_STRIPE_OVERRIDE_WARNING,
 } from "./assertProductionEnv";
 
 /** A fully valid production environment; individual tests break one field at a time. */
@@ -195,5 +197,127 @@ describe("production env guard", () => {
         VITE_NEXT_PUBLIC_BACKEND_URL: "http://127.0.0.1:8000",
       }),
     ).toThrow(/\.env\.production/);
+  });
+
+  describe("ALLOW_TEST_STRIPE_KEY demo hatch", () => {
+    // Added so a client walkthrough can go live before the Stripe live account exists.
+    // Every test here is about keeping the hatch narrow: the moment it excuses a second
+    // condition, or survives past the command line, it stops being a hatch and becomes
+    // the guard's new (much weaker) default.
+    const TEST_KEY = { VITE_STRIPE_PUBLISHABLE_KEY: "pk_test_abc" };
+    const allow = { allowTestStripeKey: true };
+
+    test("still fatal by default — nobody gets it by accident", () => {
+      expect(problemsFor(TEST_KEY).join()).toMatch(/pk_live_/);
+    });
+
+    test("lets a pk_test_ key through when opened", () => {
+      expect(collectProductionEnvProblems({ ...VALID, ...TEST_KEY }, allow)).toEqual(
+        [],
+      );
+    });
+
+    test("the blocking message tells you the hatch exists", () => {
+      // Otherwise the next person hits the wall and either invents a workaround or edits
+      // the guard, which is how guards die.
+      expect(problemsFor(TEST_KEY).join()).toContain(TEST_STRIPE_OVERRIDE_VAR);
+    });
+
+    test.each([
+      [
+        "a localhost origin",
+        { VITE_NEXT_PUBLIC_BACKEND_URL: "http://127.0.0.1:8000" },
+        /local address/,
+      ],
+      [
+        "a missing Maps key",
+        { VITE_GOOGLE_MAPS_API_KEY: "" },
+        /VITE_GOOGLE_MAPS_API_KEY is not set/,
+      ],
+      [
+        "a missing Stripe key",
+        { VITE_STRIPE_PUBLISHABLE_KEY: "" },
+        /not set/,
+      ],
+      [
+        "the Turnstile test key",
+        { VITE_TURNSTILE_SITE_KEY: `${TURNSTILE_TEST_KEY_PREFIX}AA` },
+        /always-passes TEST key/,
+      ],
+      [
+        "a leaked server secret",
+        { VITE_STRIPE_SECRET_KEY: "sk_live_x" },
+        /server-side secret/,
+      ],
+      [
+        "an .env.example placeholder",
+        { VITE_GOOGLE_MAPS_API_KEY: "your-google-maps-browser-key" },
+        /placeholder/,
+      ],
+    ])("does not excuse %s", (_label, overrides, expected) => {
+      const problems = collectProductionEnvProblems(
+        { ...VALID, ...TEST_KEY, ...overrides },
+        allow,
+      );
+      expect(problems.join()).toMatch(expected);
+    });
+
+    test("an absent Stripe key is not a test key — the hatch does not cover it", () => {
+      // "" and "pk_test_..." fail for different reasons. Unset means loadStripe(undefined)
+      // and both payment routes throw on import, which no demo wants either.
+      expect(
+        collectProductionEnvProblems(
+          { ...VALID, VITE_STRIPE_PUBLISHABLE_KEY: "" },
+          allow,
+        ).join(),
+      ).toMatch(/not set/);
+    });
+
+    test("assertProductionEnv warns loudly instead of throwing", () => {
+      const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        expect(() =>
+          assertProductionEnv({ ...VALID, ...TEST_KEY }, allow),
+        ).not.toThrow();
+        expect(warn).toHaveBeenCalledWith(TEST_STRIPE_OVERRIDE_WARNING);
+        // The warning has to say what breaks, not just that a flag is set.
+        expect(TEST_STRIPE_OVERRIDE_WARNING).toMatch(/REJECTS real cards/);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    test("warns even when the build is going to fail anyway", () => {
+      // A throw for an unrelated reason must not swallow the notice; otherwise the hatch
+      // is discovered one run later, after it has already shipped.
+      const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        expect(() =>
+          assertProductionEnv(
+            {
+              ...VALID,
+              ...TEST_KEY,
+              VITE_NEXT_PUBLIC_BACKEND_URL: "http://127.0.0.1:8000",
+            },
+            allow,
+          ),
+        ).toThrow(/local address/);
+        expect(warn).toHaveBeenCalledWith(TEST_STRIPE_OVERRIDE_WARNING);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    test("stays quiet when the key is already pk_live_", () => {
+      // Flag set out of habit on a properly configured build: no warning, because there is
+      // nothing wrong. A banner that cries wolf gets tuned out.
+      const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        assertProductionEnv(VALID, allow);
+        expect(warn).not.toHaveBeenCalled();
+      } finally {
+        warn.mockRestore();
+      }
+    });
   });
 });

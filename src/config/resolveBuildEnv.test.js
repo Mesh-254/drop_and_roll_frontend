@@ -16,7 +16,7 @@
  * the fixtures are written to a temp dir that is removed afterwards.
  */
 
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -43,26 +43,23 @@ const GOOD_ENV = [
  * @returns {{status: number, stdout: string, stderr: string}}
  */
 function runResolver(cwd, extraEnv = {}) {
-  try {
-    const stdout = execFileSync("node", [RESOLVER, "production"], {
-      cwd,
-      encoding: "utf8",
-      // Drop any VITE_ vars the developer running the suite happens to have exported;
-      // loadEnv layers process.env over the files and would otherwise leak them in.
-      env: Object.fromEntries([
-        ...Object.entries(process.env).filter(([k]) => !k.startsWith("VITE_")),
-        ...Object.entries(extraEnv),
-      ]),
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    return { status: 0, stdout, stderr: "" };
-  } catch (err) {
-    return {
-      status: err.status ?? 1,
-      stdout: err.stdout ?? "",
-      stderr: err.stderr ?? "",
-    };
-  }
+  // spawnSync, not execFileSync: execFileSync only hands back stderr by throwing, so a
+  // successful run's stderr is unreachable — and the demo-hatch banner is printed to
+  // stderr on an exit-0 run, which is exactly the case that needs asserting.
+  const { status, stdout, stderr } = spawnSync("node", [RESOLVER, "production"], {
+    cwd,
+    encoding: "utf8",
+    // Drop any VITE_ or ALLOW_ vars the developer running the suite happens to have
+    // exported; loadEnv layers process.env over the files and would otherwise leak them
+    // in, making these results depend on whose machine ran them.
+    env: Object.fromEntries([
+      ...Object.entries(process.env).filter(
+        ([k]) => !k.startsWith("VITE_") && k !== "ALLOW_TEST_STRIPE_KEY",
+      ),
+      ...Object.entries(extraEnv),
+    ]),
+  });
+  return { status, stdout, stderr };
 }
 
 let fixtureDir;
@@ -188,6 +185,71 @@ describe("scripts/resolve-build-env.mjs", () => {
     // Nothing on stdout, so a caller capturing the URL gets an empty string, never a
     // half-valid value it might go on to deploy with.
     expect(stdout).toBe("");
+  });
+
+  describe("ALLOW_TEST_STRIPE_KEY demo hatch, end to end", () => {
+    const DEMO_ENV = GOOD_ENV.replace("pk_live_", "pk_test_");
+
+    test("blocks a pk_test_ key by default and points at the hatch", () => {
+      const dir = fixture("demo-closed", { ".env": DEMO_ENV });
+      const { status, stderr } = runResolver(dir);
+
+      expect(status).toBe(1);
+      expect(stderr).toContain("ALLOW_TEST_STRIPE_KEY=1");
+    });
+
+    test("passes with the flag, and still prints the URL cleanly on stdout", () => {
+      const dir = fixture("demo-open", { ".env": DEMO_ENV });
+      const { status, stdout, stderr } = runResolver(dir, {
+        ALLOW_TEST_STRIPE_KEY: "1",
+      });
+
+      expect(status).toBe(0);
+      // The banner goes to stderr, so `BACKEND_URL="$(...)"` in deploy.sh stays clean.
+      expect(stdout).toBe("https://dropnroll.co.uk\n");
+      expect(stderr).toMatch(/REJECTS real cards/);
+    });
+
+    test.each([["true"], ["yes"], ["0"], [""], ["1 "]])(
+      "ignores ALLOW_TEST_STRIPE_KEY=%p — only the exact string 1 opens it",
+      (value) => {
+        const dir = fixture(`demo-strict-${value.trim() || "empty"}`, {
+          ".env": DEMO_ENV,
+        });
+        expect(
+          runResolver(dir, { ALLOW_TEST_STRIPE_KEY: value }).status,
+        ).toBe(1);
+      },
+    );
+
+    test("CANNOT be enabled from an env file", () => {
+      // The property the whole design rests on. loadEnv with the "" prefix would happily
+      // return this name out of .env, so if the guard read the flag off that map instead
+      // of process.env, one line in .env.production would permanently disable the check
+      // and no future deploy would ever mention it again.
+      const dir = fixture("demo-from-file", {
+        ".env": `${DEMO_ENV}\nALLOW_TEST_STRIPE_KEY=1`,
+      });
+      const { status, stderr } = runResolver(dir);
+
+      expect(status).toBe(1);
+      expect(stderr).toMatch(/pk_test_ key/);
+    });
+
+    test("does not excuse a second problem", () => {
+      const dir = fixture("demo-not-a-skeleton-key", {
+        ".env": DEMO_ENV.replace(
+          "https://dropnroll.co.uk",
+          "http://127.0.0.1:8000",
+        ),
+      });
+      const { status, stderr } = runResolver(dir, {
+        ALLOW_TEST_STRIPE_KEY: "1",
+      });
+
+      expect(status).toBe(1);
+      expect(stderr).toMatch(/local address/);
+    });
   });
 
   test("tells the reader the values come from files, not the shell", () => {

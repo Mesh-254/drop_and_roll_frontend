@@ -31,9 +31,18 @@
  */
 
 import { loadEnv } from "vite";
-import { collectProductionEnvProblems } from "../src/config/assertProductionEnv.js";
+import {
+  collectProductionEnvProblems,
+  TEST_STRIPE_OVERRIDE_VAR,
+  TEST_STRIPE_OVERRIDE_WARNING,
+} from "../src/config/assertProductionEnv.js";
 
 const mode = process.argv[2] || "production";
+
+// From process.env only, and only the exact string "1". Mirrors vite.config.js so this
+// pre-check and the build agree; see TEST_STRIPE_OVERRIDE_VAR for why it must not be
+// readable from an env file.
+const allowTestStripeKey = process.env[TEST_STRIPE_OVERRIDE_VAR] === "1";
 
 // Identical call to vite.config.js. Third arg "" loads every var rather than only the
 // VITE_-prefixed ones, so the guard can also see a server secret that was mistakenly
@@ -41,7 +50,16 @@ const mode = process.argv[2] || "production";
 // makes `VITE_NEXT_PUBLIC_BACKEND_URL=... ./deploy.sh` keep working as an override.
 const env = loadEnv(mode, process.cwd(), "");
 
-const problems = collectProductionEnvProblems(env);
+const problems = collectProductionEnvProblems(env, { allowTestStripeKey });
+
+// Before the problems check: an open hatch is worth seeing even on a run that fails for
+// some other reason.
+if (
+  allowTestStripeKey &&
+  String(env.VITE_STRIPE_PUBLISHABLE_KEY ?? "").startsWith("pk_test_")
+) {
+  process.stderr.write(TEST_STRIPE_OVERRIDE_WARNING);
+}
 
 if (problems.length) {
   process.stderr.write(

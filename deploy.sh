@@ -43,3 +43,14 @@ echo "Deploying to ${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH} (rsync --delete 
 rsync -az --delete dist/ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}"
 
 echo "DEPLOYED. Verify with a cache-bypassing reload; nginx needs no reload."
+
+# Repeated at the very end, after the rsync, on purpose. The warning the resolver printed
+# has scrolled past several hundred lines of build output by now, and this is the state the
+# LIVE site is in as of this moment. `:-` because set -u would abort on an unset name.
+if [ "${ALLOW_TEST_STRIPE_KEY:-}" = "1" ]; then
+  echo ""
+  echo "!! THIS IS A DEMO BUILD — https://dropnroll.co.uk is live with a pk_test_ Stripe key."
+  echo "!! Real cards are rejected in test mode. No booking on the live site can take money."
+  echo "!! Redeploy with the pk_live_ key in .env.production before the site takes traffic:"
+  echo "!!   ./deploy.sh"
+fi
