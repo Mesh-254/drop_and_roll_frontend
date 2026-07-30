@@ -22,13 +22,26 @@ class ReceivableApi extends ApiBase {
    * Business owners see only their own.
    * Admins see all (filterable by status).
    *
-   * @param {Object} params - { page, pageSize, status }
-   * @returns {Promise<{ count, page, results: Receivable[] }>}
+   * `view` is the semantic filter and is what the UI tabs use:
+   *   all | outstanding | overdue | partial | paid | cancelled | payable
+   * It asks the server the question the tab label promises. `status` is an exact
+   * match on one status value and stays for admin tooling.
+   *
+   * Do not send `status: "issued"` to mean "outstanding". That is exactly what
+   * this page used to do, and a DRAFT invoice with £16.00 owed was then missing
+   * from the Outstanding tab while the Outstanding total above it said £16.00.
+   *
+   * The response's `summary` block carries the ledger totals; never re-total the
+   * returned rows client-side, they are one page of one filter.
+   *
+   * @param {Object} params - { page, pageSize, view, status }
+   * @returns {Promise<{ count, page, view, summary, results: Receivable[] }>}
    */
   async list(params = {}) {
     const mapped = {};
     if (params.page) mapped.page = params.page;
     if (params.pageSize) mapped.page_size = params.pageSize;
+    if (params.view) mapped.view = params.view;
     if (params.status) mapped.status = params.status;
 
     const response = await this.axiosInstance.get(
@@ -78,6 +91,7 @@ class ReceivableApi extends ApiBase {
       const mapped = {};
       if (params.page) mapped.page = params.page;
       if (params.pageSize) mapped.page_size = params.pageSize;
+      if (params.view) mapped.view = params.view;
       if (params.status) mapped.status = params.status;
 
       const response = await this.axiosInstance.get(

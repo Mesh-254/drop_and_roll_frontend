@@ -1,10 +1,22 @@
 // Behaviour tests for the NET-terms inline "Pay now" action on the bulk
 // dashboard row (spec §C):
 //   • prepaid + payment_pending  → "Pay"      → navigates /pay/bulk/:id
-//   • NET + outstanding balance  → "Pay now"  → navigates /invoices/:rid?action=pay
+//   • NET + payable invoice      → "Pay now"  → navigates /invoices/:rid?action=pay
 //   • NET + partial payment      → "Pay now"  → shows the REMAINING balance
 //   • fully paid                 → "Settled", no pay control
 //   • prepaid completed          → "Settled", no pay control
+//
+// 2026-07-30: the row no longer decides payability from `receivable_status`. It
+// renders the server's `receivable_is_payable`, which comes from
+// Receivable.is_payable — the same property guarding pay-via-gateway.
+//
+// The test that used to live here, "NET invoice still in draft shows no pay
+// control (backend would reject it)", asserted the production bug as if it were
+// the spec: the backend had been widened to accept DRAFT, so a DRAFT invoice
+// with £16.00 owed was payable by the API while this row hid the button. The
+// draft cases below now pin the corrected behaviour, and one case pins the
+// stale-API path (flag absent ⇒ no button) so a frontend deployed ahead of the
+// backend degrades to "use /billing" instead of a button that 400s.
 
 import { render, screen, fireEvent } from "@testing-library/react";
 
@@ -45,6 +57,7 @@ const baseUpload = {
   receivable_id: null,
   outstanding: null,
   receivable_status: null,
+  receivable_is_payable: false,
 };
 
 function renderRow(overrides = {}) {
@@ -70,6 +83,7 @@ test("NET upload with outstanding balance shows Pay now → invoice pay route", 
     receivable_id: "rec-9",
     outstanding: "500.00",
     receivable_status: "issued",
+    receivable_is_payable: true,
   });
   const btn = screen.getByRole("button", { name: /Pay now/i });
   fireEvent.click(btn);
@@ -81,16 +95,46 @@ test("NET partial payment surfaces the remaining balance, not the total", () => 
     receivable_id: "rec-9",
     outstanding: "300.00",
     receivable_status: "partial",
+    receivable_is_payable: true,
   });
   expect(screen.getByText(/Outstanding: £300\.00/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Pay now/i })).toBeInTheDocument();
 });
 
-test("NET invoice still in draft shows no pay control (backend would reject it)", () => {
+// ── The production regression ───────────────────────────────────────────────
+
+test("DRAFT invoice with a balance shows Pay now (the prod bug: £16.00 owed, View only)", () => {
+  renderRow({
+    receivable_id: "rec-16",
+    outstanding: "16.00",
+    receivable_status: "draft",
+    receivable_is_payable: true,
+  });
+  expect(screen.getByText(/Outstanding: £16\.00/)).toBeInTheDocument();
+  const btn = screen.getByRole("button", { name: /Pay now/i });
+  fireEvent.click(btn);
+  expect(mockNavigate).toHaveBeenCalledWith("/invoices/rec-16?action=pay");
+});
+
+test("row ignores receivable_status entirely and follows the served flag", () => {
+  // A status the row's old whitelist would have accepted, with the server saying
+  // it is not payable (e.g. the balance was cleared by a bank transfer). The
+  // button must not appear: the server is the authority, not the status string.
+  renderRow({
+    receivable_id: "rec-9",
+    outstanding: "0.00",
+    receivable_status: "issued",
+    receivable_is_payable: false,
+  });
+  expect(screen.queryByRole("button", { name: /Pay now/i })).not.toBeInTheDocument();
+});
+
+test("absent flag (frontend deployed ahead of backend) hides the button rather than showing a dead one", () => {
   renderRow({
     receivable_id: "rec-9",
     outstanding: "500.00",
-    receivable_status: "draft",
+    receivable_status: "issued",
+    receivable_is_payable: undefined, // what an older API returns: no such field
   });
   expect(screen.queryByRole("button", { name: /Pay now/i })).not.toBeInTheDocument();
 });
@@ -100,6 +144,7 @@ test("fully paid NET invoice shows Settled and no pay control", () => {
     receivable_id: "rec-9",
     outstanding: "0.00",
     receivable_status: "paid",
+    receivable_is_payable: false,
   });
   expect(screen.getByText(/Settled/i)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /Pay/i })).not.toBeInTheDocument();

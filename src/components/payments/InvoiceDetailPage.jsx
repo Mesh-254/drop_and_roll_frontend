@@ -526,7 +526,12 @@ export default function InvoiceDetailPage() {
     );
   }
 
-  const isPayable = ["issued", "partial", "overdue"].includes(invoice.status);
+  // Served by the API (Receivable.is_payable), never re-derived from status.
+  // This was the third copy of the whitelist and the most damaging one: it
+  // guards the page the Pay button navigates TO, so even after /billing and the
+  // bulk dashboard offered to pay a DRAFT invoice, this screen would have
+  // refused to render the payment form for it.
+  const isPayable = invoice.is_payable === true;
   const outstanding = parseFloat(invoice.outstanding || 0);
   const isBulkInvoice = !!invoice.bulk_upload;
 

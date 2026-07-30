@@ -520,17 +520,21 @@ export function UploadRow({ upload, onViewDetail, onReupload }) {
 
   // NET-terms inline pay-now (spec §C): a NET upload finishes as
   // completed/partial with a linked Receivable. Surface a "Pay now" action here
-  // (instead of forcing the user into /billing) only when the invoice is
-  // actually payable — the same whitelist BillingPage and the pay-via-gateway
-  // endpoint use, so a still-DRAFT or cancelled invoice never shows a dead
-  // button that the backend would reject.
-  const PAYABLE_INVOICE_STATUSES = ["issued", "partial", "overdue"];
-  const outstanding = upload.outstanding != null ? parseFloat(upload.outstanding) : null;
-  const isNetUnpaid =
-    !!upload.receivable_id &&
-    outstanding != null &&
-    outstanding > 0 &&
-    PAYABLE_INVOICE_STATUSES.includes(upload.receivable_status);
+  // (instead of forcing the user into /billing) whenever the server says the
+  // invoice is payable.
+  //
+  // This used to hold a local ["issued","partial","overdue"] whitelist and
+  // claimed to mirror the pay-via-gateway endpoint. It stopped mirroring it when
+  // DRAFT became payable, and the claim in the comment is what stopped anyone
+  // rechecking: a production batch with £16.00 owed rendered View only, so the
+  // customer had no way to pay. `receivable_is_payable` is computed by
+  // Receivable.is_payable, the same property that guards the endpoint, so the
+  // button and the API cannot disagree again.
+  // Default 0 rather than null: `is_payable` already guarantees a positive
+  // balance server-side, and the two fields ship in the same serializer, so this
+  // only removes a `null.toFixed()` crash path from the render below.
+  const outstanding = upload.outstanding != null ? parseFloat(upload.outstanding) : 0;
+  const isNetUnpaid = upload.receivable_is_payable === true;
 
   // Settled = a NET invoice paid in full, or a prepaid upload that has cleared
   // payment (prepaid completes only after the charge succeeds).

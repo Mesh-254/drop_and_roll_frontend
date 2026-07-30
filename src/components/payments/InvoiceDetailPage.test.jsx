@@ -54,6 +54,12 @@ const ISSUED_INVOICE = {
   payment_terms: "net_60",
   bulk_upload: "bulk-1",
   booking_count: 1,
+  // Payability is served, not derived from `status`. The page held the third
+  // copy of the ["issued","partial","overdue"] whitelist, and it guarded the
+  // screen the Pay button navigates to — so a DRAFT invoice would have been
+  // refused here even once the other two screens offered to pay it.
+  is_payable: true,
+  is_outstanding: true,
 };
 
 const BANK_DETAILS = {
@@ -96,5 +102,63 @@ describe("InvoiceDetailPage — Bank Transfer tab (§5)", () => {
     // Card/PayPal still render; wait for the pay panel.
     await screen.findByText(/Pay Outstanding/i);
     expect(screen.queryByRole("button", { name: /^🏦 Bank$/ })).not.toBeInTheDocument();
+  });
+});
+
+// ── Payability comes from the server (2026-07-30) ───────────────────────────
+//
+// These set `search: ""` rather than the file's default "?action=pay": with the
+// pay panel auto-opening, the Stripe Elements subtree renders too and its stubs
+// dominate the assertion. What is under test here is only which invoices offer a
+// payment control at all.
+
+describe("InvoiceDetailPage — payability is served, not derived", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockLocation.search = "";
+    mockGetBankTransferDetails.mockResolvedValue({ success: true, data: { enabled: false } });
+  });
+
+  afterEach(() => {
+    mockLocation.search = "?action=pay";
+  });
+
+  test("a DRAFT invoice with a balance still offers Pay Now here", async () => {
+    // The production invoice: INV-2026-0001, DRAFT, £16.00 owed. This page held
+    // the third copy of the ["issued","partial","overdue"] whitelist, and it
+    // guards the screen the Pay button sends the customer to — so DRAFT was
+    // refused here even once /billing offered to pay it.
+    mockGetInvoice.mockResolvedValue({
+      ...ISSUED_INVOICE,
+      status: "draft",
+      status_display: "Draft",
+      amount: "16.00",
+      outstanding: "16.00",
+      is_payable: true,
+    });
+    render(<InvoiceDetailPage />);
+    expect(await screen.findByRole("button", { name: /Pay Now/i })).toBeInTheDocument();
+  });
+
+  test("an invoice the server calls unpayable offers no payment control, whatever its status", async () => {
+    mockGetInvoice.mockResolvedValue({
+      ...ISSUED_INVOICE,
+      status: "issued",
+      outstanding: "0.00",
+      is_payable: false,
+      is_outstanding: false,
+    });
+    render(<InvoiceDetailPage />);
+    await screen.findByText(/Invoice Details/i);
+    expect(screen.queryByRole("button", { name: /Pay Now/i })).not.toBeInTheDocument();
+  });
+
+  test("a missing is_payable (older API) hides the control rather than showing a dead one", async () => {
+    const stale = { ...ISSUED_INVOICE };
+    delete stale.is_payable;
+    mockGetInvoice.mockResolvedValue(stale);
+    render(<InvoiceDetailPage />);
+    await screen.findByText(/Invoice Details/i);
+    expect(screen.queryByRole("button", { name: /Pay Now/i })).not.toBeInTheDocument();
   });
 });

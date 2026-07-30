@@ -8,9 +8,21 @@
  *
  * Features:
  *   - Invoice list with status badges, amounts, due dates
- *   - Filter by status (all | outstanding | overdue | paid)
+ *   - Filter by view (all | outstanding | overdue | partial | paid)
  *   - Download PDF per invoice
- *   - Pay Now button for ISSUED / PARTIAL / OVERDUE invoices
+ *   - Pay Now button wherever the server says the invoice is payable
+ *
+ * TWO RULES THIS FILE MUST NOT BREAK AGAIN
+ * ────────────────────────────────────────
+ * 1. Payability is not computed here. Render `invoice.is_payable`. This file
+ *    used to hold its own ["issued","partial","overdue"] whitelist; when the
+ *    backend started accepting DRAFT, the copy here was not updated, and a
+ *    production invoice with £16.00 owed rendered no Pay button at all — the
+ *    customer could not pay a bill we had already sent.
+ * 2. Totals are not computed here. Render `summary` from the response. The tiles
+ *    used to sum whichever rows were loaded, so the Outstanding tile read
+ *    £16.00 while the Outstanding tab beneath it said "No invoices found", and
+ *    the headline numbers changed when you switched tabs or paged.
  */
 
 import { useState, useEffect, useCallback } from "react";
@@ -54,7 +66,8 @@ function StatusBadge({ status }) {
 // ─── Single invoice row ──────────────────────────────────────────────────────
 
 function InvoiceRow({ invoice, onPay, onDownload, onView }) {
-  const isPayable = ["issued", "partial", "overdue"].includes(invoice.status);
+  // Served by the API (Receivable.is_payable), never re-derived from status.
+  const isPayable = invoice.is_payable === true;
   const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
   const isOverdue = invoice.is_overdue;
 
@@ -102,7 +115,7 @@ function InvoiceRow({ invoice, onPay, onDownload, onView }) {
             <div className="text-lg font-bold text-white">
               {invoice.currency} {parseFloat(invoice.amount).toFixed(2)}
             </div>
-            {invoice.outstanding > 0 && invoice.status !== "paid" && (
+            {invoice.is_outstanding && (
               <div className="text-xs text-red-400">
                 Outstanding: {invoice.currency} {parseFloat(invoice.outstanding).toFixed(2)}
               </div>
@@ -140,13 +153,27 @@ function InvoiceRow({ invoice, onPay, onDownload, onView }) {
 
 // ─── Filter bar ──────────────────────────────────────────────────────────────
 
+// `key` is the server-side `view`, so each tab asks for exactly what its label
+// says. "Outstanding" was previously wired to status=issued — one status value
+// standing in for a question about the balance — which hid DRAFT invoices that
+// owed money.
 const FILTERS = [
-  { key: "",        label: "All" },
-  { key: "issued",  label: "Outstanding" },
-  { key: "overdue", label: "Overdue" },
-  { key: "partial", label: "Partial" },
-  { key: "paid",    label: "Paid" },
+  { key: "all",         label: "All" },
+  { key: "outstanding", label: "Outstanding" },
+  { key: "overdue",     label: "Overdue" },
+  { key: "partial",     label: "Partial" },
+  { key: "paid",        label: "Paid" },
 ];
+
+const EMPTY_SUMMARY = {
+  total_invoiced: "0.00",
+  total_paid: "0.00",
+  outstanding: "0.00",
+  overdue: "0.00",
+  counts: {},
+};
+
+const money = (value) => `£${parseFloat(value || 0).toFixed(2)}`;
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
@@ -156,30 +183,37 @@ export default function BillingPage() {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeFilter, setActiveFilter] = useState("");
+  const [activeFilter, setActiveFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [summary, setSummary] = useState(EMPTY_SUMMARY);
 
   const PAGE_SIZE = 15;
 
   const fetchInvoices = useCallback(
-    async (statusFilter = activeFilter, pg = page) => {
+    async (viewFilter = activeFilter, pg = page) => {
       setLoading(true);
       setError(null);
       try {
         const data = await receivableApi.list({
-          status: statusFilter || undefined,
+          view: viewFilter || "all",
           page: pg,
           pageSize: PAGE_SIZE,
         });
-        // Backend may return { count, results } or just an array
+        // Backend may return { count, results, summary } or just an array
         if (Array.isArray(data)) {
           setInvoices(data);
           setTotalCount(data.length);
+          setSummary(EMPTY_SUMMARY);
         } else {
           setInvoices(data.results || []);
           setTotalCount(data.count || 0);
+          // Ledger totals come from the server so they stay the same whichever
+          // tab is open. Falling back to EMPTY_SUMMARY (not to a client-side
+          // sum) keeps a stale-API deploy showing £0.00 rather than a number
+          // that quietly means something else.
+          setSummary(data.summary || EMPTY_SUMMARY);
         }
       } catch (err) {
         console.error("BillingPage: fetch error", err);
@@ -229,18 +263,6 @@ export default function BillingPage() {
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
-  // ── Aggregate stats ──────────────────────────────────────────────────────
-  const stats = invoices.reduce(
-    (acc, inv) => ({
-      total: acc.total + parseFloat(inv.amount || 0),
-      outstanding: acc.outstanding + parseFloat(inv.outstanding || 0),
-      overdue:
-        acc.overdue +
-        (inv.is_overdue ? parseFloat(inv.outstanding || 0) : 0),
-    }),
-    { total: 0, outstanding: 0, overdue: 0 }
-  );
-
   return (
     <div className="min-h-screen bg-slate-900 px-4 pt-20 pb-8 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto">
@@ -264,31 +286,37 @@ export default function BillingPage() {
           </button>
         </div>
 
-        {/* Stats row */}
-        {!loading && invoices.length > 0 && (
-          <div className="grid grid-cols-3 gap-4 mb-8">
+        {/* Stats row — server-computed over the whole ledger, so these do not
+            move when the active tab or page changes. */}
+        {!loading && (
+          <div className="grid grid-cols-3 gap-4 mb-8" data-testid="billing-summary">
             <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
               <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">
                 Total Invoiced
               </p>
-              <p className="text-xl font-bold text-white">
-                £{stats.total.toFixed(2)}
+              <p className="text-xl font-bold text-white" data-testid="tile-total">
+                {money(summary.total_invoiced)}
               </p>
             </div>
             <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
               <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">
                 Outstanding
               </p>
-              <p className="text-xl font-bold text-yellow-400">
-                £{stats.outstanding.toFixed(2)}
+              <p className="text-xl font-bold text-yellow-400" data-testid="tile-outstanding">
+                {money(summary.outstanding)}
               </p>
             </div>
             <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
               <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">
                 Overdue
               </p>
-              <p className={`text-xl font-bold ${stats.overdue > 0 ? "text-red-400" : "text-slate-400"}`}>
-                £{stats.overdue.toFixed(2)}
+              <p
+                className={`text-xl font-bold ${
+                  parseFloat(summary.overdue || 0) > 0 ? "text-red-400" : "text-slate-400"
+                }`}
+                data-testid="tile-overdue"
+              >
+                {money(summary.overdue)}
               </p>
             </div>
           </div>
@@ -344,7 +372,7 @@ export default function BillingPage() {
             <FileText className="w-12 h-12 text-slate-700 mx-auto mb-4" />
             <p className="text-slate-400 text-lg font-medium">No invoices found</p>
             <p className="text-slate-500 text-sm mt-1">
-              {activeFilter
+              {activeFilter && activeFilter !== "all"
                 ? `No ${activeFilter} invoices.`
                 : "Your invoices will appear here after bulk uploads."}
             </p>
