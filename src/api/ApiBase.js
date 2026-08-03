@@ -1,9 +1,21 @@
 import axios from "axios";
 import { markSessionExpired } from "../lib/authSession";
 
+// Circuit-breaker thresholds for the token-refresh path. Three strikes is
+// enough to ride out a single blip without letting a persistently broken
+// refresh endpoint be hammered; 30 s is long enough that a re-firing React
+// effect stops being a load generator and short enough that a recovered
+// backend is picked up on the user's next action.
+export const REFRESH_FAILURE_LIMIT = 3;
+export const REFRESH_COOLDOWN_MS = 30000;
+
 export class ApiBase {
   constructor() {
     this.baseURL = import.meta.env.VITE_NEXT_PUBLIC_BACKEND_URL;
+    // Consecutive transient refresh failures, and the timestamp until which the
+    // breaker stays open. Reset on any successful refresh or a clean expiry.
+    this._refreshFailures = 0;
+    this._refreshCooldownUntil = 0;
     this.token =
       typeof window !== "undefined"
         ? localStorage.getItem("access_token")
@@ -71,7 +83,15 @@ export class ApiBase {
           !originalRequest._retry &&
           originalRequest.url !== "/api/auth/jwt/refresh/" &&
           !isPaymentPath &&
-          originalRequest.includeAuth !== false
+          originalRequest.includeAuth !== false &&
+          // Circuit breaker. `_retry` only bounds retries within ONE axios
+          // config; a caller that re-issues a fresh request (a React effect
+          // re-firing, a poller) gets a brand-new config and is bounded by
+          // nothing. On 2026-08-03 that turned one stale localStorage token
+          // into 13 refresh calls in 90 s, accelerating to 4/s, against an
+          // endpoint that was 500ing. Refusing to refresh while the breaker is
+          // open makes the 401 terminal for that request instead.
+          !this._refreshCircuitOpen()
         ) {
           originalRequest._retry = true;
           try {
@@ -80,6 +100,7 @@ export class ApiBase {
             // once — sending it twice would hit a blacklisted token (rotation +
             // BLACKLIST_AFTER_ROTATION) and log the user out spuriously.
             const newToken = await this._refreshTokenOnce();
+            this._refreshFailures = 0; // healthy refresh closes the breaker
             originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
             return this.axiosInstance(originalRequest);
           } catch (refreshError) {
@@ -94,13 +115,27 @@ export class ApiBase {
               // Centralized expiry: clear tokens atomically, then signal the
               // React layer + other tabs. markSessionExpired() debounces, so
               // concurrent 401s produce a single logout/redirect cycle.
+              this._refreshFailures = 0;
               this.logout();
               markSessionExpired();
               return Promise.reject(
                 new Error("Session expired, please log in again")
               );
             }
-            // Transient failure — do NOT log out.
+            // Transient failure (5xx / network) — do NOT log out, the tokens
+            // may still be good. But DO count it: a refresh endpoint that keeps
+            // failing is not something to hammer. After
+            // REFRESH_FAILURE_LIMIT consecutive failures the breaker opens for
+            // REFRESH_COOLDOWN_MS and 401s pass straight through to the caller.
+            this._refreshFailures = (this._refreshFailures || 0) + 1;
+            if (this._refreshFailures >= REFRESH_FAILURE_LIMIT) {
+              this._refreshCooldownUntil =
+                Date.now() + REFRESH_COOLDOWN_MS;
+              console.warn(
+                `[ApiBase] Token refresh failed ${this._refreshFailures}x — ` +
+                  `pausing refresh attempts for ${REFRESH_COOLDOWN_MS}ms`
+              );
+            }
             return Promise.reject(refreshError);
           }
         }
@@ -144,6 +179,23 @@ export class ApiBase {
       console.error("[ApiBase] Request failed:", errorResponse);
       throw errorResponse;
     }
+  }
+
+  /**
+   * True while the refresh circuit breaker is open, i.e. refresh has failed
+   * transiently REFRESH_FAILURE_LIMIT times in a row and the cooldown has not
+   * elapsed. While open, a 401 is returned to the caller unchanged instead of
+   * triggering another refresh.
+   */
+  _refreshCircuitOpen() {
+    if (!this._refreshCooldownUntil) return false;
+    if (Date.now() >= this._refreshCooldownUntil) {
+      // Cooldown elapsed — close the breaker and allow one more attempt.
+      this._refreshCooldownUntil = 0;
+      this._refreshFailures = 0;
+      return false;
+    }
+    return true;
   }
 
   /**

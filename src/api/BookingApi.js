@@ -1,6 +1,65 @@
 // BookingApi.js (Fixed inconsistent URLs: use "/api/booking/bookings/" consistently for bookings)
 import { ApiBase } from "./ApiBase";
 
+// ─── Service area (client mirror of bookings/utils/service_area.py) ──────────
+// UX affordance only. The backend re-validates authoritatively via
+// check_service_area() and will reject anything that slips past this.
+//
+// This MUST stay a mirror of _BASE_ALLOWED_PREFIXES. It previously used a bare
+// startsWith("MK"/"OX") test, which accepted every MK/OX outward code including
+// the many the business does not serve (MK20-MK39, OX21-OX24, ...). A client
+// that says yes where the server says no is worse than no client check at all:
+// the customer gets a green tick, fills in the whole form, and is refused on
+// submit.
+export const ALLOWED_OUTWARD_CODES = new Set([
+  // Milton Keynes borough
+  "MK1", "MK2", "MK3", "MK4", "MK5", "MK6", "MK7", "MK8", "MK9",
+  "MK10", "MK11", "MK12", "MK13", "MK14", "MK15", "MK16", "MK17", "MK18", "MK19",
+  "MK40", "MK41", "MK42", "MK43", "MK44", "MK45", "MK46",
+  // Oxford and Oxfordshire
+  "OX1", "OX2", "OX3", "OX4", "OX5", "OX6", "OX7", "OX8", "OX9",
+  "OX10", "OX11", "OX12", "OX13", "OX14", "OX15", "OX16", "OX17", "OX18",
+  "OX20", "OX25", "OX26", "OX27", "OX28", "OX29", "OX33", "OX39", "OX44", "OX49",
+]);
+
+// Mirror of service_area.OUT_OF_AREA_MESSAGE.
+export const OUT_OF_AREA_MESSAGE =
+  "We currently only operate within Milton Keynes and Oxford. " +
+  "This postcode falls outside our service area.";
+
+// A UK inward code is always digit + two letters, so anchoring on the END is
+// the only reliable way to find the outward/inward boundary when the space is
+// missing. Matching greedily from the front turns "MK91AA" into "MK91", which
+// is how single-digit MK/OX postcodes used to be misread. Mirrors
+// _extract_outward_code() in service_area.py.
+const _UK_FULL_POSTCODE_RE = /^([A-Z]{1,2}\d{1,2}[A-Z]?)\s*(\d[A-Z]{2})$/;
+const _UK_OUTWARD_ONLY_RE = /^([A-Z]{1,2}\d{1,2}[A-Z]?)$/;
+
+/** 'MK9 1AA' → 'MK9'; 'OX495RJ' → 'OX49'; 'nonsense' → null. */
+export function extractOutwardCode(postcode) {
+  const raw = (postcode || "").trim().toUpperCase();
+  if (!raw) return null;
+
+  const full = _UK_FULL_POSTCODE_RE.exec(raw.includes(" ") ? raw : raw.replace(/\s+/g, ""));
+  if (full) return full[1];
+
+  // A space is how every correctly-written UK postcode marks the boundary.
+  if (raw.includes(" ")) {
+    const candidate = raw.split(/\s+/)[0];
+    if (_UK_OUTWARD_ONLY_RE.test(candidate)) return candidate;
+  }
+
+  // No space and no clean inward code: strip the last 3 characters and see if
+  // what remains is a plausible outward code.
+  const clean = raw.replace(/\s+/g, "");
+  if (clean.length > 3) {
+    const candidate = clean.slice(0, -3);
+    if (_UK_OUTWARD_ONLY_RE.test(candidate)) return candidate;
+  }
+
+  return null;
+}
+
 export class BookingApi extends ApiBase {
 
 
@@ -464,10 +523,9 @@ async lookupPostcode(postcode) {
  * bookings/utils/service_area.py if the service area ever changes.
  */
 validateAddressInServiceArea(address) {
-  const SERVICE_AREAS = ["MK", "OX"];
-  // Drop 'N Roll operates in Milton Keynes and Oxford ONLY — no extra corridor
-  // districts. Keep in sync with _BASE_ALLOWED_PREFIXES in service_area.py.
-  const EXTRA_PREFIXES = [];
+  const postcodeRaw = (address.postal_code || "").trim().toUpperCase();
+  const outward = extractOutwardCode(postcodeRaw);
+
   // PER-HUB zones: each hub has its own centre AND radius, checked with OR
   // logic — a point is in-area if it is inside ANY hub's own circle. Keep
   // in sync with _DEFAULT_HUBS / SERVICE_AREA_HUBS in service_area.py.
@@ -476,30 +534,23 @@ validateAddressInServiceArea(address) {
     { lat: 51.7520, lng: -1.2577, name: "Oxford", radiusKm: 40 },
   ];
 
-  const postcodeTrimmed = (address.postal_code || "")
-    .replace(/\s+/g, "")
-    .toUpperCase();
-
-  const matchesPrefix =
-    SERVICE_AREAS.some((area) => postcodeTrimmed.startsWith(area)) ||
-    EXTRA_PREFIXES.some((prefix) => postcodeTrimmed.startsWith(prefix.replace(/\s+/g, "")));
+  // ── Tier 1: the allow-list, as a GATE ──────────────────────────────────
+  // Was `startsWith("MK") || startsWith("OX")`, which accepted every MK/OX
+  // outward code including the ones the backend does not serve (MK20-MK39,
+  // OX21-OX24, ...). The client showed a green tick and the server then
+  // rejected the booking. Same curated list as the backend now, and a failure
+  // here is final: coordinates cannot rescue it.
+  if (!outward || !ALLOWED_OUTWARD_CODES.has(outward)) {
+    return { valid: false, message: OUT_OF_AREA_MESSAGE };
+  }
 
   const lat = Number.parseFloat(address.latitude);
   const lng = Number.parseFloat(address.longitude);
   const hasCoords = !Number.isNaN(lat) && !Number.isNaN(lng);
 
-  if (!matchesPrefix) {
-    // Tier 1 failed. If we also have coordinates, Tier 2 (radius) might
-    // still rescue an edge-of-district postcode that just isn't in our
-    // hard-coded prefix list yet — otherwise reject outright.
-    if (!hasCoords) {
-      return {
-        valid: false,
-        message: "We only deliver in the Milton Keynes (MK) and Oxford (OX) areas.",
-      };
-    }
-  }
-
+  // ── Tier 2: radius, which can only NARROW ──────────────────────────────
+  // Catches an allow-listed but edge-of-district address whose coordinates
+  // land outside every hub's radius. Never admits a Tier 1 failure.
   if (hasCoords) {
     let nearestKm = Infinity;
     let nearestHub = HUBS[0];
@@ -518,11 +569,6 @@ validateAddressInServiceArea(address) {
         message: `This address is ${nearestKm.toFixed(1)}km from ${nearestHub.name}, outside its ${nearestHub.radiusKm}km service radius.`,
       };
     }
-  } else if (!matchesPrefix) {
-    return {
-      valid: false,
-      message: "Address is outside our service area",
-    };
   }
 
   return { valid: true };

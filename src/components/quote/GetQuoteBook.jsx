@@ -299,6 +299,9 @@ export default function GetQuoteModal({
   const [servicesError, setServicesError] = useState(null);
   const [quoteId, setQuoteId] = useState(null);
   const [lastQuoteData, setLastQuoteData] = useState(null);
+  // The last payload that FAILED. Without this, only successes were memoized,
+  // so a failing payload was re-sent on every re-render with no backoff.
+  const [lastFailedQuoteData, setLastFailedQuoteData] = useState(null);
 
   const [pickupPostcode, setPickupPostcode] = useState(
     initialState?.formData?.pickupAddress?.postal_code || initialPickupPostcode || "",
@@ -494,6 +497,15 @@ export default function GetQuoteModal({
     if (quoteDataString === lastQuoteData) {
       return;
     }
+    // Failures were not memoized, only successes — so a payload that failed was
+    // re-sent on every re-render of the effect below, forever, with no backoff.
+    // On 2026-08-03 that was one request per second against an endpoint that
+    // could not succeed. Remembering the failing payload makes the retry
+    // condition "the user changed something", which is the only change that can
+    // plausibly fix a rejected quote.
+    if (quoteDataString === lastFailedQuoteData) {
+      return;
+    }
 
     setIsLoadingQuote(true);
     try {
@@ -502,9 +514,11 @@ export default function GetQuoteModal({
         setQuote(result.data);
         setQuoteId(result.data.id);
         setLastQuoteData(quoteDataString);
+        setLastFailedQuoteData(null);
         setValidation((prev) => ({ ...prev, quoteError: null }));
       } else {
         console.error("Quote calculation failed:", result.message);
+        setLastFailedQuoteData(quoteDataString);
         setValidation((prev) => ({
           ...prev,
           quoteError: result.message || "Failed to calculate quote",
@@ -512,6 +526,7 @@ export default function GetQuoteModal({
       }
     } catch (error) {
       console.error("Quote calculation error:", error);
+      setLastFailedQuoteData(quoteDataString);
       setValidation((prev) => ({
         ...prev,
         quoteError: error.message || "Quote calculation error",
@@ -519,7 +534,7 @@ export default function GetQuoteModal({
     } finally {
       setIsLoadingQuote(false);
     }
-  }, [formData, lastQuoteData]);
+  }, [formData, lastQuoteData, lastFailedQuoteData]);
 
   useEffect(() => {
     if (currentStep === 5) {
