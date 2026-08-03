@@ -716,7 +716,13 @@ export function DeliveryStatusUpdates({
 
               return (
                 <div
-                  key={job.id}
+                  // C6: keyed on the STOP, not the booking. A same-day booking is
+                  // two jobs at two doors on one route, so keying on job.id gave
+                  // React two children with the same key — it reconciles them as
+                  // one and the collection and the delivery fight over one card.
+                  // Falls back to the booking id for standalone jobs, which have
+                  // no stop.
+                  key={job.stop_id || job.id}
                   onClick={() => onJobClick && onJobClick(job)}
                   className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:shadow-xl transition-all cursor-pointer overflow-hidden group"
                 >
@@ -739,6 +745,29 @@ export function DeliveryStatusUpdates({
                           )}
                         </button>
                         <div className="min-w-0 flex-1">
+                          {/* C6: which job this is, and which end of it.
+                              job_number is the stop's own sequence from the
+                              backend — never a list index, which would restart
+                              at 1 on page 2 and desync from the real route
+                              position. Both are absent for standalone jobs. */}
+                          {job.job_number != null && (
+                            <div className="flex flex-wrap items-center gap-2 mb-3">
+                              <span className="inline-flex items-center px-3 py-1 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-bold tracking-wide">
+                                Job {job.job_number}
+                              </span>
+                              {job.leg && (
+                                <span
+                                  className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold uppercase tracking-wide ${
+                                    job.leg === "pickup"
+                                      ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
+                                      : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
+                                  }`}
+                                >
+                                  {job.leg === "pickup" ? "Collection" : "Delivery"}
+                                </span>
+                              )}
+                            </div>
+                          )}
                           {/* Large, bold tracking number */}
                           <div className="mb-2">
                             <p className="text-xs uppercase tracking-widest font-medium text-slate-500 dark:text-slate-400 mb-1">
@@ -776,6 +805,24 @@ export function DeliveryStatusUpdates({
                         )}
                       </div>
                     </div>
+
+                    {/* C6: WHERE THIS JOB IS. The card below shows the whole
+                        shipment, pickup and delivery. On a same-day route the
+                        driver has two jobs for that one shipment at two
+                        different doors, and the full picture cannot say which
+                        one they are being sent to now. stop_address is the
+                        snapshot the stop was created with, so an address edited
+                        after dispatch cannot move a job already handed out. */}
+                    {job.stop_address && (
+                      <div className="mb-6 p-4 rounded-xl border-2 border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20">
+                        <p className="text-xs uppercase tracking-widest font-bold text-orange-700 dark:text-orange-300 mb-1.5">
+                          {job.leg === "delivery" ? "Deliver to" : "Collect from"}
+                        </p>
+                        <p className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white">
+                          {formatAddress(job.stop_address) || "N/A"}
+                        </p>
+                      </div>
+                    )}
 
                     {/* Route Flow: Pickup → Delivery with Dotted Line & Arrow */}
                     <div className="mb-8">
