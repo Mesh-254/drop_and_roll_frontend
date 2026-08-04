@@ -170,3 +170,67 @@ describe("standalone jobs", () => {
     expect(screen.queryByText("Deliver to")).not.toBeInTheDocument();
   });
 });
+
+// ── C8: where the button sends a collected same-day parcel ──────────────────
+//
+// The component derived the next status from a hardcoded chain in which
+// `picked_up` is always followed by `at_hub`. A driver collecting a same-day
+// parcel was therefore offered "Mark At Hub", the app posted `at_hub`, and the
+// parcel went to a depot the customer had paid for it to skip.
+//
+// The client cannot compute the right answer: it depends on the booking having
+// an open delivery stop on this driver's route. The backend sends `next_status`
+// and the component now uses it.
+
+const COLLECTED_SAME_DAY = [
+  {
+    id: "booking-2",
+    tracking_number: "DNR-2001",
+    status: "picked_up",
+    stop_id: "stop-p2",
+    job_number: 1,
+    leg: "pickup",
+    stop_status: "pending",
+    next_status: "in_transit", // server says: skip the hub
+    stop_address: { id: "a1", line1: "5 Sender Rd", city: "MK", postal_code: "MK1 1AA" },
+    pickup_address: { id: "a1", line1: "5 Sender Rd", city: "MK", postal_code: "MK1 1AA" },
+    dropoff_address: { id: "a2", line1: "9 Recipient Ave", city: "MK", postal_code: "MK2 2BB" },
+  },
+];
+
+const COLLECTED_NEXT_DAY = [
+  {
+    ...COLLECTED_SAME_DAY[0],
+    id: "booking-3",
+    tracking_number: "DNR-3001",
+    stop_id: "stop-p3",
+    next_status: "at_hub", // server says: via the hub, as normal
+  },
+];
+
+describe("next status for a collected parcel", () => {
+  test("a same-day parcel offers In Transit, never At Hub", async () => {
+    await renderJobs(COLLECTED_SAME_DAY);
+
+    // Scoped to the action button: "In Transit" also appears as a value in the
+    // status filter dropdown, which says nothing about what the button does.
+    expect(screen.getByRole("button", { name: /In Transit/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /At Hub/ })).not.toBeInTheDocument();
+  });
+
+  test("an ordinary parcel still offers At Hub", async () => {
+    await renderJobs(COLLECTED_NEXT_DAY);
+
+    expect(screen.getByRole("button", { name: /At Hub/ })).toBeInTheDocument();
+  });
+
+  test("the server's answer overrides the local chain", async () => {
+    // Identical status on both fixtures; only next_status differs. If the
+    // component were still using its own chain both would render "At Hub".
+    const { unmount } = render(<div />);
+    unmount();
+
+    await renderJobs(COLLECTED_SAME_DAY);
+    expect(screen.queryByRole("button", { name: /At Hub/ })).not.toBeInTheDocument();
+  });
+});

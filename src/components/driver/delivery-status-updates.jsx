@@ -484,8 +484,29 @@ export function DeliveryStatusUpdates({
     [pendingDeliveryJob, pendingDeliveryJobs, fetchJobs, onStatusUpdate]
   );
 
-  const getNextStatus = (currentStatus) => {
-    switch (currentStatus) {
+  /**
+   * Where this job goes next.
+   *
+   * C8: PREFER THE SERVER'S ANSWER. This used to be the chain below and nothing
+   * else, and the chain is wrong for same-day: it sends every `picked_up`
+   * booking to `at_hub`, so a driver collecting a same-day parcel was offered
+   * "Mark At Hub", the app posted `at_hub`, and the parcel went to a depot the
+   * customer had paid for it to skip.
+   *
+   * The client cannot compute this. The correct answer depends on whether the
+   * booking has an OPEN DELIVERY STOP on this driver's route, which only the
+   * backend can see — so the backend now sends `next_status` per job and this
+   * uses it.
+   *
+   * The chain stays as a fallback for a stale cached response from before the
+   * field existed. It is deliberately NOT the primary path: if it ever becomes
+   * the primary path again, same-day silently breaks the same way.
+   */
+  const getNextStatus = (job) => {
+    if (job && job.next_status !== undefined) {
+      return job.next_status;
+    }
+    switch (job?.status) {
       case "assigned":
         return "picked_up";
       case "picked_up":
@@ -588,9 +609,18 @@ export function DeliveryStatusUpdates({
 
                     {/* At Hub - RESTRICTED */}
                     {(() => {
+                      // C8: a bulk "At Hub" applies ONE status to every selected
+                      // job, so a same-day parcel caught in the selection would
+                      // be sent to a depot it is meant to skip. The per-job
+                      // button already asks the server (`next_status`); this one
+                      // cannot, so it is offered only when every selected job
+                      // genuinely belongs at the hub.
                       const allSelectedPickedUp = selectedJobs.every((id) => {
                         const j = jobs.find((job) => job.id === id);
-                        return j?.status === "picked_up";
+                        return (
+                          j?.status === "picked_up" &&
+                          (j?.next_status === undefined || j?.next_status === "at_hub")
+                        );
                       });
                       return (
                         <>
@@ -710,7 +740,7 @@ export function DeliveryStatusUpdates({
             {filteredJobs.map((job) => {
               const check = immutableChecks[job.id];
               const isImmutable = check?.immutable;
-              const nextStatus = getNextStatus(job.status);
+              const nextStatus = getNextStatus(job);
               const canUpdate = nextStatus && !isImmutable;
               const urgent = isUrgentPickup(job.scheduled_pickup_at);
 

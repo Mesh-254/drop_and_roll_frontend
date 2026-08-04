@@ -275,8 +275,21 @@ export function JobDetailPage({ jobId, onBack }) {
     [job, currentLocation, immutable, immutableReason, getStatusText]
   );
 
-  const getNextStatus = useCallback((currentStatus) => {
-    return STATUS_TRANSITIONS.find((s) => s.current === currentStatus)?.next || null;
+  /**
+   * C8: the server's `next_status` wins over the table below.
+   *
+   * STATUS_TRANSITIONS maps `picked_up` to `at_hub` unconditionally, which is
+   * wrong for a same-day parcel: it must go straight to the recipient. Whether
+   * it may depends on the booking having an OPEN DELIVERY STOP on this driver's
+   * route, which this page cannot see and the backend can — so the backend
+   * sends the answer and the table is only a fallback for a cached response
+   * predating the field.
+   */
+  const getNextStatus = useCallback((jobData) => {
+    if (jobData && jobData.next_status !== undefined) {
+      return jobData.next_status;
+    }
+    return STATUS_TRANSITIONS.find((s) => s.current === jobData?.status)?.next || null;
   }, []);
 
   const getStatusColor = useCallback((status) => {
@@ -388,8 +401,8 @@ export function JobDetailPage({ jobId, onBack }) {
   );
 
   const nextStatus = useMemo(
-    () => getNextStatus(job?.data?.status),
-    [job?.data?.status, getNextStatus]
+    () => getNextStatus(job?.data),
+    [job?.data, getNextStatus]
   );
 
   if (loading) {
