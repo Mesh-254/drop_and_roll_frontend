@@ -234,3 +234,74 @@ describe("next status for a collected parcel", () => {
     expect(screen.queryByRole("button", { name: /At Hub/ })).not.toBeInTheDocument();
   });
 });
+
+// ── Finding 5: the delivery card is inert until the parcel is collected ─────
+//
+// `next_status_for` read the stop's leg only in its final dead-end branch, so
+// at ASSIGNED it answered `picked_up` for BOTH halves of a same-day pair. The
+// driver could collect a parcel from the DELIVERY card, and — worse — the card
+// that offered nothing fell through to the "✓ Completed" branch and told them a
+// job they had not started was already done.
+//
+// The server now sends next_status: null plus a blocked_reason naming the job
+// that has to happen first. See docs/same_day_and_bulk_audit_20260804.md.
+
+const UNCOLLECTED_PAIR = [
+  {
+    ...SAME_DAY_PAIR[0],
+    next_status: "picked_up",
+    blocked_reason: null,
+  },
+  {
+    ...SAME_DAY_PAIR[1],
+    next_status: null, // nothing to do here yet
+    blocked_reason: "Collect at job 4 first.",
+  },
+];
+
+describe("a delivery stop whose parcel is not collected yet", () => {
+  test("shows why it is blocked instead of claiming it is completed", async () => {
+    await renderJobs(UNCOLLECTED_PAIR);
+
+    expect(screen.getByText("Collect at job 4 first.")).toBeInTheDocument();
+    // The specific lie: an untouched job rendered as done.
+    expect(screen.queryByText("✓ Completed")).not.toBeInTheDocument();
+  });
+
+  test("offers no action button on the delivery card", async () => {
+    await renderJobs(UNCOLLECTED_PAIR);
+
+    // Exactly one action button across both cards — the collection's.
+    const actions = screen.getAllByRole("button", { name: /► Pick Up/ });
+    expect(actions).toHaveLength(1);
+  });
+
+  test("still offers the collection on the pickup card", async () => {
+    await renderJobs(UNCOLLECTED_PAIR);
+
+    expect(screen.getByRole("button", { name: /► Pick Up/ })).toBeInTheDocument();
+  });
+
+  test("suppresses Scan Label on the blocked card", async () => {
+    // The booking IS `assigned`, so the scan button's own condition is met.
+    // Scanning there is a collection action on the wrong half of the pair.
+    await renderJobs(UNCOLLECTED_PAIR);
+
+    expect(screen.getAllByRole("button", { name: /Scan Label/ })).toHaveLength(1);
+  });
+
+  test("a genuinely finished job still reads as completed", async () => {
+    // blocked_reason absent — the fallback must be unchanged for every job that
+    // has no action because the work is done, not because it is out of order.
+    await renderJobs([
+      {
+        ...SAME_DAY_PAIR[1],
+        status: "delivered",
+        next_status: null,
+        blocked_reason: null,
+      },
+    ]);
+
+    expect(screen.getByText("✓ Completed")).toBeInTheDocument();
+  });
+});

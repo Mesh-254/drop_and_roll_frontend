@@ -742,6 +742,12 @@ export function DeliveryStatusUpdates({
               const isImmutable = check?.immutable;
               const nextStatus = getNextStatus(job);
               const canUpdate = nextStatus && !isImmutable;
+              // A delivery stop whose parcel has not been collected yet. The
+              // server sends `blocked_reason` naming the job that has to happen
+              // first; without it this card fell through to the "✓ Completed"
+              // branch below and told the driver a job they had not started was
+              // already done.
+              const blockedReason = !canUpdate && !isImmutable ? job.blocked_reason : null;
               const urgent = isUrgentPickup(job.scheduled_pickup_at);
 
               return (
@@ -975,8 +981,11 @@ export function DeliveryStatusUpdates({
                     {/* Action Buttons Row */}
                     <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
                       <div className="flex flex-col sm:flex-row gap-3 flex-1">
-                        {/* QR Scan button for assigned jobs */}
-                        {job.status === "assigned" && !isImmutable && (
+                        {/* QR Scan button for assigned jobs. Suppressed on a
+                            blocked delivery stop — the booking IS `assigned`,
+                            but scanning the label there is a collection action
+                            on the wrong half of a same-day pair. */}
+                        {job.status === "assigned" && !isImmutable && !blockedReason && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1008,6 +1017,11 @@ export function DeliveryStatusUpdates({
                           <div className="px-6 py-3 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 font-bold rounded-xl text-center flex items-center justify-center gap-2">
                             <Lock className="h-5 w-5" />
                             <span>Locked</span>
+                          </div>
+                        ) : blockedReason ? (
+                          <div className="flex-1 px-6 py-3 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 font-bold rounded-xl text-center flex items-center justify-center gap-2">
+                            <Lock className="h-5 w-5 flex-shrink-0" />
+                            <span>{blockedReason}</span>
                           </div>
                         ) : (
                           <div className="px-6 py-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-bold rounded-xl text-center">
