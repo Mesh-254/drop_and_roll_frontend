@@ -34,11 +34,15 @@ import { JobDetailPage } from "./job-detail-page";
 import { OfflineStatusBar } from "./offline/OfflineStatusBar";
 import * as syncEngine from "../../offline/syncEngine";
 import driverApi from "../../api/driver-api";
+import { publishJobStatus } from "../../lib/driver-events";
 
 export default function DriverDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showJobDetail, setShowJobDetail] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState(null);
+  // The list row that was tapped, carrying the stop context (leg, job number,
+  // next_status, blocked_reason) that the booking detail endpoint cannot supply.
+  const [selectedJobStop, setSelectedJobStop] = useState(null);
   const [profile, setProfile] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [documents, setDocuments] = useState([]);
@@ -259,6 +263,18 @@ export default function DriverDashboard() {
         } catch {
           return;
         }
+        // A booking on this driver's board changed status, server-side. Put it
+        // on the bus and stop — the dashboard itself has nothing to do with it,
+        // and re-rendering here to deliver it would recreate every callback the
+        // job list depends on. The list subscribes and re-reads.
+        //
+        // The message carries the identity of the change, not the job: what a
+        // job looks like on the board depends on its stop, its leg and whether
+        // its collection is still open, none of which a socket frame can know.
+        if (data.type === "job.status") {
+          publishJobStatus(data);
+          return;
+        }
         if (data.type === "tracking.toggle") {
           if (data.enabled) {
             driverApi.startLocationTracking();
@@ -339,15 +355,22 @@ export default function DriverDashboard() {
           return;
         }
 
-        const result = await driverApi.getCurrentRoute(
-          currentProfile.driver_profile,
-        );
+        // No argument: a driver polls their OWN route, and the endpoint
+        // defaults to the authenticated profile. Passing the id explicitly is
+        // the admin case (read another driver's route), and doing it here was
+        // what made every driver's poll look like a cross-driver read.
+        const result = await driverApi.getCurrentRoute();
         console.log("[DriverDashboard] Route poll result:", result);
 
         if (result.success && result.data) {
-          const route = result.data;
+          // The endpoint returns {route, bookings}, not a bare route. This read
+          // `result.data.status`, which is undefined on that envelope — so
+          // `hasActiveRoute` was permanently false and the auto-start branch
+          // below was unreachable. A driver mid-route never had tracking turned
+          // on for them; it only ever worked when they toggled it by hand.
+          const route = result.data.route ?? null;
           const hasActiveRoute =
-            route.status && ["assigned", "in_progress"].includes(route.status);
+            !!route && ["assigned", "in_progress"].includes(route.status);
 
           console.log("[DriverDashboard] Active route check:", {
             hasRoute: !!route,
@@ -643,10 +666,29 @@ export default function DriverDashboard() {
     { name: "Profile", icon: User, key: "profile" },
   ];
 
-  const handleJobClick = (job) => {
+  // The whole job object is kept, not just its id. `/api/booking/bookings/<id>/`
+  // returns a BOOKING, and a same-day booking is one booking row with two jobs
+  // at two different doors — so the detail page cannot tell which one was tapped
+  // from the id alone. The list already resolved the leg, the job number and the
+  // next status; handing that down is cheaper and more correct than re-deriving
+  // it there from the booking's status (which is the guess that used to send
+  // same-day parcels to the hub).
+  const handleJobClick = useCallback((job) => {
     setSelectedJobId(job.id);
+    setSelectedJobStop(job);
     setShowJobDetail(true);
-  };
+  }, []);
+
+  // Stable identity. This used to be an inline arrow passed to
+  // DeliveryStatusUpdates, which had it in a useEffect dependency list — so a
+  // new identity on every dashboard render blanked the job list and refetched
+  // page 1, and the driver's scroll position went with it. Half of the "lazy
+  // loading keeps starting over" report was this, not the pagination.
+  // `fetchData` is itself a useCallback with only `navigate` in its deps, so
+  // this identity is stable for the life of the component.
+  const handleJobStatusUpdate = useCallback(() => {
+    fetchData();
+  }, [fetchData]);
 
   // Handle logout
   const handleLogout = async () => {
@@ -774,8 +816,11 @@ export default function DriverDashboard() {
     return (
       <JobDetailPage
         jobId={selectedJobId}
-        onBack={() => setShowJobDetail(false)}
-        usingMockData={false}
+        stopContext={selectedJobStop}
+        onBack={() => {
+          setShowJobDetail(false);
+          setSelectedJobStop(null);
+        }}
       />
     );
   }
@@ -979,11 +1024,7 @@ export default function DriverDashboard() {
               <DeliveryStatusUpdates
                 jobs={jobs}
                 onJobClick={handleJobClick}
-                onStatusUpdate={() => {
-                  toast.success("Jobs updated");
-                  fetchData(); // Refresh jobs after status update
-                }}
-                isAuthenticated={isLoggedIn}
+                onStatusUpdate={handleJobStatusUpdate}
               />
             </div>
           )}

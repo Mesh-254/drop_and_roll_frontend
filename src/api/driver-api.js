@@ -736,19 +736,25 @@ class DriverAPI extends ApiBase {
     }
 
     try {
-      // If driver_id not provided, fetch from profile
-      let id = driver_id;
-      if (!id) {
-        const profileResult = await this.getProfile();
-        if (!profileResult.success || !profileResult.data?.driver_profile) {
-          console.error("[DriverAPI] Could not fetch driver profile");
-          return { success: false, error: "Failed to fetch driver profile" };
-        }
-        id = profileResult.data.driver_profile;
-      }
-
-      const url = `/api/driver/live-tracking/current-route/?driver_id=${id}`;
-      console.log(`[DriverAPI] Fetching current route for driver: ${id}`);
+      // A driver asking for their OWN route sends no driver_id at all — the
+      // endpoint defaults to the authenticated user's profile.
+      //
+      // It used to always send one, resolving it from the profile first when the
+      // caller passed nothing. That cost a needless extra GET on every 60-second
+      // poll, and it was the whole of the 403: the endpoint authorised on the
+      // PRESENCE of driver_id rather than on who it named, so a driver naming
+      // themselves was treated as a driver reaching for someone else's data.
+      // The dashboard then read the 403 as "no active route" and stopped
+      // location tracking on a driver who was mid-route.
+      //
+      // The parameter is still sent when an explicit id is passed, which is the
+      // admin map's case (click a driver, see their route).
+      const url = driver_id
+        ? `/api/driver/live-tracking/current-route/?driver_id=${driver_id}`
+        : "/api/driver/live-tracking/current-route/";
+      console.log(
+        `[DriverAPI] Fetching current route for ${driver_id || "the signed-in driver"}`,
+      );
       const response = await this.request(url);
       await this._cacheRead(cacheKey, response.data);
       return { success: true, data: response.data };
