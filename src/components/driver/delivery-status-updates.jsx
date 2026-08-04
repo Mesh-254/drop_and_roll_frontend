@@ -1,16 +1,39 @@
 "use client";
 
+/**
+ * The driver's job board.
+ *
+ * WHAT A CARD IS ALLOWED TO SAY
+ * -----------------------------
+ * A card answers one question: what do I do at THIS door? So it carries the
+ * stop's own fixed field set and nothing else —
+ *
+ *   leg (Collection / Delivery)   which end of the shipment this is
+ *   job status                    assigned / picked up / in transit / …
+ *   same-day tag                  on BOTH halves of a same-day pair
+ *   contact name + phone          the sender at a collection, the receiver at
+ *                                 a delivery — never both, never the wrong one
+ *   parcel count                  how many pieces to hand over
+ *   postcode (bold) + address     the postcode is what a driver navigates by
+ *   actions                       advance status, scan label, report an issue
+ *
+ * Everything else — tracking number, job id, the other end's address, weight,
+ * dimensions, service type, route metadata — lives on the detail page. Those
+ * fields were on the card and they buried the six that matter under a
+ * full-screen block of text per job.
+ *
+ * The card renders the STOP the driver is at, which is why `stop_address` and
+ * `contact_*` come from the server. A same-day booking is one row and two jobs
+ * at two different doors; the client cannot tell them apart, and a collection
+ * card showing the receiver's name is a parcel handed to a stranger.
+ */
+
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { toast } from "react-hot-toast";
 import {
-  MapPin,
-  Clock,
   Package,
   Filter,
   Search,
-  CheckSquare,
-  Square,
-  ChevronDown,
   AlertTriangle,
   Loader2,
   Lock,
@@ -18,112 +41,169 @@ import {
   ChevronRight,
   AlertCircle,
   RefreshCw,
-  Camera, // NEW: For QR scan button
+  Camera,
   User,
-  Phone, // Used as the call button icon for customer/receiver phone (lines ~809/848)
+  Phone,
+  Zap,
+  ChevronRight as ChevronRightIcon,
 } from "lucide-react";
 import { driverApi } from "../../api/driver-api";
-import { QRScannerModal } from "./QRScannerModal"; // NEW: QR Scanner component
-import { ProofOfDelivery } from "./proof-of-delivery"; // NEW: Proof of Delivery component
-import { FailureReportModal } from "./FailureReportModal"; // NEW: Failure Report Modal
+import { QRScannerModal } from "./QRScannerModal";
+import { ProofOfDelivery } from "./proof-of-delivery";
+import { FailureReportModal } from "./FailureReportModal";
+import { publishJobStatus, subscribeJobStatus } from "../../lib/driver-events";
+
+/**
+ * Identity of a job in this list.
+ *
+ * The STOP, not the booking. A same-day booking is two stops on one route, so a
+ * booking-keyed identity gives React two children with the same key — it
+ * reconciles them as one element and the collection and the delivery fight over
+ * a single card. Falls back to the booking id for standalone jobs, which have
+ * no stop.
+ */
+const jobKey = (job) => job.stop_id || job.id;
+
+/** Slow poll. The floor under the live socket, not the primary path. */
+const BACKGROUND_REFRESH_MS = 45000;
+
+/** How long to let live messages settle before re-reading. */
+const LIVE_REFRESH_DEBOUNCE_MS = 400;
+
+const STATUS_BADGE = {
+  assigned: "bg-blue-100 text-blue-700 border-blue-200",
+  picked_up: "bg-amber-100 text-amber-700 border-amber-200",
+  at_hub: "bg-purple-100 text-purple-700 border-purple-200",
+  in_transit: "bg-indigo-100 text-indigo-700 border-indigo-200",
+  delivered: "bg-green-100 text-green-700 border-green-200",
+};
+
+const ACTION_LABEL = {
+  picked_up: "Mark Picked Up",
+  at_hub: "Mark At Hub",
+  in_transit: "Start Delivery",
+  delivered: "Complete Delivery",
+};
 
 export function DeliveryStatusUpdates({
   jobs: initialJobs = [],
   onJobClick,
   onStatusUpdate,
 }) {
-  const [selectedJobs, setSelectedJobs] = useState([]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [bulkActionOpen, setBulkActionOpen] = useState(false);
   const [jobs, setJobs] = useState(Array.isArray(initialJobs) ? initialJobs : []);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasMoreJobs, setHasMoreJobs] = useState(true);
   const [immutableChecks, setImmutableChecks] = useState({});
-  const [isCheckingImmutable, setIsCheckingImmutable] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [selectedJobForQR, setSelectedJobForQR] = useState(null);
   const [showProofModal, setShowProofModal] = useState(false);
   const [pendingDeliveryJob, setPendingDeliveryJob] = useState(null);
-  const [pendingDeliveryJobs, setPendingDeliveryJobs] = useState([]); // For bulk
   const [showFailureModal, setShowFailureModal] = useState(false);
   const [failureJobId, setFailureJobId] = useState(null);
   const [failureJobTitle, setFailureJobTitle] = useState("");
-  const [failureType, setFailureType] = useState("delivery"); // 'pickup' or 'delivery'
+  const [failureType, setFailureType] = useState("delivery");
   const observerTarget = useRef(null);
 
-  // NEW: Auto-refresh interval ref (for cleanup)
-  const autoRefreshIntervalRef = useRef(null);
+  // `currentPage` read from inside callbacks that must not be recreated when it
+  // changes. A callback that closes over the state value would either be stale
+  // or would re-subscribe every effect that depends on it on every page load.
+  const currentPageRef = useRef(1);
+  useEffect(() => {
+    currentPageRef.current = currentPage;
+  }, [currentPage]);
 
+  /**
+   * Load one page.
+   *
+   * `page` is ALWAYS the page being fetched, and `currentPage` ALWAYS reflects
+   * the highest page currently in `jobs`. The two used to be allowed to
+   * disagree, and that is the whole of the "stuck at ten jobs" bug:
+   *
+   *   1. the driver scrolls, page 2 appends → 20 jobs, currentPage = 2;
+   *   2. the 8-second auto-refresh called fetchJobs(1, false), which REPLACED
+   *      the list with page 1's ten jobs and left currentPage at 2;
+   *   3. the sentinel was on screen again, so the observer fired and asked for
+   *      currentPage + 1 = page 3;
+   *   4. page 3 of a 15-job list is empty, and `hasMoreJobs = 3 < 2` is false.
+   *
+   * From there the list was ten jobs, the sentinel was gone, and nothing would
+   * ever fetch the other five. Every refresh restarted the same cycle, which is
+   * why it read as "the refresh starts all over again".
+   *
+   * The fix is that the cursor follows the data unconditionally, below.
+   */
   const fetchJobs = useCallback(
     async (page, append = false) => {
       try {
-        if (append) {
-          setIsLoadingMore(true);
-        }
+        if (append) setIsLoadingMore(true);
 
         const statusParam = statusFilter !== "all" ? statusFilter : "all";
-        const response = await driverApi.getAssignedJobs(
-          page,
-          pageSize,
-          statusParam
-        );
+        const response = await driverApi.getAssignedJobs(page, pageSize, statusParam);
 
         const newJobs = response.ordered_bookings || [];
         const count = response.count || 0;
 
         if (append) {
-          setJobs((prevJobs) => [...prevJobs, ...newJobs]);
+          // Dedupe on the stop. Pages can genuinely overlap: the list is ordered
+          // by status priority then updated_at, so a status change between two
+          // page fetches shifts every job after it by one position.
+          setJobs((prev) => {
+            const seen = new Set(prev.map(jobKey));
+            return [...prev, ...newJobs.filter((j) => !seen.has(jobKey(j)))];
+          });
         } else {
           setJobs(newJobs);
         }
 
         setTotalCount(count);
-        const totalPages = Math.ceil(count / pageSize);
-        setHasMoreJobs(page < totalPages);
+        setCurrentPage(page);
+        setHasMoreJobs(page < Math.ceil(count / pageSize));
+        return true;
       } catch (error) {
-        toast.error("Failed to fetch jobs");
         console.error("[DeliveryStatusUpdates] Error fetching jobs:", error);
+        toast.error("Failed to fetch jobs");
         if (!append) {
           setJobs([]);
           setTotalCount(0);
+          setCurrentPage(page);
+          setHasMoreJobs(false);
         }
+        return false;
       } finally {
-        if (append) {
-          setIsLoadingMore(false);
-        }
+        if (append) setIsLoadingMore(false);
       }
     },
     [statusFilter, pageSize]
   );
 
-  const checkAllSelectedImmutable = useCallback(async () => {
-    if (selectedJobs.length === 0 || isCheckingImmutable) return;
-    setIsCheckingImmutable(true);
-    try {
-      const response = await driverApi.batchCheckImmutable(selectedJobs);
-      setImmutableChecks((prev) => ({ ...prev, ...response.data }));
-    } catch (error) {
-      console.error("[DeliveryStatusUpdates] Batch immutable check error:", error);
-      toast.error("Failed to check job statuses");
-      await Promise.allSettled(
-        selectedJobs.slice(0, 5).map((id) =>
-          driverApi.checkImmutable(id).then((res) => {
-            if (res.success)
-              setImmutableChecks((prev) => ({
-                ...prev,
-                [id]: { immutable: res.immutable, reason: res.reason },
-              }));
-          })
-        )
-      );
-    } finally {
-      setIsCheckingImmutable(false);
+  /**
+   * Refresh everything the driver has already scrolled to, in place.
+   *
+   * The old auto-refresh called `fetchJobs(1, false)`, which threw away pages
+   * 2..N on every tick — a driver who had scrolled was yanked back to the top
+   * ten jobs every 8 seconds while they were reading one. Re-requesting the
+   * loaded range keeps both the visible list and the cursor intact.
+   *
+   * If the list has shrunk (jobs completed), the later pages come back short or
+   * empty and the list simply ends there, with `hasMoreJobs` recomputed from
+   * the real count each time.
+   */
+  const refreshLoadedPages = useCallback(async () => {
+    const pagesLoaded = Math.max(1, currentPageRef.current);
+    const ok = await fetchJobs(1, false);
+    if (!ok) return;
+    for (let page = 2; page <= pagesLoaded; page += 1) {
+      // Sequential on purpose: each append reads the accumulated list, so the
+      // dedupe above needs the previous page already in state.
+      await fetchJobs(page, true);
     }
-  }, [selectedJobs, isCheckingImmutable]);
+  }, [fetchJobs]);
 
   const checkSingleImmutable = useCallback(
     async (jobId) => {
@@ -131,381 +211,133 @@ export function DeliveryStatusUpdates({
       if (cached !== undefined) return cached;
       const result = await driverApi.checkImmutable(jobId);
       if (result.success) {
-        setImmutableChecks((prev) => ({
-          ...prev,
-          [jobId]: { immutable: result.immutable, reason: result.reason },
-        }));
-        return { immutable: result.immutable, reason: result.reason };
+        const value = { immutable: result.immutable, reason: result.reason };
+        setImmutableChecks((prev) => ({ ...prev, [jobId]: value }));
+        return value;
       }
       return { immutable: false };
     },
     [immutableChecks]
   );
 
+  // First load, and a full reset whenever the driver changes the status filter.
+  //
+  // `onStatusUpdate` used to be in this dependency list. It is an inline arrow
+  // in DriverDashboard, so it had a new identity on every parent render — this
+  // effect therefore blanked `jobs` and refetched page 1 whenever anything at
+  // all re-rendered the dashboard. That is the second half of the "it keeps
+  // starting over" report, and it is not fixed by anything in fetchJobs.
   useEffect(() => {
-    setCurrentPage(1);
     setJobs([]);
+    setCurrentPage(1);
+    setHasMoreJobs(true);
     fetchJobs(1, false);
-  }, [statusFilter, onStatusUpdate, fetchJobs]);
-
-  // STEP 4: Auto-refresh every 8 seconds when on "all" or "assigned" tab (critical for QR scan updates)
-  useEffect(() => {
-    // Clear any existing interval
-    if (autoRefreshIntervalRef.current) {
-      clearInterval(autoRefreshIntervalRef.current);
-    }
-
-    // Only auto-refresh on relevant tabs where QR scan would affect the list
-    if (statusFilter === "all" || statusFilter === "assigned") {
-      autoRefreshIntervalRef.current = setInterval(() => {
-        console.log("[DeliveryStatusUpdates] Auto-refresh triggered (QR scan / status change)");
-        fetchJobs(1, false); // Force full refresh from page 1
-      }, 8000);
-    }
-
-    // Cleanup on unmount or when filter changes
-    return () => {
-      if (autoRefreshIntervalRef.current) {
-        clearInterval(autoRefreshIntervalRef.current);
-      }
-    };
   }, [statusFilter, fetchJobs]);
 
+  // LIVE: a status change on this driver's board arrives on the WebSocket.
+  //
+  // Debounced because one action can produce several messages in a burst (a
+  // same-day collection closes a stop and re-plans the route), and because a
+  // refresh of N loaded pages is N requests. One re-read per settled burst.
   useEffect(() => {
-    if (statusFilter !== "all") {
-      return;
-    }
+    let timer = null;
+    const unsubscribe = subscribeJobStatus(() => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        refreshLoadedPages();
+      }, LIVE_REFRESH_DEBOUNCE_MS);
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [refreshLoadedPages]);
+
+  // The floor under the socket. Was every 8 seconds and reset the list each
+  // time; the socket now carries the urgent case, so this only has to catch
+  // changes made somewhere the broadcast could not reach (an admin edit while
+  // the socket was down).
+  useEffect(() => {
+    const interval = setInterval(refreshLoadedPages, BACKGROUND_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [refreshLoadedPages]);
+
+  // Infinite scroll. Only on the unfiltered board — a status filter gets real
+  // pagination controls instead, because "load more" over a filter that the
+  // driver's own actions keep changing is disorienting.
+  useEffect(() => {
+    if (statusFilter !== "all") return undefined;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        const target = entries[0];
-        if (target.isIntersecting && hasMoreJobs && !isLoadingMore) {
-          const nextPage = currentPage + 1;
-          setCurrentPage(nextPage);
-          fetchJobs(nextPage, true);
-        }
+        if (!entries[0].isIntersecting) return;
+        if (!hasMoreJobs || isLoadingMore) return;
+        fetchJobs(currentPageRef.current + 1, true);
       },
-      {
-        root: null,
-        rootMargin: "100px",
-        threshold: 0.1,
-      }
+      { root: null, rootMargin: "200px", threshold: 0 }
     );
 
-    const currentTarget = observerTarget.current;
-    if (currentTarget) {
-      observer.observe(currentTarget);
-    }
-
+    const target = observerTarget.current;
+    if (target) observer.observe(target);
     return () => {
-      if (currentTarget) {
-        observer.unobserve(currentTarget);
-      }
+      if (target) observer.unobserve(target);
     };
-  }, [statusFilter, currentPage, hasMoreJobs, isLoadingMore, fetchJobs]);
+  }, [statusFilter, hasMoreJobs, isLoadingMore, fetchJobs]);
 
   const totalPages = Math.ceil(totalCount / pageSize);
 
   const formatAddress = useCallback((addr) => {
     if (typeof addr === "string") return addr;
     if (typeof addr === "object" && addr !== null) {
-      const parts = [
-        addr.line1 || "",
-        addr.city || "",
-        addr.region || "",
-        addr.postal_code || "",
-      ].filter(Boolean);
-      return parts.join(", ");
+      return [addr.line1, addr.line2, addr.city, addr.region]
+        .filter(Boolean)
+        .join(", ");
     }
     return "";
   }, []);
 
   const isUrgentPickup = useCallback((scheduledPickupAt) => {
     if (!scheduledPickupAt) return false;
-    const now = new Date();
-    const pickupTime = new Date(scheduledPickupAt);
-    const diffMinutes = (pickupTime - now) / (1000 * 60);
+    const diffMinutes = (new Date(scheduledPickupAt) - new Date()) / (1000 * 60);
     return diffMinutes <= 30 && diffMinutes >= 0;
   }, []);
 
+  // Search covers what the card actually shows: the contact and the address the
+  // driver is being sent to. Searching fields the card hides returns matches the
+  // driver cannot see the reason for.
   const filteredJobs = useMemo(() => {
+    const needle = searchTerm.trim().toLowerCase();
+    if (!needle) return jobs;
     return jobs.filter((job) => {
-      const matchesSearch =
-        (job.customer?.name?.toLowerCase() || "").includes(
-          searchTerm.toLowerCase()
-        ) ||
-        formatAddress(job.pickup_address)
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        formatAddress(job.dropoff_address)
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase());
-      return matchesSearch;
+      const haystack = [
+        job.contact_name,
+        job.contact_phone,
+        job.stop_address?.postal_code,
+        formatAddress(job.stop_address),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(needle);
     });
   }, [jobs, searchTerm, formatAddress]);
-
-  const updatableJobs = useMemo(() => {
-    return selectedJobs.filter((jobId) => {
-      const check = immutableChecks[jobId];
-      return !check?.immutable;
-    });
-  }, [selectedJobs, immutableChecks]);
-
-  const skippedCount = selectedJobs.length - updatableJobs.length;
-
-  const handleJobSelect = useCallback((jobId) => {
-    setSelectedJobs((prev) =>
-      prev.includes(jobId)
-        ? prev.filter((id) => id !== jobId)
-        : [...prev, jobId]
-    );
-    setImmutableChecks((prev) => {
-      const { [jobId]: _, ...rest } = prev;
-      return rest;
-    });
-  }, []);
-
-  const handleSelectAll = () => {
-    if (selectedJobs.length === filteredJobs.length) {
-      setSelectedJobs([]);
-    } else {
-      setSelectedJobs(filteredJobs.map((job) => job.id));
-    }
-  };
-
-  const handleBulkStatusUpdate = useCallback(
-    async (newStatus) => {
-      await checkAllSelectedImmutable();
-      if (updatableJobs.length === 0) {
-        toast.error("No jobs can be updated—all selected are locked.");
-        return;
-      }
-
-      // BLOCK: If trying to mark as "delivered", open Proof of Delivery instead
-      if (newStatus === "delivered") {
-        console.log("[DeliveryStatusUpdates] Blocking bulk delivered - opening ProofOfDelivery for each job");
-        setPendingDeliveryJobs(updatableJobs);
-        setShowProofModal(true);
-        toast.info("You will need to submit proof of delivery for each job");
-        return;
-      }
-
-      const confirmMsg =
-        skippedCount > 0
-          ? `Update ${updatableJobs.length} jobs to ${newStatus
-              .toUpperCase()
-              .replace("_", " ")}? (Skipping ${skippedCount} locked jobs)`
-          : `Update ${selectedJobs.length} jobs to ${newStatus
-              .toUpperCase()
-              .replace("_", " ")}?`;
-
-      if (!window.confirm(confirmMsg)) return;
-
-      try {
-        if (skippedCount > 0) {
-          toast.warning(
-            `Skipping ${skippedCount} locked jobs. Updating ${updatableJobs.length}.`
-          );
-        }
-        await driverApi.bulkUpdateStatus(updatableJobs, newStatus);
-        toast.success(
-          `Updated ${updatableJobs.length} jobs to ${newStatus
-            .toUpperCase()
-            .replace("_", " ")}`
-        );
-        setSelectedJobs([]);
-        setBulkActionOpen(false);
-        setCurrentPage(1);
-        await fetchJobs(1, false);
-        if (onStatusUpdate) onStatusUpdate();
-      } catch (error) {
-        toast.error("Failed to update job statuses");
-        console.error("[DeliveryStatusUpdates] Bulk status update error:", error);
-      }
-    },
-    [checkAllSelectedImmutable, updatableJobs, skippedCount, selectedJobs.length, fetchJobs, onStatusUpdate]
-  );
-
-  const handleSingleStatusUpdate = useCallback(
-    async (jobId, newStatus) => {
-      // Step 1: Check if the job is locked (immutable)
-      const check = await checkSingleImmutable(jobId);
-      if (check.immutable) {
-        toast.error(check.reason || "Job is locked—cannot update.");
-        return;
-      }
-
-      // Step 2: Special handling for "delivered" status → open Proof of Delivery modal
-      if (newStatus === "delivered") {
-        console.log("[DeliveryStatusUpdates] Opening ProofOfDelivery for job:", jobId);
-        setPendingDeliveryJob(jobId);
-        setShowProofModal(true);
-        return;
-      }
-
-      // Step 3: Confirm with user before updating
-      if (
-        !window.confirm(
-          `Mark this job as ${newStatus.toUpperCase().replace("_", " ")}?`
-        )
-      ) {
-        return;
-      }
-
-      try {
-        // Step 4: Call backend to update status
-        const result = await driverApi.updateJobStatus(jobId, newStatus);
-
-        // Step 5: Optimistic UI update + SMART removal
-        // We remove the job from the list immediately when status becomes "at_hub"
-        // because it means the pickup leg is complete (dropped at hub)
-        setJobs((prev) =>
-          prev
-            .map((job) =>
-              job.id === jobId
-                ? {
-                    ...job,
-                    status: newStatus,
-                    updated_at: new Date().toISOString(),
-                  }
-                : job
-            )
-            // Remove from UI if status changed to "at_hub" (completed pickup)
-            .filter((job) => !(job.id === jobId && newStatus === "at_hub"))
-        );
-
-        // Step 6: Single success toast — distinguish "queued for later" from
-        // "confirmed by the server" so the driver always knows sync state.
-        if (result?.queued) {
-          toast(`Saved offline — will sync once you're back online`, { icon: "📶" });
-        } else {
-          toast.success(
-            `Job marked as ${newStatus.toUpperCase().replace("_", " ")}`
-          );
-        }
-
-        // Step 7: Notify parent component (triggers refresh if needed)
-        if (onStatusUpdate) onStatusUpdate();
-      } catch (error) {
-        console.error("[DeliveryStatusUpdates] Single status update error:", error);
-        toast.error("Failed to update job status");
-
-        // Fallback: Refresh from server to keep UI in sync
-        await fetchJobs(1, false);
-      }
-    },
-    [checkSingleImmutable, onStatusUpdate, fetchJobs]
-  );
-
-  // NEW: Manual refresh button handler (great UX for QR scan confirmation)
-  const handleManualRefresh = useCallback(() => {
-    toast.loading("Refreshing jobs...", { id: "refresh-toast" });
-    fetchJobs(1, false).finally(() => {
-      toast.success("Jobs refreshed", { id: "refresh-toast" });
-    });
-  }, [fetchJobs]);
-
-  // NEW: Handle QR scan success
-  const handleQRScanSuccess = useCallback(
-    async (qrContent) => {
-      try {
-        const result = await driverApi.scanQr(qrContent);
-        if (result.success) {
-          toast.success("Label scanned successfully! Job picked up.", {
-            duration: 3,
-          });
-          setShowQRScanner(false);
-          setSelectedJobForQR(null);
-          // Refresh the jobs list to show updated status
-          await fetchJobs(1, false);
-        } else {
-          toast.error(
-            result.message ||
-              "Failed to scan QR. Please try again or manually update status."
-          );
-        }
-      } catch (error) {
-        console.error("[DeliveryStatusUpdates] QR scan error:", error);
-        toast.error("QR scan failed. Please try again.");
-      }
-    },
-    [fetchJobs]
-  );
-
-  // NEW: Handle Proof of Delivery submission
-  // NEW: Handle Proof of Delivery submission
-  // NOTE: submitProofOfDelivery now automatically updates status to "delivered" atomically
-  const handleProofOfDeliverySubmit = useCallback(
-    async (proofData) => {
-      try {
-        const jobId = pendingDeliveryJob || (pendingDeliveryJobs.length > 0 ? pendingDeliveryJobs[0] : null);
-        console.log("[DeliveryStatusUpdates] Submitting proof of delivery for job:", jobId, {
-          hasPhoto: !!proofData.photo,
-          location: proofData.location,
-        });
-
-        // Single API call that submits proof AND updates status to "delivered" atomically
-        const result = await driverApi.submitProofOfDelivery(jobId, proofData);
-
-        if (!result.success) {
-          throw new Error(result.message || "Failed to submit proof");
-        }
-
-        console.log("[DeliveryStatusUpdates] Proof submitted and status updated:", result);
-
-        // Close modal and reset state
-        setShowProofModal(false);
-        setPendingDeliveryJob(null);
-        setPendingDeliveryJobs([]);
-        setSelectedJobs([]);
-        setBulkActionOpen(false);
-        // FIX: Immediately remove the delivered job from the UI so it
-        // disappears right away, without waiting for the network refresh.
-        setJobs((prev) => prev.filter((job) => job.id !== jobId));
-        setSelectedJobs((prev) => prev.filter((id) => id !== jobId));
-
-        if (result.queued) {
-          toast("Saved offline — proof of delivery will sync automatically 📶", {
-            icon: "📶",
-          });
-          // No network refetch here — there's nothing to fetch until sync
-          // happens, and the optimistic removal above already reflects it.
-        } else {
-          toast.success("Delivery completed successfully! ✓");
-          // Refresh the jobs list to show updated status
-          await fetchJobs(1, false);
-        }
-        if (onStatusUpdate) onStatusUpdate();
-      } catch (error) {
-        console.error("[DeliveryStatusUpdates] Proof submission error:", error);
-        toast.error(error.message || "Failed to complete delivery");
-      }
-    },
-    [pendingDeliveryJob, pendingDeliveryJobs, fetchJobs, onStatusUpdate]
-  );
 
   /**
    * Where this job goes next.
    *
-   * C8: PREFER THE SERVER'S ANSWER. This used to be the chain below and nothing
-   * else, and the chain is wrong for same-day: it sends every `picked_up`
-   * booking to `at_hub`, so a driver collecting a same-day parcel was offered
-   * "Mark At Hub", the app posted `at_hub`, and the parcel went to a depot the
-   * customer had paid for it to skip.
+   * C8: PREFER THE SERVER'S ANSWER. The chain below is wrong for same-day: it
+   * sends every `picked_up` booking to `at_hub`, so a driver collecting a
+   * same-day parcel was offered "Mark At Hub", the app posted `at_hub`, and the
+   * parcel went to a depot the customer had paid for it to skip.
    *
    * The client cannot compute this. The correct answer depends on whether the
    * booking has an OPEN DELIVERY STOP on this driver's route, which only the
-   * backend can see — so the backend now sends `next_status` per job and this
-   * uses it.
-   *
-   * The chain stays as a fallback for a stale cached response from before the
-   * field existed. It is deliberately NOT the primary path: if it ever becomes
-   * the primary path again, same-day silently breaks the same way.
+   * backend can see. The chain stays only as a fallback for a stale cached
+   * response from before the field existed.
    */
   const getNextStatus = (job) => {
-    if (job && job.next_status !== undefined) {
-      return job.next_status;
-    }
+    if (job && job.next_status !== undefined) return job.next_status;
     switch (job?.status) {
       case "assigned":
         return "picked_up";
@@ -520,173 +352,186 @@ export function DeliveryStatusUpdates({
     }
   };
 
-  const getStatusBadgeClass = (status) => {
-    switch (status) {
-      case "assigned":
-        return "bg-blue-100 text-blue-700 border border-blue-200";
-      case "picked_up":
-        return "bg-amber-100 text-amber-700 border border-amber-200";
-      case "at_hub":
-        return "bg-purple-100 text-purple-700 border border-purple-200";
-      case "in_transit":
-        return "bg-indigo-100 text-indigo-700 border border-indigo-200";
-      case "delivered":
-        return "bg-green-100 text-green-700 border border-green-200";
-      default:
-        return "bg-gray-100 text-gray-700 border border-gray-200";
-    }
-  };
+  const handleSingleStatusUpdate = useCallback(
+    async (jobId, newStatus) => {
+      const check = await checkSingleImmutable(jobId);
+      if (check.immutable) {
+        toast.error(check.reason || "Job is locked — cannot update.");
+        return;
+      }
 
-  const getStatusLabel = (status) => {
-    return status?.replace("_", " ").toUpperCase() || "UNKNOWN";
-  };
+      // Delivered is never a bare status flip: the backend rejects it without a
+      // proof of delivery on file (POD_REQUIRED), so go straight to capture.
+      if (newStatus === "delivered") {
+        setPendingDeliveryJob(jobId);
+        setShowProofModal(true);
+        return;
+      }
 
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-      fetchJobs(currentPage + 1, false);
-    }
-  };
+      if (!window.confirm(`Mark this job as ${ACTION_LABEL[newStatus] || newStatus}?`)) {
+        return;
+      }
 
-  const handlePrevPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-      fetchJobs(currentPage - 1, false);
+      try {
+        const result = await driverApi.updateJobStatus(jobId, newStatus);
+
+        if (result?.queued) {
+          toast("Saved offline — will sync once you're back online", { icon: "📶" });
+          // Offline: no broadcast is coming, so reflect it locally and stop.
+          setJobs((prev) =>
+            prev.map((job) =>
+              job.id === jobId ? { ...job, status: newStatus } : job
+            )
+          );
+        } else {
+          toast.success(`Job marked ${newStatus.replace("_", " ")}`);
+          // The floor under the socket: announce our own write so the board
+          // re-reads even if the broadcast never arrives.
+          publishJobStatus({ booking_id: jobId, status: newStatus, reason: "local" });
+        }
+
+        if (onStatusUpdate) onStatusUpdate();
+      } catch (error) {
+        console.error("[DeliveryStatusUpdates] Single status update error:", error);
+        toast.error("Failed to update job status");
+        await refreshLoadedPages();
+      }
+    },
+    [checkSingleImmutable, onStatusUpdate, refreshLoadedPages]
+  );
+
+  const handleManualRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    toast.loading("Refreshing jobs...", { id: "refresh-toast" });
+    try {
+      await refreshLoadedPages();
+      toast.success("Jobs refreshed", { id: "refresh-toast" });
+    } finally {
+      setIsRefreshing(false);
     }
+  }, [refreshLoadedPages]);
+
+  /**
+   * Label scanned.
+   *
+   * The backend marks the booking PICKED_UP through the state machine and
+   * broadcasts the change to this driver's socket, so the card updates itself.
+   * `publishJobStatus` here is the floor: if the socket is down or reconnecting,
+   * the driver still sees their own scan land immediately.
+   */
+  const handleQRScanSuccess = useCallback(
+    async (qrContent) => {
+      try {
+        const result = await driverApi.scanQr(qrContent);
+        if (result.success) {
+          toast.success("Label scanned — job picked up");
+          setShowQRScanner(false);
+          setSelectedJobForQR(null);
+          publishJobStatus({
+            booking_id: result.data?.booking_id,
+            status: result.data?.new_status || "picked_up",
+            reason: "scan",
+          });
+          if (onStatusUpdate) onStatusUpdate();
+        } else {
+          toast.error(result.message || "Scan failed. Update the status manually.");
+        }
+      } catch (error) {
+        console.error("[DeliveryStatusUpdates] QR scan error:", error);
+        toast.error("QR scan failed. Please try again.");
+      }
+    },
+    [onStatusUpdate]
+  );
+
+  const handleProofOfDeliverySubmit = useCallback(
+    async (proofData) => {
+      const jobId = pendingDeliveryJob;
+      try {
+        // One call: submits the proof AND moves the booking to delivered.
+        const result = await driverApi.submitProofOfDelivery(jobId, proofData);
+        if (!result.success) throw new Error(result.message || "Failed to submit proof");
+
+        setShowProofModal(false);
+        setPendingDeliveryJob(null);
+        // Drop the card right away rather than waiting for the network round
+        // trip — the driver is standing at the door and the job is done.
+        setJobs((prev) => prev.filter((job) => job.id !== jobId));
+
+        if (result.queued) {
+          toast("Saved offline — proof will sync automatically", { icon: "📶" });
+        } else {
+          toast.success("Delivery completed");
+          publishJobStatus({ booking_id: jobId, status: "delivered", reason: "pod" });
+        }
+        if (onStatusUpdate) onStatusUpdate();
+      } catch (error) {
+        console.error("[DeliveryStatusUpdates] Proof submission error:", error);
+        toast.error(error.message || "Failed to complete delivery");
+      }
+    },
+    [pendingDeliveryJob, onStatusUpdate]
+  );
+
+  const openFailureReport = useCallback((job, type) => {
+    setFailureJobId(job.id);
+    setFailureJobTitle(
+      job.job_number != null ? `Job ${job.job_number}` : job.tracking_number || "this job"
+    );
+    setFailureType(type);
+    setShowFailureModal(true);
+  }, []);
+
+  const handlePageChange = (page) => {
+    if (page < 1 || page > totalPages) return;
+    fetchJobs(page, false);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="sticky top-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-slate-200 dark:border-slate-800">
+        <div className="max-w-3xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <h1 className="text-3xl font-bold text-slate-900">Deliveries</h1>
-              <p className="text-sm text-slate-600 mt-1">
-                {totalCount} total jobs • {filteredJobs.length} visible
+              <h1 className="text-xl font-bold text-slate-900 dark:text-white">
+                My Jobs
+              </h1>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {filteredJobs.length} of {totalCount} shown
               </p>
             </div>
-
-            {/* NEW: Manual Refresh Button (highly visible for QR scan confirmation) */}
             <button
               onClick={handleManualRefresh}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
+              disabled={isRefreshing}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-semibold disabled:opacity-60 active:scale-95 transition"
             >
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
               Refresh
             </button>
-
-            {selectedJobs.length > 0 && (
-              <div className="relative">
-                <button
-                  onClick={async () => {
-                    await checkAllSelectedImmutable();
-                    setBulkActionOpen(!bulkActionOpen);
-                  }}
-                  disabled={isCheckingImmutable}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                >
-                  Actions ({updatableJobs.length}/{selectedJobs.length})
-                  <ChevronDown className="h-4 w-4" />
-                </button>
-                {bulkActionOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg py-2 z-10">
-                    {/* Warning Section */}
-                    {skippedCount > 0 && (
-                      <div className="px-4 py-3 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-800 font-medium">
-                        ⓘ Skipping {skippedCount} locked job{skippedCount > 1 ? "s" : ""}
-                      </div>
-                    )}
-
-                    {/* Picked Up Option */}
-                    {/* <button
-                      onClick={() => handleBulkStatusUpdate("picked_up")}
-                      className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-700 text-sm font-medium"
-                    >
-                      ► Mark as Picked Up
-                    </button> */}
-
-                    {/* At Hub - RESTRICTED */}
-                    {(() => {
-                      // C8: a bulk "At Hub" applies ONE status to every selected
-                      // job, so a same-day parcel caught in the selection would
-                      // be sent to a depot it is meant to skip. The per-job
-                      // button already asks the server (`next_status`); this one
-                      // cannot, so it is offered only when every selected job
-                      // genuinely belongs at the hub.
-                      const allSelectedPickedUp = selectedJobs.every((id) => {
-                        const j = jobs.find((job) => job.id === id);
-                        return (
-                          j?.status === "picked_up" &&
-                          (j?.next_status === undefined || j?.next_status === "at_hub")
-                        );
-                      });
-                      return (
-                        <>
-                          {allSelectedPickedUp ? (
-                            <button
-                              onClick={() => handleBulkStatusUpdate("at_hub")}
-                              className="w-full text-left px-4 py-3 hover:bg-purple-50 dark:hover:bg-purple-900/30 transition-colors text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-700 text-sm font-medium"
-                            >
-                              ◆ Mark as At Hub
-                            </button>
-                          ) : (
-                            <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
-                              <div className="flex items-start gap-2">
-                                <Lock className="h-4 w-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                                <div>
-                                  <p className="text-xs font-bold text-red-700 dark:text-red-300">
-                                    ◆ At Hub Disabled
-                                  </p>
-                                  <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
-                                    Only available when ALL are "Picked Up"
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-
-                    {/* In Transit Option */}
-                    {/* <button
-                      onClick={() => handleBulkStatusUpdate("in_transit")}
-                      className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-900 dark:text-white text-sm font-medium"
-                    >
-                      ↗ Mark as In Transit
-                    </button> */}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
-        </div>
-      </div>
 
-      {/* Filters & Search */}
-      <div className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row gap-3">
+          {/* Search + filter */}
+          <div className="flex gap-2 mt-3">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search by customer, address..."
+                placeholder="Search postcode, name, phone..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-transparent focus:border-slate-300 dark:focus:border-slate-600 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
               />
             </div>
             <div className="relative">
-              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none text-sm font-medium"
+                aria-label="Filter by status"
+                className="pl-9 pr-8 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-transparent text-sm font-medium text-slate-900 dark:text-white appearance-none focus:outline-none"
               >
-                <option value="all">All Statuses</option>
+                <option value="all">All</option>
                 <option value="assigned">Assigned</option>
                 <option value="picked_up">Picked Up</option>
                 <option value="at_hub">At Hub</option>
@@ -698,429 +543,252 @@ export function DeliveryStatusUpdates({
         </div>
       </div>
 
-      {/* Jobs List - Modern Card Design */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Select All Row */}
-        {filteredJobs.length > 0 && (
-          <div className="mb-6 flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-            <button
-              onClick={handleSelectAll}
-              className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors flex-shrink-0"
-              aria-label="Select all jobs"
-            >
-              {selectedJobs.length === filteredJobs.length && filteredJobs.length > 0 ? (
-                <CheckSquare className="h-5 w-5 text-orange-600" />
-              ) : (
-                <Square className="h-5 w-5 text-slate-400" />
-              )}
-            </button>
-            <span className="text-sm font-semibold text-slate-900 dark:text-white">
-              {selectedJobs.length > 0
-                ? `${selectedJobs.length} selected`
-                : `Select jobs (${filteredJobs.length} total)`}
-            </span>
-            {isCheckingImmutable && (
-              <Loader2 className="h-4 w-4 animate-spin text-orange-600 ml-auto" />
-            )}
-          </div>
-        )}
-
-        {/* Bulk Action Restriction Notice */}
-        {selectedJobs.length > 0 && (
-          <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-500 rounded-lg">
-            <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
-              ℹ️ Bulk "At Hub" is only available when ALL selected bookings are "Picked Up"
-            </p>
-          </div>
-        )}
-
-        {/* Jobs Grid */}
+      {/* Job cards */}
+      <div className="max-w-3xl mx-auto px-4 py-4">
         {filteredJobs.length > 0 ? (
-          <div className="space-y-6">
+          <div className="space-y-3">
             {filteredJobs.map((job) => {
-              const check = immutableChecks[job.id];
-              const isImmutable = check?.immutable;
+              const isDelivery = (job.stop_leg || job.leg) === "delivery";
+              const isImmutable = immutableChecks[job.id]?.immutable;
               const nextStatus = getNextStatus(job);
               const canUpdate = nextStatus && !isImmutable;
               // A delivery stop whose parcel has not been collected yet. The
-              // server sends `blocked_reason` naming the job that has to happen
-              // first; without it this card fell through to the "✓ Completed"
-              // branch below and told the driver a job they had not started was
-              // already done.
+              // server names the job that has to happen first; without it this
+              // card fell through to "Completed" and told the driver a job they
+              // had not started was already done.
               const blockedReason = !canUpdate && !isImmutable ? job.blocked_reason : null;
-              const urgent = isUrgentPickup(job.scheduled_pickup_at);
+              const address = job.stop_address;
+              const postcode = address?.postal_code || "";
+              const urgent = !isDelivery && isUrgentPickup(job.scheduled_pickup_at);
+              const parcels = job.num_parcels || 1;
 
               return (
                 <div
-                  // C6: keyed on the STOP, not the booking. A same-day booking is
-                  // two jobs at two doors on one route, so keying on job.id gave
-                  // React two children with the same key — it reconciles them as
-                  // one and the collection and the delivery fight over one card.
-                  // Falls back to the booking id for standalone jobs, which have
-                  // no stop.
-                  key={job.stop_id || job.id}
-                  onClick={() => onJobClick && onJobClick(job)}
-                  className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl hover:shadow-xl transition-all cursor-pointer overflow-hidden group"
+                  key={jobKey(job)}
+                  className={`bg-white dark:bg-slate-900 rounded-2xl border-l-4 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm ${
+                    isDelivery ? "border-l-emerald-500" : "border-l-sky-500"
+                  }`}
                 >
-                  <div className="p-6 sm:p-7">
-                    {/* Top Row: Checkbox + Tracking Number + Status Badge + Urgent Badge */}
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-slate-200 dark:border-slate-700">
-                      <div className="flex gap-4 flex-1 min-w-0">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleJobSelect(job.id);
-                          }}
-                          className="mt-1 p-2.5 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors flex-shrink-0"
-                          aria-label="Select job"
-                        >
-                          {selectedJobs.includes(job.id) ? (
-                            <CheckSquare className="h-5 w-5 text-orange-600" />
-                          ) : (
-                            <Square className="h-5 w-5 text-slate-300 dark:text-slate-600" />
-                          )}
-                        </button>
-                        <div className="min-w-0 flex-1">
-                          {/* C6: which job this is, and which end of it.
-                              job_number is the stop's own sequence from the
-                              backend — never a list index, which would restart
-                              at 1 on page 2 and desync from the real route
-                              position. Both are absent for standalone jobs. */}
-                          {job.job_number != null && (
-                            <div className="flex flex-wrap items-center gap-2 mb-3">
-                              <span className="inline-flex items-center px-3 py-1 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-bold tracking-wide">
-                                Job {job.job_number}
-                              </span>
-                              {job.leg && (
-                                <span
-                                  className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold uppercase tracking-wide ${
-                                    job.leg === "pickup"
-                                      ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200"
-                                      : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
-                                  }`}
-                                >
-                                  {job.leg === "pickup" ? "Collection" : "Delivery"}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                          {/* Large, bold tracking number */}
-                          <div className="mb-2">
-                            <p className="text-xs uppercase tracking-widest font-medium text-slate-500 dark:text-slate-400 mb-1">
-                              Tracking #
-                            </p>
-                            <h3 className="text-2xl sm:text-3xl font-bold font-mono text-slate-900 dark:text-white break-all">
-                              {job.tracking_number || job.id?.slice(-12) || "N/A"}
-                            </h3>
-                          </div>
-                          {job.id && (
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                              Job ID: {job.id.slice(-8)}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Status & Urgent Badges */}
-                      <div className="flex flex-wrap items-center gap-3 sm:items-start sm:justify-end">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold uppercase tracking-wide ${getStatusBadgeClass(
-                            job.status
-                          )}`}
-                        >
-                          {getStatusLabel(job.status)}
-                          {isImmutable && (
-                            <Lock className="h-3.5 w-3.5" title="Locked" />
-                          )}
+                  {/* Tap the body to open the details; the action row below
+                      stops propagation so a mis-tap never fires an action. */}
+                  <button
+                    type="button"
+                    onClick={() => onJobClick && onJobClick(job)}
+                    className="w-full text-left p-4 active:bg-slate-50 dark:active:bg-slate-800/60 transition"
+                  >
+                    {/* Tag row: leg, status, same-day, urgent */}
+                    <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide ${
+                          isDelivery
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
+                            : "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200"
+                        }`}
+                      >
+                        {isDelivery ? "Delivery" : "Collection"}
+                      </span>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-bold uppercase tracking-wide ${
+                          STATUS_BADGE[job.status] ||
+                          "bg-slate-100 text-slate-700 border-slate-200"
+                        }`}
+                      >
+                        {(job.status || "unknown").replace("_", " ")}
+                        {isImmutable && <Lock className="h-3 w-3" />}
+                      </span>
+                      {/* Same-day tag, on BOTH halves of the pair — a driver
+                          holding a same-day parcel must not route it via the
+                          hub, and the delivery card is where that gets decided
+                          just as often as the collection card. */}
+                      {job.is_same_day && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200">
+                          <Zap className="h-3 w-3" />
+                          Same Day
                         </span>
-                        {urgent && (
-                          <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold uppercase tracking-wide bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700">
-                            <AlertCircle className="h-3.5 w-3.5" />
-                            URGENT
-                          </span>
-                        )}
-                      </div>
+                      )}
+                      {urgent && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200">
+                          <AlertCircle className="h-3 w-3" />
+                          Urgent
+                        </span>
+                      )}
+                      {job.job_number != null && (
+                        <span className="ml-auto text-xs font-bold text-slate-400 dark:text-slate-500">
+                          #{job.job_number}
+                        </span>
+                      )}
                     </div>
 
-                    {/* C6: WHERE THIS JOB IS. The card below shows the whole
-                        shipment, pickup and delivery. On a same-day route the
-                        driver has two jobs for that one shipment at two
-                        different doors, and the full picture cannot say which
-                        one they are being sent to now. stop_address is the
-                        snapshot the stop was created with, so an address edited
-                        after dispatch cannot move a job already handed out. */}
-                    {job.stop_address && (
-                      <div className="mb-6 p-4 rounded-xl border-2 border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20">
-                        <p className="text-xs uppercase tracking-widest font-bold text-orange-700 dark:text-orange-300 mb-1.5">
-                          {job.leg === "delivery" ? "Deliver to" : "Collect from"}
+                    {/* Postcode first, big and bold — it is what a driver
+                        navigates by and what they read at speed. The full
+                        address sits under it for the last hundred metres. */}
+                    <div className="mb-3">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+                          {postcode || "No postcode"}
+                        </span>
+                        <ChevronRightIcon className="h-4 w-4 text-slate-300 dark:text-slate-600" />
+                      </div>
+                      <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5 leading-snug">
+                        {formatAddress(address) || "Address unavailable"}
+                      </p>
+                    </div>
+
+                    {/* Contact + parcels */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] uppercase tracking-wide font-semibold text-slate-400 dark:text-slate-500">
+                          {isDelivery ? "Receiver" : "Sender"}
                         </p>
-                        <p className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white">
-                          {formatAddress(job.stop_address) || "N/A"}
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-1.5 truncate">
+                          <User className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+                          {job.contact_name || "Not provided"}
                         </p>
+                      </div>
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-sm font-bold text-slate-700 dark:text-slate-200 flex-shrink-0">
+                        <Package className="h-4 w-4" />
+                        {parcels}
+                        <span className="font-medium text-slate-500 dark:text-slate-400">
+                          {parcels === 1 ? "parcel" : "parcels"}
+                        </span>
+                      </span>
+                    </div>
+                  </button>
+
+                  {/* Actions */}
+                  <div className="flex items-stretch gap-2 px-4 pb-4">
+                    {/* Tap-to-call. Rendered only when there is a number to
+                        dial — a call button that does nothing is worse at a
+                        door than no call button. */}
+                    {job.contact_phone ? (
+                      <a
+                        href={`tel:${job.contact_phone.replace(/[^\d+]/g, "")}`}
+                        aria-label={`Call ${job.contact_name || "contact"}`}
+                        className="flex items-center justify-center w-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 transition flex-shrink-0"
+                      >
+                        <Phone className="h-5 w-5" />
+                      </a>
+                    ) : null}
+
+                    {/* Scan Label: a collection action, so it is suppressed on a
+                        blocked delivery stop. The booking there IS `assigned`,
+                        but scanning is the wrong half of a same-day pair. */}
+                    {job.status === "assigned" && !isImmutable && !blockedReason && (
+                      <button
+                        onClick={() => {
+                          setSelectedJobForQR(job);
+                          setShowQRScanner(true);
+                        }}
+                        className="flex items-center justify-center w-12 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 active:scale-95 transition flex-shrink-0"
+                        aria-label="Scan label"
+                        title="Scan label"
+                      >
+                        <Camera className="h-5 w-5" />
+                      </button>
+                    )}
+
+                    {canUpdate ? (
+                      <button
+                        onClick={() => handleSingleStatusUpdate(job.id, nextStatus)}
+                        className="flex-1 px-4 py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm active:scale-95 transition"
+                      >
+                        {ACTION_LABEL[nextStatus] || "Update"}
+                      </button>
+                    ) : isImmutable ? (
+                      <div className="flex-1 px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold text-sm text-center flex items-center justify-center gap-2">
+                        <Lock className="h-4 w-4" />
+                        Locked
+                      </div>
+                    ) : blockedReason ? (
+                      <div className="flex-1 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 font-semibold text-sm text-center flex items-center justify-center gap-2">
+                        <Lock className="h-4 w-4 flex-shrink-0" />
+                        {blockedReason}
+                      </div>
+                    ) : (
+                      <div className="flex-1 px-4 py-3 rounded-xl bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 font-bold text-sm text-center">
+                        ✓ Completed
                       </div>
                     )}
 
-                    {/* Route Flow: Pickup → Delivery with Dotted Line & Arrow */}
-                    <div className="mb-8">
-                      {/* Pickup Section */}
-                      <div className="mb-6 pb-6 border-b-2 border-dashed border-teal-200 dark:border-teal-800 relative">
-                        <div className="flex gap-4">
-                          <div className="flex flex-col items-center">
-                            <div className="w-4 h-4 rounded-full bg-teal-500 mb-2" />
-                            <div className="w-1 h-16 bg-gradient-to-b from-teal-300 to-teal-100 dark:from-teal-700 dark:to-teal-800" />
-                          </div>
-                          <div className="flex-1 min-w-0 pt-0.5">
-                            <p className="text-xs uppercase tracking-widest font-bold text-teal-700 dark:text-teal-300 mb-1.5">
-                              📦 Pickup Location
-                            </p>
-                            <p className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white mb-2">
-                              {formatAddress(job.pickup_address) || "N/A"}
-                            </p>
-                            {job.customer?.name && (
-                              <p className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1.5 mb-1">
-                                <User className="h-3.5 w-3.5" />
-                                {job.customer.name}
-                              </p>
-                            )}
-                            {job.customer?.phone && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.location.href = `tel:${job.customer.phone.replace(/\D/g, "")}`;
-                                }}
-                                className="text-xs text-teal-600 dark:text-teal-300 hover:underline font-medium flex items-center gap-1.5"
-                              >
-                                <Phone className="h-3.5 w-3.5" />
-                                {job.customer.phone}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Down Arrow Indicator */}
-                        <div className="absolute left-1.5 top-20 text-teal-300 dark:text-teal-700 text-xl">
-                          ↓
-                        </div>
-                      </div>
-
-                      {/* Delivery Section */}
-                      <div className="flex gap-4">
-                        <div className="flex flex-col items-center">
-                          <div className="w-4 h-4 rounded-full bg-blue-500" />
-                        </div>
-                        <div className="flex-1 min-w-0 pt-0.5">
-                          <p className="text-xs uppercase tracking-widest font-bold text-blue-700 dark:text-blue-300 mb-1.5">
-                            🎯 Delivery Location
-                          </p>
-                          <p className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white mb-2">
-                            {formatAddress(job.dropoff_address) || "N/A"}
-                          </p>
-                          {job.receiver_name && (
-                            <p className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1.5 mb-1">
-                              <User className="h-3.5 w-3.5" />
-                              {job.receiver_name}
-                            </p>
-                          )}
-                          {job.receiver_phone && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                window.location.href = `tel:${job.receiver_phone.replace(/\D/g, "")}`;
-                              }}
-                              className="text-xs text-blue-600 dark:text-blue-300 hover:underline font-medium flex items-center gap-1.5"
-                            >
-                              <Phone className="h-3.5 w-3.5" />
-                              {job.receiver_phone}
-                            </button>
-                          )}
-                          {job.receiver_email && (
-                            <p className="text-xs text-slate-600 dark:text-slate-400 break-all">
-                              {job.receiver_email}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Route Metadata */}
-                    {(job.route_number || job.estimated_hours || job.number_of_stops) && (
-                      <div className="mb-6 pb-6 border-b border-slate-200 dark:border-slate-700 grid grid-cols-2 sm:grid-cols-3 gap-4">
-                        {job.route_number && (
-                          <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3">
-                            <p className="text-xs uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-1">
-                              Route
-                            </p>
-                            <p className="text-lg font-bold text-slate-900 dark:text-white">
-                              #{job.route_number}
-                            </p>
-                          </div>
-                        )}
-                        {job.estimated_hours && (
-                          <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3">
-                            <p className="text-xs uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-1">
-                              Est. Time
-                            </p>
-                            <p className="text-lg font-bold text-slate-900 dark:text-white">
-                              {job.estimated_hours}h
-                            </p>
-                          </div>
-                        )}
-                        {job.number_of_stops && (
-                          <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3">
-                            <p className="text-xs uppercase tracking-widest font-bold text-slate-600 dark:text-slate-400 mb-1">
-                              Stops
-                            </p>
-                            <p className="text-lg font-bold text-slate-900 dark:text-white">
-                              {job.number_of_stops}
-                            </p>
-                          </div>
-                        )}
-                      </div>
+                    {/* Report an issue. Available on every job the driver can
+                        still act on: a failure can happen at a collection or a
+                        delivery, and the old card only offered it at two
+                        specific statuses. */}
+                    {!isImmutable && nextStatus && (
+                      <button
+                        onClick={() =>
+                          openFailureReport(job, isDelivery ? "delivery" : "pickup")
+                        }
+                        className="flex items-center justify-center w-12 rounded-xl bg-amber-500 hover:bg-amber-600 text-white active:scale-95 transition flex-shrink-0"
+                        aria-label={isDelivery ? "Report delivery issue" : "Report pickup issue"}
+                        title="Report an issue"
+                      >
+                        <AlertTriangle className="h-5 w-5" />
+                      </button>
                     )}
-
-                    {/* Action Buttons Row */}
-                    <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-                      <div className="flex flex-col sm:flex-row gap-3 flex-1">
-                        {/* QR Scan button for assigned jobs. Suppressed on a
-                            blocked delivery stop — the booking IS `assigned`,
-                            but scanning the label there is a collection action
-                            on the wrong half of a same-day pair. */}
-                        {job.status === "assigned" && !isImmutable && !blockedReason && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedJobForQR(job);
-                              setShowQRScanner(true);
-                            }}
-                            className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg active:scale-95"
-                          >
-                            <Camera className="h-5 w-5" />
-                            <span>Scan Label</span>
-                          </button>
-                        )}
-
-                        {/* Main Action Button */}
-                        {canUpdate ? (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSingleStatusUpdate(job.id, nextStatus);
-                            }}
-                            className="flex-1 px-6 py-3 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg active:scale-95"
-                          >
-                            {nextStatus === "picked_up" && "► Pick Up"}
-                            {nextStatus === "at_hub" && "◆ At Hub"}
-                            {nextStatus === "in_transit" && "↗ In Transit"}
-                            {nextStatus === "delivered" && "✓ Deliver"}
-                          </button>
-                        ) : isImmutable ? (
-                          <div className="px-6 py-3 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 font-bold rounded-xl text-center flex items-center justify-center gap-2">
-                            <Lock className="h-5 w-5" />
-                            <span>Locked</span>
-                          </div>
-                        ) : blockedReason ? (
-                          <div className="flex-1 px-6 py-3 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 font-bold rounded-xl text-center flex items-center justify-center gap-2">
-                            <Lock className="h-5 w-5 flex-shrink-0" />
-                            <span>{blockedReason}</span>
-                          </div>
-                        ) : (
-                          <div className="px-6 py-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-bold rounded-xl text-center">
-                            ✓ Completed
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Secondary Actions */}
-                      <div className="flex gap-2 sm:flex-col">
-                        {/* Report Issue - Contextual */}
-                        {job.status === "assigned" && !isImmutable && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setFailureJobId(job.id);
-                              setFailureJobTitle(job.tracking_number || "Unknown");
-                              setFailureType("pickup");
-                              setShowFailureModal(true);
-                            }}
-                            className="p-3 sm:px-4 sm:py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg transition-colors shadow-sm text-sm flex items-center justify-center gap-1"
-                            title="Report Pickup Issue"
-                          >
-                            <AlertTriangle className="h-4 w-4" />
-                            <span className="hidden sm:inline">Pickup Issue</span>
-                          </button>
-                        )}
-                        {job.status === "in_transit" && !isImmutable && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setFailureJobId(job.id);
-                              setFailureJobTitle(job.tracking_number || "Unknown");
-                              setFailureType("delivery");
-                              setShowFailureModal(true);
-                            }}
-                            className="p-3 sm:px-4 sm:py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-colors shadow-sm text-sm flex items-center justify-center gap-1"
-                            title="Report Delivery Issue"
-                          >
-                            <AlertTriangle className="h-4 w-4" />
-                            <span className="hidden sm:inline">Delivery Issue</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
                   </div>
                 </div>
               );
             })}
           </div>
         ) : (
-          <div className="text-center py-16">
-            <Package className="h-16 w-16 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
-            <p className="text-lg font-bold text-slate-900 dark:text-white">No jobs found</p>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
-              {searchTerm ? "Try adjusting your search filters" : "No deliveries assigned yet"}
+          <div className="text-center py-20">
+            <Package className="h-14 w-14 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
+            <p className="text-base font-bold text-slate-900 dark:text-white">
+              No jobs found
+            </p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+              {searchTerm ? "Try a different search" : "Nothing assigned right now"}
             </p>
           </div>
         )}
 
-        {/* Pagination (only for filtered status) */}
+        {/* Pagination for a filtered board */}
         {statusFilter !== "all" && totalPages > 1 && (
-          <div className="mt-6 flex items-center justify-center gap-2">
+          <div className="mt-6 flex items-center justify-center gap-3">
             <button
-              onClick={handlePrevPage}
+              onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 disabled:opacity-40 active:scale-95 transition"
               aria-label="Previous page"
             >
-              <ChevronLeft className="h-5 w-5 text-slate-600" />
+              <ChevronLeft className="h-5 w-5 text-slate-600 dark:text-slate-300" />
             </button>
-            <span className="text-sm font-medium text-slate-900">
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
               Page {currentPage} of {totalPages}
             </span>
             <button
-              onClick={handleNextPage}
+              onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="p-2 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 disabled:opacity-40 active:scale-95 transition"
               aria-label="Next page"
             >
-              <ChevronRight className="h-5 w-5 text-slate-600" />
+              <ChevronRight className="h-5 w-5 text-slate-600 dark:text-slate-300" />
             </button>
           </div>
         )}
 
-        {/* Infinite scroll trigger */}
+        {/* Infinite-scroll sentinel. Rendered whenever there is more to load, so
+            the observer always has something to watch; it disappears only when
+            the real count says the list is complete. */}
         {statusFilter === "all" && hasMoreJobs && (
-          <div ref={observerTarget} className="mt-8 flex justify-center">
-            {isLoadingMore && (
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-                <span className="text-sm text-slate-600">Loading more...</span>
-              </div>
-            )}
+          <div ref={observerTarget} className="mt-6 py-6 flex justify-center">
+            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+              <Loader2
+                className={`h-4 w-4 text-orange-600 ${isLoadingMore ? "animate-spin" : "opacity-40"}`}
+              />
+              {isLoadingMore ? "Loading more..." : `${totalCount - jobs.length} more`}
+            </div>
           </div>
+        )}
+
+        {statusFilter === "all" && !hasMoreJobs && jobs.length > 0 && (
+          <p className="mt-6 py-4 text-center text-xs font-medium text-slate-400 dark:text-slate-600">
+            All {totalCount} jobs loaded
+          </p>
         )}
       </div>
 
-      {/* NEW: QR Scanner Modal */}
       {showQRScanner && (
         <QRScannerModal
           jobId={selectedJobForQR?.id}
@@ -1132,20 +800,17 @@ export function DeliveryStatusUpdates({
         />
       )}
 
-      {/* NEW: Proof of Delivery Modal */}
       {showProofModal && (
         <ProofOfDelivery
-          jobId={pendingDeliveryJob || (pendingDeliveryJobs.length > 0 ? pendingDeliveryJobs[0] : null)}
+          jobId={pendingDeliveryJob}
           onClose={() => {
             setShowProofModal(false);
             setPendingDeliveryJob(null);
-            setPendingDeliveryJobs([]);
           }}
           onSubmit={handleProofOfDeliverySubmit}
         />
       )}
 
-      {/* NEW: Failure Report Modal - with contextual failure type */}
       <FailureReportModal
         isOpen={showFailureModal}
         jobId={failureJobId}
@@ -1155,12 +820,10 @@ export function DeliveryStatusUpdates({
           setShowFailureModal(false);
           setFailureJobId(null);
           setFailureJobTitle("");
-          setFailureType("delivery"); // Reset to default
+          setFailureType("delivery");
         }}
-        onSuccess={(result) => {
-          console.log("[DeliveryStatusUpdates] Failure reported successfully:", result);
-          // Refresh jobs list to reflect status change
-          fetchJobs(1, false);
+        onSuccess={() => {
+          refreshLoadedPages();
           if (onStatusUpdate) onStatusUpdate();
         }}
       />
