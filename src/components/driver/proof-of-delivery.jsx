@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, lazy, Suspense } from "react";
+import { useState, useRef, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import {
   Camera,
@@ -12,9 +12,19 @@ import {
   Trash2,
 } from "lucide-react";
 import { compressImage } from "../../utils/imageCompression";
+import {
+  ACCURACY_GOOD_M,
+  ACCURACY_MAX_M,
+  LOCATION_WINDOW_MS,
+  classifyAccuracy,
+  exifHorizontalError,
+  formatAccuracy,
+  watchForBestFix,
+} from "../../utils/geoAccuracy";
 
-// Lazy-load exifr to reduce initial load time
-// const exifr = lazy(() => import("exifr"));
+// exifr is loaded on demand inside extractExifLocation via a dynamic import(),
+// which is what keeps it out of the initial bundle. React.lazy/Suspense are for
+// components, not libraries, and importing them here only produced a lint error.
 
 export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
   const [photo, setPhoto] = useState(null);
@@ -282,10 +292,16 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
         return null;
       }
 
+      // See exifHorizontalError: this used to read `gpsAltitudeAccuracy || 10`,
+      // which is the error on the wrong axis with a fabricated fallback.
+      const horizontalError = exifHorizontalError(exif);
+
       return {
         lat: exif.latitude,
         lng: exif.longitude,
-        accuracy: exif.gpsAltitudeAccuracy || 10,
+        accuracy: horizontalError,
+        source: "exif",
+        quality: classifyAccuracy(horizontalError),
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
@@ -294,7 +310,7 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
     }
   };
 
-  const getCurrentLocation = async (retries = 3, timeout = 10000) => {
+  const getCurrentLocation = async (retries = 2, windowMs = LOCATION_WINDOW_MS) => {
     console.log(
       "[ProofOfDelivery] Attempting to get current location, retries left:",
       retries
@@ -306,12 +322,9 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
     }
     setLoading(true);
     try {
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout,
-          maximumAge: 0, // Force fresh location
-        });
+      const position = await watchForBestFix(navigator.geolocation, {
+        windowMs,
+        goodEnoughM: ACCURACY_GOOD_M,
       });
       const { latitude: lat, longitude: lng, accuracy } = position.coords;
       console.log("[ProofOfDelivery] Geolocation success:", {
@@ -319,20 +332,126 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
         lng,
         accuracy,
       });
-      setLocation({ lat, lng, accuracy, timestamp: new Date().toISOString() });
-      toast.success(`Location captured (${accuracy.toFixed(0)}m accuracy)`, {
-        id: "location-toast",
+
+      // A fix this wide is not a location, so retry once or twice for a better
+      // one — a cold GPS chip often just needs a longer window.
+      //
+      // BUT NEVER DEAD-END THE DRIVER. An earlier version cleared the location
+      // and refused to proceed after the retries, which is unfixable on a
+      // device that has no GPS radio at all: no amount of "step outside" makes
+      // a desktop grow one, and the parcel is still delivered. The fix is kept,
+      // labelled `rejected`, and the server records the verdict rather than
+      // refusing the POD. Evidence flagged beats evidence lost.
+      if (accuracy > ACCURACY_MAX_M && retries > 0) {
+        console.warn(
+          `[ProofOfDelivery] Fix too wide (±${Math.round(accuracy)}m), retrying with a longer window`
+        );
+        setTimeout(
+          () => getCurrentLocation(retries - 1, windowMs + LOCATION_WINDOW_MS),
+          500
+        );
+        return;
+      }
+
+      const quality = classifyAccuracy(accuracy);
+      setLocation({
+        lat,
+        lng,
+        accuracy,
+        // The server needs to know whether this came off the GPS chip or out of
+        // a photo's EXIF, because the two have completely different trust.
+        source: "gps",
+        quality,
+        timestamp: new Date().toISOString(),
       });
+
+      if (quality === "rejected") {
+        toast(
+          `Location is only accurate to ±${formatAccuracy(accuracy)}, so it cannot ` +
+            "confirm the address. You can still submit — it will be flagged for review.",
+          { id: "location-toast", icon: "⚑", duration: 9000 }
+        );
+        return;
+      }
+
+      if (accuracy <= ACCURACY_GOOD_M) {
+        toast.success(`Location captured (±${formatAccuracy(accuracy)})`, {
+          id: "location-toast",
+        });
+      } else {
+        // Usable but not good. Saying so lets the driver decide whether to move
+        // a few metres and re-capture before this becomes the delivery record.
+        toast(
+          `Location captured but only accurate to ±${formatAccuracy(accuracy)}. ` +
+            "Tap update outdoors for a better fix.",
+          { id: "location-toast", icon: "⚠️", duration: 6000 }
+        );
+      }
     } catch (error) {
       console.error("[ProofOfDelivery] Geolocation failed:", error);
+      if (error?.code === error?.PERMISSION_DENIED) {
+        toast.error(
+          "Location permission is off. Enable it for this site to record proof of delivery.",
+          { id: "location-toast", duration: 8000 }
+        );
+        return;
+      }
       if (retries > 0) {
         console.log(
           "[ProofOfDelivery] Retrying location capture, attempts left:",
           retries - 1
         );
-        setTimeout(() => getCurrentLocation(retries - 1, timeout + 2000), 1000);
+        setTimeout(
+          () => getCurrentLocation(retries - 1, windowMs + LOCATION_WINDOW_MS),
+          1000
+        );
         return;
       }
+
+      // LAST RESORT, and the reason the driver is not stranded here.
+      //
+      // `watchForBestFix` asks for high accuracy, and a device with no GPS
+      // radio can answer that with neither a position nor an error — the watch
+      // simply stays silent until the window closes ("no position acquired").
+      // Submission requires a location, so without this the driver is stuck on
+      // a screen with nothing left to try, holding a parcel they have already
+      // delivered.
+      //
+      // Dropping to enableHighAccuracy:false asks for the WiFi/IP estimate
+      // explicitly. It is a poor location and it is labelled as one — quality
+      // `rejected`, source `network` — but it is honest, it is submittable, and
+      // the server records the verdict instead of refusing the POD.
+      try {
+        console.log("[ProofOfDelivery] Falling back to low-accuracy position");
+        const fallback = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: false,
+            timeout: 15000,
+            maximumAge: 60000,
+          });
+        });
+        const { latitude: lat, longitude: lng, accuracy } = fallback.coords;
+        setLocation({
+          lat,
+          lng,
+          accuracy: accuracy ?? null,
+          source: "network",
+          quality: classifyAccuracy(accuracy),
+          timestamp: new Date().toISOString(),
+        });
+        toast(
+          `Only an approximate location was available (±${formatAccuracy(accuracy)}). ` +
+            "You can still submit — it will be flagged for review.",
+          { id: "location-toast", icon: "⚑", duration: 9000 }
+        );
+        return;
+      } catch (fallbackError) {
+        console.error(
+          "[ProofOfDelivery] Low-accuracy fallback also failed:",
+          fallbackError
+        );
+      }
+
       toast.error(
         "Failed to capture location. Ensure location services are enabled.",
         { id: "location-toast" }
@@ -502,14 +621,30 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
               >
                 <MapPin className="h-4 w-4" />
                 {location
-                  ? `Update (${location.accuracy?.toFixed(0)}m)`
+                  ? `Update (±${
+                      location.accuracy == null
+                        ? "?"
+                        : formatAccuracy(location.accuracy)
+                    })`
                   : "Capture Location"}
               </button>
             </div>
             {location && (
-              <p className="text-sm text-green-400">
-                ✓ Lat: {location.lat.toFixed(6)}, Lng: {location.lng.toFixed(6)}{" "}
-                (Accuracy: {location.accuracy?.toFixed(0)}m)
+              // The error radius is shown, and coloured, because it is the part
+              // of a POD that decides whether the coordinates prove anything. A
+              // bare pin from a 374 km fix looks exactly like a good one.
+              <p
+                className={`text-sm ${
+                  location.accuracy != null && location.accuracy <= ACCURACY_GOOD_M
+                    ? "text-green-400"
+                    : "text-amber-400"
+                }`}
+              >
+                ✓ Lat: {location.lat.toFixed(6)}, Lng: {location.lng.toFixed(6)}
+                {location.accuracy == null
+                  ? " — accuracy unknown (from photo metadata)"
+                  : ` — accurate to ±${formatAccuracy(location.accuracy)}`}
+                {location.source === "exif" && " · from photo"}
               </p>
             )}
           </div>
