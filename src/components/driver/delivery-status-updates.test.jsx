@@ -39,7 +39,9 @@ jest.mock("../../api/driver-api", () => ({
   driverApi: {
     getAssignedJobs: (...a) => mockGetAssignedJobs(...a),
     batchCheckImmutable: jest.fn(() => Promise.resolve({ results: {} })),
-    checkImmutable: jest.fn(() => Promise.resolve({ success: true, immutable: false })),
+    checkImmutable: jest.fn(() =>
+      Promise.resolve({ success: true, immutable: false }),
+    ),
     updateJobStatus: jest.fn(() => Promise.resolve({ id: "x" })),
     scanQr: jest.fn(),
     submitProofOfDelivery: jest.fn(),
@@ -119,9 +121,21 @@ function job(overrides = {}) {
     is_same_day: false,
     next_status: "picked_up",
     blocked_reason: null,
-    stop_address: { line1: "12 Elm St", city: "Milton Keynes", postal_code: "MK9 1AA" },
-    pickup_address: { line1: "12 Elm St", city: "Milton Keynes", postal_code: "MK9 1AA" },
-    dropoff_address: { line1: "8 Oak Rd", city: "Oxford", postal_code: "OX1 2BB" },
+    stop_address: {
+      line1: "12 Elm St",
+      city: "Milton Keynes",
+      postal_code: "MK9 1AA",
+    },
+    pickup_address: {
+      line1: "12 Elm St",
+      city: "Milton Keynes",
+      postal_code: "MK9 1AA",
+    },
+    dropoff_address: {
+      line1: "8 Oak Rd",
+      city: "Oxford",
+      postal_code: "OX1 2BB",
+    },
     ...overrides,
   };
 }
@@ -136,7 +150,11 @@ const SAME_DAY_PAIR = [
     is_same_day: true,
     contact_name: "Sam Sender",
     contact_role: "sender",
-    stop_address: { line1: "12 Elm St", city: "Milton Keynes", postal_code: "MK9 1AA" },
+    stop_address: {
+      line1: "12 Elm St",
+      city: "Milton Keynes",
+      postal_code: "MK9 1AA",
+    },
   }),
   job({
     stop_id: "stop-delivery",
@@ -180,8 +198,8 @@ describe("same-day dual stop", () => {
     await renderJobs(SAME_DAY_PAIR);
 
     // Keyed on booking id, React collapses these into one card.
-    expect(screen.getByText("#4")).toBeInTheDocument();
-    expect(screen.getByText("#5")).toBeInTheDocument();
+    expect(screen.getByText("4")).toBeInTheDocument();
+    expect(screen.getByText("5")).toBeInTheDocument();
   });
 
   test("labels which end of the shipment each card is", async () => {
@@ -203,8 +221,12 @@ describe("same-day dual stop", () => {
     // the receiver's name is a parcel handed to a stranger.
     await renderJobs(SAME_DAY_PAIR);
 
-    const collection = screen.getByText("Collection").closest("div.bg-white, div");
-    expect(within(collection.closest("button")).getByText("Sam Sender")).toBeInTheDocument();
+    const collection = screen
+      .getByText("Collection")
+      .closest("div.bg-white, div");
+    expect(
+      within(collection.closest("button")).getByText("Sam Sender"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Rita Receiver")).toBeInTheDocument();
     expect(screen.getByText("Sender")).toBeInTheDocument();
     expect(screen.getByText("Receiver")).toBeInTheDocument();
@@ -274,7 +296,9 @@ describe("what a card is allowed to say", () => {
     // The per-job button asks the server; a bulk one cannot.
     await renderJobs([job()]);
 
-    expect(screen.queryByRole("button", { name: /Actions \(/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Actions \(/ }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(/select all/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Select job")).not.toBeInTheDocument();
   });
@@ -286,7 +310,9 @@ describe("what a card is allowed to say", () => {
   });
 
   test("offers tap-to-call when there is a number, and nothing when there is not", async () => {
-    await renderJobs([job({ contact_phone: "+447700900999", contact_name: "Sam Sender" })]);
+    await renderJobs([
+      job({ contact_phone: "+447700900999", contact_name: "Sam Sender" }),
+    ]);
     const call = screen.getByLabelText("Call Sam Sender");
     expect(call).toHaveAttribute("href", "tel:+447700900999");
   });
@@ -313,19 +339,30 @@ describe("what a card is allowed to say", () => {
 
 describe("next status for a collected parcel", () => {
   const collected = (next_status) =>
-    job({ id: "b2", status: "picked_up", stop_id: `stop-${next_status}`, next_status });
+    job({
+      id: "b2",
+      status: "picked_up",
+      stop_id: `stop-${next_status}`,
+      next_status,
+    });
 
   test("a same-day parcel offers In Transit, never At Hub", async () => {
     await renderJobs([collected("in_transit")]);
 
-    expect(screen.getByRole("button", { name: "Start Delivery" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Mark At Hub" })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Start Delivery" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Mark At Hub" }),
+    ).not.toBeInTheDocument();
   });
 
   test("an ordinary parcel still offers At Hub", async () => {
     await renderJobs([collected("at_hub")]);
 
-    expect(screen.getByRole("button", { name: "Mark At Hub" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Mark At Hub" }),
+    ).toBeInTheDocument();
   });
 
   test("the server's answer overrides the local chain", async () => {
@@ -333,7 +370,9 @@ describe("next status for a collected parcel", () => {
     // component were still using its own chain both would render "Mark At Hub".
     await renderJobs([collected("in_transit")]);
 
-    expect(screen.queryByRole("button", { name: "Mark At Hub" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Mark At Hub" }),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -353,7 +392,9 @@ describe("a blocked delivery stop", () => {
   test("offers exactly one action button across the pair", async () => {
     await renderJobs(SAME_DAY_PAIR);
 
-    expect(screen.getAllByRole("button", { name: "Mark Picked Up" })).toHaveLength(1);
+    expect(
+      screen.getAllByRole("button", { name: "Mark Picked Up" }),
+    ).toHaveLength(1);
   });
 
   test("suppresses Scan Label on the blocked card", async () => {
@@ -368,7 +409,13 @@ describe("a blocked delivery stop", () => {
     // blocked_reason absent — the fallback must be unchanged for every job with
     // no action because the work is done, not because it is out of order.
     await renderJobs([
-      job({ id: "b9", stop_id: "s9", status: "delivered", next_status: null, blocked_reason: null }),
+      job({
+        id: "b9",
+        stop_id: "s9",
+        status: "delivered",
+        next_status: null,
+        blocked_reason: null,
+      }),
     ]);
 
     expect(screen.getByText("✓ Completed")).toBeInTheDocument();
@@ -382,10 +429,10 @@ describe("a blocked delivery stop", () => {
 describe("pagination", () => {
   /** 15 jobs over two pages of 10, matching the reported route. */
   const page1 = Array.from({ length: 10 }, (_, i) =>
-    job({ id: `b${i}`, stop_id: `s${i}`, job_number: i + 1 })
+    job({ id: `b${i}`, stop_id: `s${i}`, job_number: i + 1 }),
   );
   const page2 = Array.from({ length: 5 }, (_, i) =>
-    job({ id: `b${10 + i}`, stop_id: `s${10 + i}`, job_number: 11 + i })
+    job({ id: `b${10 + i}`, stop_id: `s${10 + i}`, job_number: 11 + i }),
   );
 
   function serveTwoPages() {
@@ -393,18 +440,22 @@ describe("pagination", () => {
       Promise.resolve({
         ordered_bookings: page === 1 ? page1 : page === 2 ? page2 : [],
         count: 15,
-      })
+      }),
     );
   }
 
   test("scrolling to the bottom loads the rest of the route", async () => {
     serveTwoPages();
     render(<DeliveryStatusUpdates jobs={[]} />);
-    await waitFor(() => expect(screen.getAllByText("MK9 1AA")).toHaveLength(10));
+    await waitFor(() =>
+      expect(screen.getAllByText("MK9 1AA")).toHaveLength(10),
+    );
 
     await scrollToBottom();
 
-    await waitFor(() => expect(screen.getAllByText("MK9 1AA")).toHaveLength(15));
+    await waitFor(() =>
+      expect(screen.getAllByText("MK9 1AA")).toHaveLength(15),
+    );
   });
 
   test("a background refresh keeps the pages already loaded", async () => {
@@ -423,26 +474,36 @@ describe("pagination", () => {
      */
     serveTwoPages();
     render(<DeliveryStatusUpdates jobs={[]} />);
-    await waitFor(() => expect(screen.getAllByText("MK9 1AA")).toHaveLength(10));
+    await waitFor(() =>
+      expect(screen.getAllByText("MK9 1AA")).toHaveLength(10),
+    );
 
     await scrollToBottom();
-    await waitFor(() => expect(screen.getAllByText("MK9 1AA")).toHaveLength(15));
+    await waitFor(() =>
+      expect(screen.getAllByText("MK9 1AA")).toHaveLength(15),
+    );
 
     await act(async () => {
       screen.getByRole("button", { name: /Refresh/ }).click();
     });
 
     // Still all 15 — a refresh must not rewind a driver who has scrolled.
-    await waitFor(() => expect(screen.getAllByText("MK9 1AA")).toHaveLength(15));
+    await waitFor(() =>
+      expect(screen.getAllByText("MK9 1AA")).toHaveLength(15),
+    );
   });
 
   test("the observer never asks for a page past the end", async () => {
     serveTwoPages();
     render(<DeliveryStatusUpdates jobs={[]} />);
-    await waitFor(() => expect(screen.getAllByText("MK9 1AA")).toHaveLength(10));
+    await waitFor(() =>
+      expect(screen.getAllByText("MK9 1AA")).toHaveLength(10),
+    );
 
     await scrollToBottom();
-    await waitFor(() => expect(screen.getAllByText("MK9 1AA")).toHaveLength(15));
+    await waitFor(() =>
+      expect(screen.getAllByText("MK9 1AA")).toHaveLength(15),
+    );
     // Keep scrolling at the end of a fully loaded list.
     await scrollToBottom();
     await scrollToBottom();
@@ -454,11 +515,15 @@ describe("pagination", () => {
   test("stops asking for more once every job is loaded", async () => {
     serveTwoPages();
     render(<DeliveryStatusUpdates jobs={[]} />);
-    await waitFor(() => expect(screen.getAllByText("MK9 1AA")).toHaveLength(10));
+    await waitFor(() =>
+      expect(screen.getAllByText("MK9 1AA")).toHaveLength(10),
+    );
 
     await scrollToBottom();
 
-    await waitFor(() => expect(screen.getByText("All 15 jobs loaded")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("All 15 jobs loaded")).toBeInTheDocument(),
+    );
   });
 
   test("does not reset when the parent re-renders with a new callback identity", async () => {
@@ -469,18 +534,26 @@ describe("pagination", () => {
      * whenever anything at all re-rendered the dashboard.
      */
     serveTwoPages();
-    const { rerender } = render(<DeliveryStatusUpdates jobs={[]} onStatusUpdate={() => {}} />);
-    await waitFor(() => expect(screen.getAllByText("MK9 1AA")).toHaveLength(10));
+    const { rerender } = render(
+      <DeliveryStatusUpdates jobs={[]} onStatusUpdate={() => {}} />,
+    );
+    await waitFor(() =>
+      expect(screen.getAllByText("MK9 1AA")).toHaveLength(10),
+    );
 
     await scrollToBottom();
-    await waitFor(() => expect(screen.getAllByText("MK9 1AA")).toHaveLength(15));
+    await waitFor(() =>
+      expect(screen.getAllByText("MK9 1AA")).toHaveLength(15),
+    );
 
     // A fresh arrow, exactly as an inline prop produces on every render.
     await act(async () => {
       rerender(<DeliveryStatusUpdates jobs={[]} onStatusUpdate={() => {}} />);
     });
 
-    await waitFor(() => expect(screen.getAllByText("MK9 1AA")).toHaveLength(15));
+    await waitFor(() =>
+      expect(screen.getAllByText("MK9 1AA")).toHaveLength(15),
+    );
   });
 
   test("overlapping pages do not duplicate a job", async () => {
@@ -491,14 +564,18 @@ describe("pagination", () => {
       Promise.resolve({
         ordered_bookings: page === 1 ? page1 : [page1[9], ...page2],
         count: 15,
-      })
+      }),
     );
     render(<DeliveryStatusUpdates jobs={[]} />);
-    await waitFor(() => expect(screen.getAllByText("MK9 1AA")).toHaveLength(10));
+    await waitFor(() =>
+      expect(screen.getAllByText("MK9 1AA")).toHaveLength(10),
+    );
 
     await scrollToBottom();
 
-    await waitFor(() => expect(screen.getAllByText("MK9 1AA")).toHaveLength(15));
+    await waitFor(() =>
+      expect(screen.getAllByText("MK9 1AA")).toHaveLength(15),
+    );
   });
 });
 
@@ -515,13 +592,19 @@ describe("live status updates", () => {
     const callsBefore = mockGetAssignedJobs.mock.calls.length;
 
     await act(async () => {
-      publishJobStatus({ booking_id: "booking-1", status: "picked_up", reason: "scan" });
+      publishJobStatus({
+        booking_id: "booking-1",
+        status: "picked_up",
+        reason: "scan",
+      });
       // Past the debounce that coalesces a burst of messages into one re-read.
       await new Promise((resolve) => setTimeout(resolve, 600));
     });
 
     await waitFor(() =>
-      expect(mockGetAssignedJobs.mock.calls.length).toBeGreaterThan(callsBefore)
+      expect(mockGetAssignedJobs.mock.calls.length).toBeGreaterThan(
+        callsBefore,
+      ),
     );
   });
 
@@ -538,5 +621,171 @@ describe("live status updates", () => {
 
     // One page loaded, so one request per settled burst.
     expect(mockGetAssignedJobs.mock.calls.length).toBe(callsBefore + 1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Job card: the step-by-step guide
+//
+// Three defects, all visible on the driver dashboard screenshots:
+//
+//  1. The job number lived inside the tag row as its last child with `ml-auto`.
+//     That row is `flex-wrap`, so on a card carrying four tags (Delivery +
+//     status + Same Day + Urgent) the number wrapped to a second line and
+//     landed in a different place on every card. Following a sequence meant
+//     hunting for the number on each one.
+//
+//  2. The phone number existed in the payload but was rendered only as a green
+//     call icon. A driver could not read it, check it, or say it aloud.
+//
+//  3. `leave_safe_spot` was never sent to the app at all, so the only way to
+//     learn a safe-spot drop was authorised was to open the details modal —
+//     which a driver at an unanswered door does not do. They knock, wait, and
+//     mark it failed for a delivery they were allowed to complete.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("job card: job number", () => {
+  test("the number is rendered outside the tag row so it cannot wrap", async () => {
+    // The regression guard for the alignment defect. The number and the tags
+    // must not share a wrapping flex container.
+    await renderJobs([
+      job({ job_number: 7, is_same_day: true, status: "assigned" }),
+    ]);
+
+    const number = screen.getByText("7");
+    const tag = screen.getByText("Same Day");
+
+    expect(number.closest("div").contains(tag)).toBe(false);
+  });
+
+  test("every card reserves the same width for the number", async () => {
+    // What actually makes a column line up: #7 and #17 occupy the same box.
+    await renderJobs([
+      job({
+        id: "a",
+        stop_id: "s-a",
+        job_number: 7,
+        stop_address: { line1: "1 A St", city: "MK", postal_code: "MK1 1AA" },
+      }),
+      job({
+        id: "b",
+        stop_id: "s-b",
+        job_number: 17,
+        stop_address: { line1: "2 B St", city: "MK", postal_code: "MK2 2BB" },
+      }),
+    ]);
+
+    const seven = screen.getByText("7").closest("div");
+    const seventeen = screen.getByText("17").closest("div");
+
+    expect(seven.className).toBe(seventeen.className);
+    expect(seven.className).toMatch(/tabular-nums/);
+  });
+
+  test("the number is labelled so it reads as a step, not an id", async () => {
+    await renderJobs([job({ job_number: 3 })]);
+
+    expect(screen.getByText("Job")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+  });
+
+  test("a job with no number still renders a card", async () => {
+    // Standalone jobs have no route stop and therefore no job number. The
+    // placeholder keeps the column aligned rather than collapsing the row.
+    await renderJobs([job({ job_number: null })]);
+
+    expect(screen.getByText("MK9 1AA")).toBeInTheDocument();
+  });
+});
+
+describe("job card: phone number", () => {
+  test("the number itself is visible, not just a call button", async () => {
+    await renderJobs([job({ contact_phone: "+447700900999" })]);
+
+    expect(screen.getByText("+447700900999")).toBeInTheDocument();
+  });
+
+  test("the receiver's number shows on a delivery card", async () => {
+    await renderJobs([
+      job({
+        leg: "delivery",
+        stop_leg: "delivery",
+        contact_role: "receiver",
+        contact_name: "Rita Receiver",
+        contact_phone: "+447911222333",
+        status: "at_hub",
+        next_status: "out_for_delivery",
+      }),
+    ]);
+
+    expect(screen.getByText("Receiver")).toBeInTheDocument();
+    expect(screen.getByText("+447911222333")).toBeInTheDocument();
+  });
+
+  test("a missing number says so instead of leaving a blank row", async () => {
+    await renderJobs([job({ contact_phone: "" })]);
+
+    expect(screen.getByText("No phone number")).toBeInTheDocument();
+  });
+
+  test("the number stays tappable alongside being readable", async () => {
+    await renderJobs([job({ contact_phone: "+447700900999" })]);
+
+    expect(screen.getByLabelText(/Call Sam Sender/i)).toHaveAttribute(
+      "href",
+      "tel:+447700900999",
+    );
+  });
+});
+
+describe("job card: leave safe", () => {
+  const leaveSafeJob = (overrides = {}) =>
+    job({
+      leg: "delivery",
+      stop_leg: "delivery",
+      contact_role: "receiver",
+      status: "at_hub",
+      next_status: "out_for_delivery",
+      leave_safe_spot: true,
+      safe_spot_location: "Behind the green bin",
+      ...overrides,
+    });
+
+  test("an authorised safe spot is shown with its location", async () => {
+    await renderJobs([leaveSafeJob()]);
+
+    expect(screen.getByText(/Leave safe authorised/i)).toBeInTheDocument();
+    expect(screen.getByText("Behind the green bin")).toBeInTheDocument();
+  });
+
+  test("authorised with no location still tells the driver what to do", async () => {
+    // Permission without a spot is still permission. Rendering nothing here
+    // would hide the authorisation entirely.
+    await renderJobs([leaveSafeJob({ safe_spot_location: "" })]);
+
+    expect(screen.getByText(/Leave safe authorised/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/leave in a safe place and photograph it/i),
+    ).toBeInTheDocument();
+  });
+
+  test("nothing is shown when the customer did not authorise it", async () => {
+    // The dangerous direction. A driver told to leave a parcel that was never
+    // authorised has abandoned it on a doorstep.
+    await renderJobs([leaveSafeJob({ leave_safe_spot: false })]);
+
+    expect(
+      screen.queryByText(/Leave safe authorised/i),
+    ).not.toBeInTheDocument();
+  });
+
+  test("a payload with no leave-safe fields renders no notice", async () => {
+    // An older backend, or a standalone job. Absent must read as "not
+    // authorised", never as authorised-with-no-spot.
+    await renderJobs([job()]);
+
+    expect(
+      screen.queryByText(/Leave safe authorised/i),
+    ).not.toBeInTheDocument();
   });
 });

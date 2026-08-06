@@ -44,6 +44,7 @@ import {
   Camera,
   User,
   Phone,
+  ShieldCheck,
   Zap,
   ChevronRight as ChevronRightIcon,
 } from "lucide-react";
@@ -92,7 +93,9 @@ export function DeliveryStatusUpdates({
 }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [jobs, setJobs] = useState(Array.isArray(initialJobs) ? initialJobs : []);
+  const [jobs, setJobs] = useState(
+    Array.isArray(initialJobs) ? initialJobs : [],
+  );
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
@@ -144,7 +147,11 @@ export function DeliveryStatusUpdates({
         if (append) setIsLoadingMore(true);
 
         const statusParam = statusFilter !== "all" ? statusFilter : "all";
-        const response = await driverApi.getAssignedJobs(page, pageSize, statusParam);
+        const response = await driverApi.getAssignedJobs(
+          page,
+          pageSize,
+          statusParam,
+        );
 
         const newJobs = response.ordered_bookings || [];
         const count = response.count || 0;
@@ -179,7 +186,7 @@ export function DeliveryStatusUpdates({
         if (append) setIsLoadingMore(false);
       }
     },
-    [statusFilter, pageSize]
+    [statusFilter, pageSize],
   );
 
   /**
@@ -217,7 +224,7 @@ export function DeliveryStatusUpdates({
       }
       return { immutable: false };
     },
-    [immutableChecks]
+    [immutableChecks],
   );
 
   // First load, and a full reset whenever the driver changes the status filter.
@@ -275,7 +282,7 @@ export function DeliveryStatusUpdates({
         if (!hasMoreJobs || isLoadingMore) return;
         fetchJobs(currentPageRef.current + 1, true);
       },
-      { root: null, rootMargin: "200px", threshold: 0 }
+      { root: null, rootMargin: "200px", threshold: 0 },
     );
 
     const target = observerTarget.current;
@@ -299,7 +306,8 @@ export function DeliveryStatusUpdates({
 
   const isUrgentPickup = useCallback((scheduledPickupAt) => {
     if (!scheduledPickupAt) return false;
-    const diffMinutes = (new Date(scheduledPickupAt) - new Date()) / (1000 * 60);
+    const diffMinutes =
+      (new Date(scheduledPickupAt) - new Date()) / (1000 * 60);
     return diffMinutes <= 30 && diffMinutes >= 0;
   }, []);
 
@@ -368,7 +376,11 @@ export function DeliveryStatusUpdates({
         return;
       }
 
-      if (!window.confirm(`Mark this job as ${ACTION_LABEL[newStatus] || newStatus}?`)) {
+      if (
+        !window.confirm(
+          `Mark this job as ${ACTION_LABEL[newStatus] || newStatus}?`,
+        )
+      ) {
         return;
       }
 
@@ -376,28 +388,37 @@ export function DeliveryStatusUpdates({
         const result = await driverApi.updateJobStatus(jobId, newStatus);
 
         if (result?.queued) {
-          toast("Saved offline — will sync once you're back online", { icon: "📶" });
+          toast("Saved offline — will sync once you're back online", {
+            icon: "📶",
+          });
           // Offline: no broadcast is coming, so reflect it locally and stop.
           setJobs((prev) =>
             prev.map((job) =>
-              job.id === jobId ? { ...job, status: newStatus } : job
-            )
+              job.id === jobId ? { ...job, status: newStatus } : job,
+            ),
           );
         } else {
           toast.success(`Job marked ${newStatus.replace("_", " ")}`);
           // The floor under the socket: announce our own write so the board
           // re-reads even if the broadcast never arrives.
-          publishJobStatus({ booking_id: jobId, status: newStatus, reason: "local" });
+          publishJobStatus({
+            booking_id: jobId,
+            status: newStatus,
+            reason: "local",
+          });
         }
 
         if (onStatusUpdate) onStatusUpdate();
       } catch (error) {
-        console.error("[DeliveryStatusUpdates] Single status update error:", error);
+        console.error(
+          "[DeliveryStatusUpdates] Single status update error:",
+          error,
+        );
         toast.error("Failed to update job status");
         await refreshLoadedPages();
       }
     },
-    [checkSingleImmutable, onStatusUpdate, refreshLoadedPages]
+    [checkSingleImmutable, onStatusUpdate, refreshLoadedPages],
   );
 
   const handleManualRefresh = useCallback(async () => {
@@ -434,14 +455,16 @@ export function DeliveryStatusUpdates({
           });
           if (onStatusUpdate) onStatusUpdate();
         } else {
-          toast.error(result.message || "Scan failed. Update the status manually.");
+          toast.error(
+            result.message || "Scan failed. Update the status manually.",
+          );
         }
       } catch (error) {
         console.error("[DeliveryStatusUpdates] QR scan error:", error);
         toast.error("QR scan failed. Please try again.");
       }
     },
-    [onStatusUpdate]
+    [onStatusUpdate],
   );
 
   const handleProofOfDeliverySubmit = useCallback(
@@ -450,7 +473,8 @@ export function DeliveryStatusUpdates({
       try {
         // One call: submits the proof AND moves the booking to delivered.
         const result = await driverApi.submitProofOfDelivery(jobId, proofData);
-        if (!result.success) throw new Error(result.message || "Failed to submit proof");
+        if (!result.success)
+          throw new Error(result.message || "Failed to submit proof");
 
         setShowProofModal(false);
         setPendingDeliveryJob(null);
@@ -459,10 +483,16 @@ export function DeliveryStatusUpdates({
         setJobs((prev) => prev.filter((job) => job.id !== jobId));
 
         if (result.queued) {
-          toast("Saved offline — proof will sync automatically", { icon: "📶" });
+          toast("Saved offline — proof will sync automatically", {
+            icon: "📶",
+          });
         } else {
           toast.success("Delivery completed");
-          publishJobStatus({ booking_id: jobId, status: "delivered", reason: "pod" });
+          publishJobStatus({
+            booking_id: jobId,
+            status: "delivered",
+            reason: "pod",
+          });
         }
         if (onStatusUpdate) onStatusUpdate();
       } catch (error) {
@@ -470,13 +500,15 @@ export function DeliveryStatusUpdates({
         toast.error(error.message || "Failed to complete delivery");
       }
     },
-    [pendingDeliveryJob, onStatusUpdate]
+    [pendingDeliveryJob, onStatusUpdate],
   );
 
   const openFailureReport = useCallback((job, type) => {
     setFailureJobId(job.id);
     setFailureJobTitle(
-      job.job_number != null ? `Job ${job.job_number}` : job.tracking_number || "this job"
+      job.job_number != null
+        ? `Job ${job.job_number}`
+        : job.tracking_number || "this job",
     );
     setFailureType(type);
     setShowFailureModal(true);
@@ -506,7 +538,9 @@ export function DeliveryStatusUpdates({
               disabled={isRefreshing}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-semibold disabled:opacity-60 active:scale-95 transition"
             >
-              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+              />
               Refresh
             </button>
           </div>
@@ -556,10 +590,12 @@ export function DeliveryStatusUpdates({
               // server names the job that has to happen first; without it this
               // card fell through to "Completed" and told the driver a job they
               // had not started was already done.
-              const blockedReason = !canUpdate && !isImmutable ? job.blocked_reason : null;
+              const blockedReason =
+                !canUpdate && !isImmutable ? job.blocked_reason : null;
               const address = job.stop_address;
               const postcode = address?.postal_code || "";
-              const urgent = !isDelivery && isUrgentPickup(job.scheduled_pickup_at);
+              const urgent =
+                !isDelivery && isUrgentPickup(job.scheduled_pickup_at);
               const parcels = job.num_parcels || 1;
 
               return (
@@ -576,47 +612,73 @@ export function DeliveryStatusUpdates({
                     onClick={() => onJobClick && onJobClick(job)}
                     className="w-full text-left p-4 active:bg-slate-50 dark:active:bg-slate-800/60 transition"
                   >
-                    {/* Tag row: leg, status, same-day, urgent */}
-                    <div className="flex flex-wrap items-center gap-1.5 mb-3">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide ${
-                          isDelivery
-                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
-                            : "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200"
-                        }`}
-                      >
-                        {isDelivery ? "Delivery" : "Collection"}
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-bold uppercase tracking-wide ${
-                          STATUS_BADGE[job.status] ||
-                          "bg-slate-100 text-slate-700 border-slate-200"
-                        }`}
-                      >
-                        {(job.status || "unknown").replace("_", " ")}
-                        {isImmutable && <Lock className="h-3 w-3" />}
-                      </span>
-                      {/* Same-day tag, on BOTH halves of the pair — a driver
+                    {/* Job number: its own fixed column, OUTSIDE the tag row.
+                        It used to be the last child of that row with `ml-auto`,
+                        and the row is `flex-wrap` — so on a card carrying four
+                        tags (Delivery + status + Same Day + Urgent) the number
+                        wrapped onto a second line and landed under a different
+                        tag on every card. A driver following a sequence had to
+                        hunt for the number on each one.
+
+                        Fixed width and tabular numerals so #7 and #17 occupy
+                        the same box and the digits line up vertically down the
+                        list, which is what makes the sequence scannable. */}
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="flex-shrink-0 w-14 text-center">
+                        {job.job_number != null ? (
+                          <>
+                            <div className="text-[10px] uppercase tracking-wide font-semibold text-slate-400 dark:text-slate-500 leading-none">
+                              Job
+                            </div>
+                            <div className="text-2xl font-extrabold tabular-nums leading-tight text-slate-900 dark:text-white">
+                              {job.job_number}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-2xl font-extrabold tabular-nums leading-tight text-slate-300 dark:text-slate-700">
+                            –
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Tag row: leg, status, same-day, urgent. Wraps freely
+                          now without dragging the job number around with it. */}
+                      <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide ${
+                            isDelivery
+                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
+                              : "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200"
+                          }`}
+                        >
+                          {isDelivery ? "Delivery" : "Collection"}
+                        </span>
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-bold uppercase tracking-wide ${
+                            STATUS_BADGE[job.status] ||
+                            "bg-slate-100 text-slate-700 border-slate-200"
+                          }`}
+                        >
+                          {(job.status || "unknown").replace("_", " ")}
+                          {isImmutable && <Lock className="h-3 w-3" />}
+                        </span>
+                        {/* Same-day tag, on BOTH halves of the pair — a driver
                           holding a same-day parcel must not route it via the
                           hub, and the delivery card is where that gets decided
                           just as often as the collection card. */}
-                      {job.is_same_day && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200">
-                          <Zap className="h-3 w-3" />
-                          Same Day
-                        </span>
-                      )}
-                      {urgent && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200">
-                          <AlertCircle className="h-3 w-3" />
-                          Urgent
-                        </span>
-                      )}
-                      {job.job_number != null && (
-                        <span className="ml-auto text-xs font-bold text-slate-400 dark:text-slate-500">
-                          #{job.job_number}
-                        </span>
-                      )}
+                        {job.is_same_day && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200">
+                            <Zap className="h-3 w-3" />
+                            Same Day
+                          </span>
+                        )}
+                        {urgent && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200">
+                            <AlertCircle className="h-3 w-3" />
+                            Urgent
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Postcode first, big and bold — it is what a driver
@@ -644,6 +706,21 @@ export function DeliveryStatusUpdates({
                           <User className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
                           {job.contact_name || "Not provided"}
                         </p>
+                        {/* The NUMBER, not just a call icon.
+                            The card carried a green call button and nothing
+                            else, so the digits existed in the payload but were
+                            unreadable — a driver could not check they were
+                            about to ring the right person, read it out, or use
+                            it at all without tapping through. Rendered as text
+                            here and left tappable in the action row below. */}
+                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 mt-0.5 tabular-nums">
+                          <Phone className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+                          {job.contact_phone || (
+                            <span className="font-medium text-slate-400 dark:text-slate-500">
+                              No phone number
+                            </span>
+                          )}
+                        </p>
                       </div>
                       <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-sm font-bold text-slate-700 dark:text-slate-200 flex-shrink-0">
                         <Package className="h-4 w-4" />
@@ -653,6 +730,32 @@ export function DeliveryStatusUpdates({
                         </span>
                       </span>
                     </div>
+
+                    {/* Leave-safe authorisation.
+                        Without this on the card the only way to learn the
+                        customer had authorised a safe-spot drop was to open the
+                        details modal — which a driver at an unanswered door
+                        does not do. They knock, wait, and mark it failed for a
+                        delivery they were allowed to complete.
+
+                        Amber and full-width because it CHANGES THE JOB: it is
+                        an instruction, not a detail, and it has to survive being
+                        read at arm's length in the rain. */}
+                    {job.leave_safe_spot && (
+                      <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2">
+                        <ShieldCheck className="h-4 w-4 flex-shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                        <div className="min-w-0">
+                          <p className="text-[11px] uppercase tracking-wide font-bold text-amber-700 dark:text-amber-300 leading-none">
+                            Leave safe authorised
+                          </p>
+                          <p className="text-sm font-semibold text-amber-900 dark:text-amber-100 mt-1 leading-snug">
+                            {job.safe_spot_location?.trim()
+                              ? job.safe_spot_location
+                              : "No spot given — leave in a safe place and photograph it."}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </button>
 
                   {/* Actions */}
@@ -673,23 +776,27 @@ export function DeliveryStatusUpdates({
                     {/* Scan Label: a collection action, so it is suppressed on a
                         blocked delivery stop. The booking there IS `assigned`,
                         but scanning is the wrong half of a same-day pair. */}
-                    {job.status === "assigned" && !isImmutable && !blockedReason && (
-                      <button
-                        onClick={() => {
-                          setSelectedJobForQR(job);
-                          setShowQRScanner(true);
-                        }}
-                        className="flex items-center justify-center w-12 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 active:scale-95 transition flex-shrink-0"
-                        aria-label="Scan label"
-                        title="Scan label"
-                      >
-                        <Camera className="h-5 w-5" />
-                      </button>
-                    )}
+                    {job.status === "assigned" &&
+                      !isImmutable &&
+                      !blockedReason && (
+                        <button
+                          onClick={() => {
+                            setSelectedJobForQR(job);
+                            setShowQRScanner(true);
+                          }}
+                          className="flex items-center justify-center w-12 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 active:scale-95 transition flex-shrink-0"
+                          aria-label="Scan label"
+                          title="Scan label"
+                        >
+                          <Camera className="h-5 w-5" />
+                        </button>
+                      )}
 
                     {canUpdate ? (
                       <button
-                        onClick={() => handleSingleStatusUpdate(job.id, nextStatus)}
+                        onClick={() =>
+                          handleSingleStatusUpdate(job.id, nextStatus)
+                        }
                         className="flex-1 px-4 py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm active:scale-95 transition"
                       >
                         {ACTION_LABEL[nextStatus] || "Update"}
@@ -717,10 +824,17 @@ export function DeliveryStatusUpdates({
                     {!isImmutable && nextStatus && (
                       <button
                         onClick={() =>
-                          openFailureReport(job, isDelivery ? "delivery" : "pickup")
+                          openFailureReport(
+                            job,
+                            isDelivery ? "delivery" : "pickup",
+                          )
                         }
                         className="flex items-center justify-center w-12 rounded-xl bg-amber-500 hover:bg-amber-600 text-white active:scale-95 transition flex-shrink-0"
-                        aria-label={isDelivery ? "Report delivery issue" : "Report pickup issue"}
+                        aria-label={
+                          isDelivery
+                            ? "Report delivery issue"
+                            : "Report pickup issue"
+                        }
                         title="Report an issue"
                       >
                         <AlertTriangle className="h-5 w-5" />
@@ -738,7 +852,9 @@ export function DeliveryStatusUpdates({
               No jobs found
             </p>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              {searchTerm ? "Try a different search" : "Nothing assigned right now"}
+              {searchTerm
+                ? "Try a different search"
+                : "Nothing assigned right now"}
             </p>
           </div>
         )}
@@ -777,7 +893,9 @@ export function DeliveryStatusUpdates({
               <Loader2
                 className={`h-4 w-4 text-orange-600 ${isLoadingMore ? "animate-spin" : "opacity-40"}`}
               />
-              {isLoadingMore ? "Loading more..." : `${totalCount - jobs.length} more`}
+              {isLoadingMore
+                ? "Loading more..."
+                : `${totalCount - jobs.length} more`}
             </div>
           </div>
         )}
