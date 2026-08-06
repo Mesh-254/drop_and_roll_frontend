@@ -15,6 +15,28 @@ import { db } from "../offline/db";
 const LIVE_TRACKING_FLAG = "dnr_live_tracking_active";
 const LIVE_TRACKING_TTL_MS = 5 * 60 * 1000; // 5 min
 
+// ── Live ping cadence ───────────────────────────────────────────────────────
+// These three numbers ARE the contract with the server's freshness window, and
+// they were previously not stated anywhere: tracking ran a watchPosition and a
+// 30 s setInterval at once, so the real rate was emergent. Meanwhile
+// LIVE_LOCATION_TTL_SECONDS=15 marked a driver stale after 15 s, which a 30 s
+// interval could never satisfy — every driver read stale about half the time.
+//
+// Stated instead:
+//   * at most one ping every LIVE_PING_MIN_INTERVAL_MS (throttle), and
+//   * at least one every LIVE_PING_HEARTBEAT_MS (heartbeat re-sends the last
+//     known fix when a parked driver produces no watch events).
+//
+// So a healthy driver is silent for at most 10 s. LIVE_LOCATION_TTL_SECONDS is
+// set to 30 to clear that with room for network latency and a missed beat; it
+// must never be lowered below LIVE_PING_HEARTBEAT_MS or freshness flaps again.
+const LIVE_PING_MIN_INTERVAL_MS = 5000;
+const LIVE_PING_HEARTBEAT_MS = 10000;
+// Pings wider than this are dropped rather than sent: a 374 km "fix" drags the
+// pin across the map and invents journeys on the history trail. Matches
+// LIVE_ACCURACY_MAX_M on the server, which is the gate that actually holds.
+const LIVE_PING_MAX_ACCURACY_M = 500;
+
 class DriverAPI extends ApiBase {
   constructor() {
     super(); // Initialize ApiBase
@@ -998,9 +1020,32 @@ class DriverAPI extends ApiBase {
     return ws;
   }
 
-  // NEW: Start periodic location updates (call when driver has active jobs)
-  startLocationTracking(intervalMs = 30000) {
-    // Default: every 30 seconds
+  /**
+   * Start live location tracking for a driver with active jobs.
+   *
+   * ONE EMITTER, THROTTLED. This used to run `watchPosition` AND a 30 s
+   * `setInterval` at the same time, both calling the same handler, so the ping
+   * rate was whatever the GPS chip happened to produce plus a poll on top —
+   * unbounded, unpredictable, and doubled while moving.
+   *
+   * Worse, it did not line up with the server. `LIVE_LOCATION_TTL_SECONDS` is
+   * 15 s: a driver whose last ping is older than that is drawn as stale on the
+   * admin map. The interval was 30 s. So a stationary driver — no movement, no
+   * watch events — was marked stale for 15 of every 30 seconds while working
+   * perfectly normally. That is the "location frequency is way off" symptom.
+   *
+   * The fix is to make the cadence a stated number instead of an emergent one:
+   *   * `watchPosition` is the only source (it fires when the device has news,
+   *     which is what actually saves battery on a phone).
+   *   * Emissions are throttled to at most one per `LIVE_PING_MIN_INTERVAL_MS`.
+   *   * A heartbeat re-emits the last known position when the watch has gone
+   *     quiet, so a parked driver keeps reading online.
+   *
+   * The contract the server can rely on: a healthy driver emits at least once
+   * per LIVE_PING_HEARTBEAT_MS. LIVE_LOCATION_TTL_SECONDS must exceed that plus
+   * network latency, or freshness will flap again.
+   */
+  startLocationTracking(intervalMs = LIVE_PING_HEARTBEAT_MS) {
     if (this.locationWatcher) {
       console.log(
         "[DriverAPI] Location tracking already active - not starting duplicate watcher",
@@ -1013,14 +1058,39 @@ class DriverAPI extends ApiBase {
     // only an explicit driver-off / logout clears it via clearLiveTrackingActive().
     this.markLiveTrackingActive();
 
-    // Shared success handler
-    const handlePosition = async (position) => {
+    // Shared success handler. `force` bypasses the throttle for the heartbeat.
+    const handlePosition = async (position, { force = false } = {}) => {
+      const accuracy = position.coords.accuracy ?? null;
+
+      // A fix this wide is not a location. Sending it would drag the driver's
+      // pin across the map and, on the history trail, invent journeys that
+      // never happened. The server rejects these too — this just avoids paying
+      // for the round trip. Note this drops the PING, not the tracking: the
+      // next usable fix goes out normally.
+      if (accuracy != null && accuracy > LIVE_PING_MAX_ACCURACY_M) {
+        console.warn(
+          `[DriverAPI] Dropping ping, accuracy ±${Math.round(accuracy)}m exceeds ${LIVE_PING_MAX_ACCURACY_M}m`,
+        );
+        return;
+      }
+
+      // Throttle. watchPosition can fire several times a second on a moving
+      // vehicle; the admin map cannot use that and the buffer should not carry
+      // it. One emission per LIVE_PING_MIN_INTERVAL_MS is the stated rate.
+      const now = Date.now();
+      if (!force && this._lastPingAt && now - this._lastPingAt < LIVE_PING_MIN_INTERVAL_MS) {
+        this._lastKnownPosition = position; // keep it for the heartbeat
+        return;
+      }
+      this._lastPingAt = now;
+      this._lastKnownPosition = position;
+
       const locationData = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         speed_kmh: position.coords.speed ? position.coords.speed * 3.6 : null, // m/s → km/h
         heading_degrees: position.coords.heading ?? null,
-        accuracy_meters: position.coords.accuracy ?? null,
+        accuracy_meters: accuracy,
       };
 
       // Buffer locally rather than posting immediately — the sync engine
@@ -1079,50 +1149,29 @@ class DriverAPI extends ApiBase {
       highAccuracyOptions,
     );
 
-    console.log("[DriverAPI] Started high-accuracy location watcher");
+    console.log(
+      `[DriverAPI] Location watcher started (min ${LIVE_PING_MIN_INTERVAL_MS}ms between pings, ` +
+        `heartbeat every ${intervalMs}ms)`,
+    );
 
-    // Fallback polling interval (runs in parallel as safety net)
+    // HEARTBEAT, not a second source. It re-sends the last known position when
+    // the watcher has gone quiet, which is the normal state of a driver who is
+    // parked at a drop: no movement means no watch events, and without this the
+    // server sees nothing and marks a working driver offline.
+    //
+    // It never asks the device for a new fix — that was the old interval's job
+    // and it is what made the ping rate unpredictable. If the watcher has
+    // produced nothing at all yet there is simply nothing to send.
     this.locationInterval = setInterval(async () => {
-      try {
-        const position = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(
-            resolve,
-            reject,
-            highAccuracyOptions,
-          );
-        });
-
-        await handlePosition(position); // Reuse same handler
-      } catch (error) {
-        console.error(
-          "[DriverAPI] Interval high-accuracy getCurrentPosition failed:",
-          error,
-        );
-
-        if (error.code === error.TIMEOUT) {
-          console.warn(
-            "[DriverAPI] Interval timeout → trying low-accuracy fallback",
-          );
-
-          try {
-            const position = await new Promise((resolve, reject) => {
-              navigator.geolocation.getCurrentPosition(resolve, reject, {
-                enableHighAccuracy: false,
-                timeout: 45000,
-                maximumAge: 10000,
-              });
-            });
-
-            await handlePosition(position);
-          } catch (lowErr) {
-            console.error(
-              "[DriverAPI] Low-accuracy interval fallback also failed:",
-              lowErr,
-            );
-          }
-        }
+      const last = this._lastKnownPosition;
+      if (!last) {
+        console.warn("[DriverAPI] Heartbeat: no position acquired yet, nothing to send");
+        return;
       }
-    }, intervalMs);
+      const sinceLastPing = Date.now() - (this._lastPingAt ?? 0);
+      if (sinceLastPing < intervalMs) return; // the watcher is keeping up on its own
+      await handlePosition(last, { force: true });
+    }, Math.max(1000, Math.floor(intervalMs / 2)));
   }
 
 
@@ -1251,8 +1300,14 @@ class DriverAPI extends ApiBase {
     if (this.locationInterval) {
       clearInterval(this.locationInterval);
       this.locationInterval = null;
-      console.log("[DriverAPI] Cleared location polling interval");
+      console.log("[DriverAPI] Cleared location heartbeat");
     }
+
+    // Drop the cached fix and the throttle clock. Without this, restarting
+    // tracking would heartbeat a position from the previous session — the
+    // driver's last known spot from hours ago, re-sent as if it were current.
+    this._lastKnownPosition = null;
+    this._lastPingAt = null;
   }
 }
 
