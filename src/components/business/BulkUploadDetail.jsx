@@ -45,11 +45,19 @@ import {
 import toast from "react-hot-toast";
 import bookingApi from "../../api/BookingApi";
 import { useBulkUploadDetail } from "../../hooks/useBulkUploadDetail";
-import { getStatusColors, getStatusLabel } from "../../utils/bulkUploadValidation";
+import {
+  getStatusColors,
+  getStatusLabel,
+} from "../../utils/bulkUploadValidation";
 import BulkUploadProgressBar from "./BulkUploadProgressBar";
 import ErrorTable from "./ErrorTable";
 
-const STEPS_PREPAID = ["Uploaded", "Processing", "Awaiting Payment", "Completed"];
+const STEPS_PREPAID = [
+  "Uploaded",
+  "Processing",
+  "Awaiting Payment",
+  "Completed",
+];
 const STEPS_NET = ["Uploaded", "Processing", "Completed"];
 
 export default function BulkUploadDetail() {
@@ -75,6 +83,12 @@ export default function BulkUploadDetail() {
     handleRetryFailed,
     handleDownloadErrorReport,
     isRetrying,
+    isDraft,
+    isStalled,
+    submitDraft,
+    discardDraft,
+    isSubmittingDraft,
+    draftActionError,
   } = useBulkUploadDetail(id);
 
   const [activeTab, setActiveTab] = useState("overview");
@@ -91,12 +105,23 @@ export default function BulkUploadDetail() {
       : null;
 
   const statusColors = upload ? getStatusColors(upload.status) : null;
-  const statusLabel = upload ? getStatusLabel(upload.status) : "";
+  // "Pending" reads as "we're on it". For a draft nobody is on it, and the
+  // pill is the first thing the user looks at, so it has to say so.
+  const statusLabel = upload
+    ? isDraft
+      ? "Not Submitted"
+      : getStatusLabel(upload.status)
+    : "";
 
   // ─── Step status logic ────────────────────────────────────────────────────
   const getStepStatus = (stepIdx) => {
     if (!upload) return "pending";
     const s = upload.status;
+
+    // A draft stopped at step 1. It was uploaded, and that is all — no task
+    // exists, so showing step 2 "Processing" as active claimed work that was
+    // never dispatched and left the user watching a bar that could not move.
+    if (isDraft) return stepIdx === 0 ? "active" : "pending";
 
     if (isPrepaid) {
       if (stepIdx === 0) return "done";
@@ -121,7 +146,13 @@ export default function BulkUploadDetail() {
         return "done";
       }
       if (stepIdx === 2) {
-        if (s === "completed" || s === "partial" || s === "failed" || s === "cancelled") return "done";
+        if (
+          s === "completed" ||
+          s === "partial" ||
+          s === "failed" ||
+          s === "cancelled"
+        )
+          return "done";
         return "pending";
       }
     }
@@ -139,7 +170,10 @@ export default function BulkUploadDetail() {
           <div className="h-4 w-1/3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-10" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+              <div
+                key={i}
+                className="h-24 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"
+              />
             ))}
           </div>
           <div className="flex justify-center pt-8">
@@ -316,8 +350,9 @@ export default function BulkUploadDetail() {
                   Payment Required
                 </h3>
                 <p className="text-sm text-amber-700 dark:text-amber-400/80 mt-1">
-                  Your {upload.successful} booking{upload.successful !== 1 ? "s are" : " is"} processed
-                  and reserved. Complete payment to schedule deliveries.
+                  Your {upload.successful} booking
+                  {upload.successful !== 1 ? "s are" : " is"} processed and
+                  reserved. Complete payment to schedule deliveries.
                 </p>
                 {amount && (
                   <p className="text-lg font-bold text-amber-800 dark:text-amber-300 mt-2">
@@ -346,7 +381,8 @@ export default function BulkUploadDetail() {
                   All Bookings Created Successfully
                 </h3>
                 <p className="text-sm text-green-600 dark:text-green-400/80 mt-1">
-                  All {upload.total_rows} rows processed. {upload.successful} bookings created and scheduled.
+                  All {upload.total_rows} rows processed. {upload.successful}{" "}
+                  bookings created and scheduled.
                 </p>
                 {amount && (
                   <p className="text-sm text-green-600 dark:text-green-400/80 mt-2 font-semibold">
@@ -366,7 +402,8 @@ export default function BulkUploadDetail() {
                   {upload.successful} of {upload.total_rows} Rows Processed
                 </h3>
                 <p className="text-sm text-amber-600 dark:text-amber-400/80 mt-1">
-                  {upload.failed} row{upload.failed !== 1 ? "s had" : " had"} errors. Review and retry below.
+                  {upload.failed} row{upload.failed !== 1 ? "s had" : " had"}{" "}
+                  errors. Review and retry below.
                 </p>
               </div>
             </div>
@@ -389,12 +426,113 @@ export default function BulkUploadDetail() {
             </div>
           )}
 
+          {/* Nothing new to book — every valid row matched a booking that
+              already exists. Distinct from "failed": no work was lost, and
+              telling the user to fix and re-upload would create duplicates. */}
+          {["completed", "partial"].includes(upload.status) &&
+            (upload.successful || 0) === 0 &&
+            (upload.skipped || 0) > 0 && (
+              <div className="p-6 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 rounded-lg flex gap-4 items-start">
+                <AlertCircle className="h-6 w-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-bold text-blue-700 dark:text-blue-400 text-lg">
+                    Already Booked — No New Bookings Created
+                  </h3>
+                  <p className="text-sm text-blue-600 dark:text-blue-400/80 mt-1">
+                    {upload.skipped} row{upload.skipped !== 1 ? "s" : ""}{" "}
+                    matched a booking you already have, so nothing was
+                    duplicated and nothing was charged. The "Already booked"
+                    list on the Successful tab shows which ones.
+                    {(upload.failed || 0) > 0
+                      ? ` The remaining ${upload.failed} row${upload.failed !== 1 ? "s" : ""} had errors — fix those rows only and re-upload just them.`
+                      : ""}
+                  </p>
+                </div>
+              </div>
+            )}
+
+          {/* Draft — validated but never submitted. No Celery task exists, so
+              this will sit here until the user submits or discards it. */}
+          {isDraft && (
+            <div className="p-6 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-lg">
+              <div className="flex gap-4 items-start">
+                <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-bold text-amber-700 dark:text-amber-400 text-lg">
+                    Not Submitted Yet
+                  </h3>
+                  <p className="text-sm text-amber-600 dark:text-amber-400/80 mt-1">
+                    This file was uploaded and checked, but never sent for
+                    processing — no bookings have been created and nothing has
+                    been charged. Submit it now, or discard it and start again.
+                  </p>
+                  {draftActionError && (
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                      {draftActionError}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-3 mt-4">
+                    <button
+                      type="button"
+                      onClick={submitDraft}
+                      disabled={isSubmittingDraft}
+                      className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white text-sm font-semibold"
+                    >
+                      {isSubmittingDraft
+                        ? "Submitting…"
+                        : "Submit for Processing"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={discardDraft}
+                      disabled={isSubmittingDraft}
+                      className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-60 text-sm font-semibold text-gray-700 dark:text-gray-300"
+                    >
+                      Discard
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Stalled — submitted, but the status has not moved in minutes.
+              Polling has stopped; say so rather than animate a dead bar. */}
+          {isStalled && !isDraft && (
+            <div className="p-6 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-lg">
+              <div className="flex gap-4 items-start">
+                <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-bold text-amber-700 dark:text-amber-400 text-lg">
+                    Taking Longer Than Expected
+                  </h3>
+                  <p className="text-sm text-amber-600 dark:text-amber-400/80 mt-1">
+                    This upload hasn't progressed for several minutes. It may
+                    still finish — our system automatically clears genuinely
+                    stuck uploads within 15 minutes and nothing is charged for
+                    one that never completes. Check again, or contact support if
+                    it stays here.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={refetchUpload}
+                    className="mt-4 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold"
+                  >
+                    Check Again
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Cancelled */}
           {upload.status === "cancelled" && (
             <div className="p-6 bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-lg flex gap-4 items-start">
               <AlertCircle className="h-6 w-6 text-gray-500 flex-shrink-0 mt-0.5" />
               <div>
-                <h3 className="font-bold text-gray-700 dark:text-gray-300 text-lg">Upload Cancelled</h3>
+                <h3 className="font-bold text-gray-700 dark:text-gray-300 text-lg">
+                  Upload Cancelled
+                </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   This upload was cancelled before it was processed.
                 </p>
@@ -402,8 +540,10 @@ export default function BulkUploadDetail() {
             </div>
           )}
 
-          {/* Processing — live progress, refreshed automatically by the hook */}
-          {["pending", "processing"].includes(upload.status) && (
+          {/* Processing — live progress, refreshed automatically by the hook.
+              Excluded for a draft: "Processing: 0 / 0 rows" on a batch nobody
+              is processing is the exact lie this screen used to tell. */}
+          {!isDraft && ["pending", "processing"].includes(upload.status) && (
             <BulkUploadProgressBar
               pct={upload.progress_pct || 0}
               label={`Processing: ${(upload.successful || 0) + (upload.failed || 0) + (upload.skipped || 0)} / ${upload.total_rows} rows`}
@@ -419,9 +559,23 @@ export default function BulkUploadDetail() {
           transition={{ delay: 0.15 }}
           className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4"
         >
-          <KPICard label="TOTAL ROWS" value={upload.total_rows || 0} icon={BarChart3} />
-          <KPICard label="SUCCESSFUL" value={upload.successful || 0} icon={CheckCircle2} color="green" />
-          <KPICard label="FAILED" value={upload.failed || 0} icon={AlertCircle} color="red" />
+          <KPICard
+            label="TOTAL ROWS"
+            value={upload.total_rows || 0}
+            icon={BarChart3}
+          />
+          <KPICard
+            label="SUCCESSFUL"
+            value={upload.successful || 0}
+            icon={CheckCircle2}
+            color="green"
+          />
+          <KPICard
+            label="FAILED"
+            value={upload.failed || 0}
+            icon={AlertCircle}
+            color="red"
+          />
           <KPICard
             label="TOTAL VALUE"
             value={amount ? `£${amount}` : "—"}
@@ -433,24 +587,26 @@ export default function BulkUploadDetail() {
         {/* Overview progress indicator — always visible, not just while
            actively processing, so the KPI grid and progress bar agree even
            after a page refresh mid- or post-run. */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.18 }}
-          className="mb-8"
-        >
-          <BulkUploadProgressBar
-            pct={upload.progress_pct ?? 0}
-            label={statusLabel}
-            status={
-              upload.status === "completed"
-                ? "completed"
-                : upload.status === "failed"
-                  ? "failed"
-                  : "processing"
-            }
-          />
-        </motion.div>
+        {!isDraft && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.18 }}
+            className="mb-8"
+          >
+            <BulkUploadProgressBar
+              pct={upload.progress_pct ?? 0}
+              label={statusLabel}
+              status={
+                upload.status === "completed"
+                  ? "completed"
+                  : upload.status === "failed"
+                    ? "failed"
+                    : "processing"
+              }
+            />
+          </motion.div>
+        )}
 
         {/* Discount badge */}
         {(upload.bulk_discount_pct || 0) > 0 && (
@@ -478,6 +634,7 @@ export default function BulkUploadDetail() {
             onTabChange={setActiveTab}
             failedCount={upload.failed || 0}
             successfulCount={upload.successful || 0}
+            skippedCount={upload.skipped || 0}
           />
         </motion.div>
 
@@ -545,11 +702,34 @@ export default function BulkUploadDetail() {
 // Sub-components
 // ═══════════════════════════════════════════════════════════════════════════
 
-function TabSelector({ activeTab, onTabChange, failedCount, successfulCount }) {
+function TabSelector({
+  activeTab,
+  onTabChange,
+  failedCount,
+  successfulCount,
+  skippedCount = 0,
+}) {
+  // The Successful tab also holds the matched-existing (skipped) rows, so it
+  // must open when there are skips even with zero new bookings. Gating it on
+  // successfulCount alone locked the all-duplicates batch — the one case where
+  // the user most needs to see WHICH bookings already existed — behind a
+  // disabled tab, with the Overview offering no other route to that list.
+  const successfulTabCount = successfulCount + skippedCount;
   const tabs = [
     { id: "overview", label: "Overview" },
-    { id: "errors", label: `Errors (${failedCount})`, disabled: failedCount === 0 },
-    { id: "successful", label: `Successful (${successfulCount})`, disabled: successfulCount === 0 },
+    {
+      id: "errors",
+      label: `Errors (${failedCount})`,
+      disabled: failedCount === 0,
+    },
+    {
+      id: "successful",
+      label:
+        skippedCount > 0
+          ? `Successful (${successfulCount}) · Already booked (${skippedCount})`
+          : `Successful (${successfulCount})`,
+      disabled: successfulTabCount === 0,
+    },
   ];
 
   return (
@@ -576,29 +756,45 @@ function OverviewTab({ upload, amount }) {
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <InfoCard title="Batch Details" items={[
-          { label: "Batch Name", value: upload.batch_name || "Unnamed" },
-          { label: "Created At", value: new Date(upload.created_at).toLocaleString() },
-          { label: "Status", value: getStatusLabel(upload.status) },
-        ]} />
+        <InfoCard
+          title="Batch Details"
+          items={[
+            { label: "Batch Name", value: upload.batch_name || "Unnamed" },
+            {
+              label: "Created At",
+              value: new Date(upload.created_at).toLocaleString(),
+            },
+            { label: "Status", value: getStatusLabel(upload.status) },
+          ]}
+        />
 
-        <InfoCard title="Processing Summary" items={[
-          { label: "Total Rows", value: upload.total_rows || 0 },
-          {
-            label: "Success Rate",
-            value: upload.total_rows > 0 ? `${Math.round((upload.successful / upload.total_rows) * 100)}%` : "0%",
-          },
-          {
-            label: "Processed At",
-            value: upload.processed_at ? new Date(upload.processed_at).toLocaleString() : "In progress...",
-          },
-          { label: "Total Value", value: amount ? `£${amount}` : "—" },
-        ]} />
+        <InfoCard
+          title="Processing Summary"
+          items={[
+            { label: "Total Rows", value: upload.total_rows || 0 },
+            {
+              label: "Success Rate",
+              value:
+                upload.total_rows > 0
+                  ? `${Math.round((upload.successful / upload.total_rows) * 100)}%`
+                  : "0%",
+            },
+            {
+              label: "Processed At",
+              value: upload.processed_at
+                ? new Date(upload.processed_at).toLocaleString()
+                : "In progress...",
+            },
+            { label: "Total Value", value: amount ? `£${amount}` : "—" },
+          ]}
+        />
       </div>
 
       {upload.notes && (
         <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-          <p className="text-sm text-gray-600 dark:text-gray-400 font-medium mb-2">Notes</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 font-medium mb-2">
+            Notes
+          </p>
           <p className="text-gray-900 dark:text-gray-100">{upload.notes}</p>
         </div>
       )}
@@ -606,12 +802,24 @@ function OverviewTab({ upload, amount }) {
   );
 }
 
-function ErrorsTab({ upload, errorRows, errorMeta, errorPage, onPageChange, isFetching, onDownload, onRetry, isRetrying }) {
+function ErrorsTab({
+  upload,
+  errorRows,
+  errorMeta,
+  errorPage,
+  onPageChange,
+  isFetching,
+  onDownload,
+  onRetry,
+  isRetrying,
+}) {
   if (upload.failed === 0) {
     return (
       <div className="text-center py-12">
         <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4 opacity-50" />
-        <p className="text-gray-600 dark:text-gray-400 font-medium">No errors — all rows processed successfully!</p>
+        <p className="text-gray-600 dark:text-gray-400 font-medium">
+          No errors — all rows processed successfully!
+        </p>
       </div>
     );
   }
@@ -631,7 +839,17 @@ function ErrorsTab({ upload, errorRows, errorMeta, errorPage, onPageChange, isFe
   );
 }
 
-function SuccessfulTab({ upload, amount, rows, meta, page, onPageChange, isFetching, skippedRows = [], onViewBooking }) {
+function SuccessfulTab({
+  upload,
+  amount,
+  rows,
+  meta,
+  page,
+  onPageChange,
+  isFetching,
+  skippedRows = [],
+  onViewBooking,
+}) {
   // Per-row label download in flight (by row id), and the bulk "download all".
   const [downloadingRow, setDownloadingRow] = useState(null);
   const [downloadingAll, setDownloadingAll] = useState(false);
@@ -653,15 +871,24 @@ function SuccessfulTab({ upload, amount, rows, meta, page, onPageChange, isFetch
     if (!res.success) {
       toast.error(res.message || "Could not download labels.");
     } else if (res.pending) {
-      toast.success(`Downloaded ${res.ready} label${res.ready === 1 ? "" : "s"}; ${res.pending} still generating.`);
+      toast.success(
+        `Downloaded ${res.ready} label${res.ready === 1 ? "" : "s"}; ${res.pending} still generating.`,
+      );
     }
   };
 
   if (!upload.successful || upload.successful === 0) {
     return (
-      <div className="text-center py-12">
-        <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4 opacity-50" />
-        <p className="text-gray-600 dark:text-gray-400 font-medium">No successful bookings in this upload.</p>
+      <div>
+        <div className="text-center py-12">
+          <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4 opacity-50" />
+          <p className="text-gray-600 dark:text-gray-400 font-medium">
+            {skippedRows.length > 0
+              ? "No NEW bookings were created — every valid row already had one."
+              : "No successful bookings in this upload."}
+          </p>
+        </div>
+        <SkippedRowsTable skippedRows={skippedRows} />
       </div>
     );
   }
@@ -672,14 +899,20 @@ function SuccessfulTab({ upload, amount, rows, meta, page, onPageChange, isFetch
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <InfoCard title="Success Stats" items={[
-          { label: "Bookings Created", value: upload.successful },
-          {
-            label: "Success Rate",
-            value: upload.total_rows > 0 ? `${Math.round((upload.successful / upload.total_rows) * 100)}%` : "0%",
-          },
-          { label: "Total Value", value: amount ? `£${amount}` : "—" },
-        ]} />
+        <InfoCard
+          title="Success Stats"
+          items={[
+            { label: "Bookings Created", value: upload.successful },
+            {
+              label: "Success Rate",
+              value:
+                upload.total_rows > 0
+                  ? `${Math.round((upload.successful / upload.total_rows) * 100)}%`
+                  : "0%",
+            },
+            { label: "Total Value", value: amount ? `£${amount}` : "—" },
+          ]}
+        />
       </div>
 
       {/* Download All Labels — appears once at least one label is ready. */}
@@ -704,14 +937,17 @@ function SuccessfulTab({ upload, amount, rows, meta, page, onPageChange, isFetch
       <div className="p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30 rounded-lg flex items-start gap-3">
         <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
         <p className="text-sm text-green-700 dark:text-green-400">
-          {upload.successful} booking{upload.successful !== 1 ? "s have" : " has"} been created and are ready for
-          scheduling. Tap a row below to jump to it in Booking History.
+          {upload.successful} booking
+          {upload.successful !== 1 ? "s have" : " has"} been created and are
+          ready for scheduling. Tap a row below to jump to it in Booking
+          History.
           {(upload.skipped || 0) > 0 && (
             <>
               {" "}
               <span className="text-amber-700 dark:text-amber-400">
-                {upload.skipped} row{upload.skipped !== 1 ? "s" : ""} matched an existing booking (duplicate reference)
-                and did not create a new one — see below.
+                {upload.skipped} row{upload.skipped !== 1 ? "s" : ""} matched an
+                existing booking (duplicate reference) and did not create a new
+                one — see below.
               </span>
             </>
           )}
@@ -723,7 +959,10 @@ function SuccessfulTab({ upload, amount, rows, meta, page, onPageChange, isFetch
         {isFetching && rows.length === 0 ? (
           <div className="space-y-2 p-4">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+              <div
+                key={i}
+                className="h-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
+              />
             ))}
           </div>
         ) : rows.length === 0 ? (
@@ -734,12 +973,24 @@ function SuccessfulTab({ upload, amount, rows, meta, page, onPageChange, isFetch
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 w-16">Row</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">Tracking #</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 hidden md:table-cell">Route</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 dark:text-gray-300">Price</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 w-28">Label</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 w-24">Booking</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 w-16">
+                  Row
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  Tracking #
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 hidden md:table-cell">
+                  Route
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  Price
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 w-28">
+                  Label
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 w-24">
+                  Booking
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -748,7 +999,9 @@ function SuccessfulTab({ upload, amount, rows, meta, page, onPageChange, isFetch
                   key={row.id ?? row.row_number}
                   className="border-b border-gray-200 dark:border-gray-700 hover:bg-green-50 dark:hover:bg-green-900/10 transition-colors"
                 >
-                  <td className="px-4 py-3 text-sm font-mono text-gray-500 dark:text-gray-400">{row.row_number}</td>
+                  <td className="px-4 py-3 text-sm font-mono text-gray-500 dark:text-gray-400">
+                    {row.row_number}
+                  </td>
                   <td className="px-4 py-3 text-sm font-mono text-gray-700 dark:text-gray-300">
                     {row.tracking_number || "—"}
                     {Array.isArray(row.warnings) && row.warnings.length > 0 && (
@@ -765,7 +1018,9 @@ function SuccessfulTab({ upload, amount, rows, meta, page, onPageChange, isFetch
                     {row.pickup_city || "—"} → {row.dropoff_city || "—"}
                   </td>
                   <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-white">
-                    {row.computed_price ? `£${parseFloat(row.computed_price).toFixed(2)}` : "—"}
+                    {row.computed_price
+                      ? `£${parseFloat(row.computed_price).toFixed(2)}`
+                      : "—"}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {row.label_status === "ready" ? (
@@ -783,7 +1038,10 @@ function SuccessfulTab({ upload, amount, rows, meta, page, onPageChange, isFetch
                         Label
                       </button>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-xs text-gray-400" title="Label still generating">
+                      <span
+                        className="inline-flex items-center gap-1 text-xs text-gray-400"
+                        title="Label still generating"
+                      >
                         <Loader2 className="h-3 w-3 animate-spin" />
                         Pending
                       </span>
@@ -834,49 +1092,76 @@ function SuccessfulTab({ upload, amount, rows, meta, page, onPageChange, isFetch
       {/* Matched existing bookings (skipped duplicate references) — shown
           distinctly so they are never mistaken for newly-created bookings and
           never counted in "Bookings Created". */}
-      {skippedRows.length > 0 && (
-        <div className="mt-8">
-          <div className="flex items-center gap-2 mb-3">
-            <h4 className="text-sm font-semibold text-amber-700 dark:text-amber-400">
-              Matched existing bookings ({skippedRows.length})
-            </h4>
-          </div>
-          <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-lg mb-3">
-            <p className="text-sm text-amber-700 dark:text-amber-400">
-              These rows reused a <span className="font-mono">reference</span> already present in this batch, so they
-              matched the booking created by the first occurrence. No new booking was created for them, and they are not
-              billed.
-            </p>
-          </div>
-          <div className="overflow-x-auto border border-amber-200 dark:border-amber-900/30 rounded-lg">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-amber-200 dark:border-amber-900/30 bg-amber-50 dark:bg-amber-900/10">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-300 w-16">Row</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-300">Reference</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-300">Outcome</th>
-                </tr>
-              </thead>
-              <tbody>
-                {skippedRows.map((row) => (
-                  <tr key={row.id ?? row.row_number} className="border-b border-amber-100 dark:border-amber-900/20">
-                    <td className="px-4 py-3 text-sm font-mono text-gray-500 dark:text-gray-400">{row.row_number}</td>
-                    <td className="px-4 py-3 text-sm font-mono text-gray-700 dark:text-gray-300">
-                      {row.row_reference || "—"}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-amber-700 dark:text-amber-400">
-                      <span className="inline-flex items-center gap-1">
-                        <AlertTriangle className="h-3 w-3" />
-                        Matched existing booking — no new booking created
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      <SkippedRowsTable skippedRows={skippedRows} />
+    </div>
+  );
+}
+
+/**
+ * The matched-existing (skipped) rows.
+ *
+ * Extracted so it can render on BOTH paths through SuccessfulTab. It used to
+ * live only after the early "no successful bookings" return, which meant the
+ * all-duplicates batch — the one where this list IS the answer — showed the
+ * user nothing but "No successful bookings in this upload."
+ */
+function SkippedRowsTable({ skippedRows = [] }) {
+  if (skippedRows.length === 0) return null;
+
+  return (
+    <div className="mt-8">
+      <div className="flex items-center gap-2 mb-3">
+        <h4 className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+          Already booked — matched existing bookings ({skippedRows.length})
+        </h4>
+      </div>
+      <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-lg mb-3">
+        <p className="text-sm text-amber-700 dark:text-amber-400">
+          These rows reused a <span className="font-mono">reference</span> that
+          already belongs to one of your bookings — either from earlier in this
+          file or from a batch you uploaded in the last 30 days. The existing
+          booking stands; no duplicate was created and these rows are not
+          billed.
+        </p>
+      </div>
+      <div className="overflow-x-auto border border-amber-200 dark:border-amber-900/30 rounded-lg">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-amber-200 dark:border-amber-900/30 bg-amber-50 dark:bg-amber-900/10">
+              <th className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-300 w-16">
+                Row
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-300">
+                Reference
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-300">
+                Outcome
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {skippedRows.map((row) => (
+              <tr
+                key={row.id ?? row.row_number}
+                className="border-b border-amber-100 dark:border-amber-900/20"
+              >
+                <td className="px-4 py-3 text-sm font-mono text-gray-500 dark:text-gray-400">
+                  {row.row_number}
+                </td>
+                <td className="px-4 py-3 text-sm font-mono text-gray-700 dark:text-gray-300">
+                  {row.row_reference || "—"}
+                </td>
+                <td className="px-4 py-3 text-xs text-amber-700 dark:text-amber-400">
+                  <span className="inline-flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    Matched existing booking — no new booking created
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -884,10 +1169,12 @@ function SuccessfulTab({ upload, amount, rows, meta, page, onPageChange, isFetch
 function KPICard({ label, value, icon: Icon, color = "default" }) {
   const colors = {
     default: "bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white",
-    green: "bg-green-50 dark:bg-green-900/10 text-green-600 dark:text-green-400",
+    green:
+      "bg-green-50 dark:bg-green-900/10 text-green-600 dark:text-green-400",
     red: "bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400",
     blue: "bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400",
-    amber: "bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400",
+    amber:
+      "bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400",
   };
 
   return (
@@ -898,7 +1185,9 @@ function KPICard({ label, value, icon: Icon, color = "default" }) {
     >
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase opacity-70 mb-1">{label}</p>
+          <p className="text-xs font-semibold uppercase opacity-70 mb-1">
+            {label}
+          </p>
           <p className="text-2xl font-bold">{value}</p>
         </div>
         <Icon className="h-5 w-5 opacity-40" />
@@ -910,12 +1199,18 @@ function KPICard({ label, value, icon: Icon, color = "default" }) {
 function InfoCard({ title, items }) {
   return (
     <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-      <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{title}</h4>
+      <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+        {title}
+      </h4>
       <div className="space-y-2">
         {items.map((item, idx) => (
           <div key={idx} className="flex justify-between items-start">
-            <span className="text-xs text-gray-600 dark:text-gray-400">{item.label}</span>
-            <span className="text-sm font-medium text-gray-900 dark:text-white text-right">{item.value}</span>
+            <span className="text-xs text-gray-600 dark:text-gray-400">
+              {item.label}
+            </span>
+            <span className="text-sm font-medium text-gray-900 dark:text-white text-right">
+              {item.value}
+            </span>
           </div>
         ))}
       </div>
