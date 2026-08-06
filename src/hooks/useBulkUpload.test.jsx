@@ -34,8 +34,15 @@ import { useBulkUpload } from "./useBulkUpload";
 
 async function driveToTerminal(uploadId, terminalStatus) {
   mockValidate.mockResolvedValue({ id: "validated-1" });
-  mockCreate.mockResolvedValue({ id: uploadId, status: "processing", customer_type: "PREPAID" });
-  mockGetStatus.mockResolvedValue({ status: terminalStatus, customer_type: "PREPAID" });
+  mockCreate.mockResolvedValue({
+    id: uploadId,
+    status: "processing",
+    customer_type: "PREPAID",
+  });
+  mockGetStatus.mockResolvedValue({
+    status: terminalStatus,
+    customer_type: "PREPAID",
+  });
 
   const view = renderHook(() => useBulkUpload());
   const file = new File(["reference\n"], "batch.csv", { type: "text/csv" });
@@ -79,4 +86,75 @@ test("`payment_pending` is a success terminal state: navigates to payment", asyn
     );
   });
   await waitFor(() => expect(result.current.isPolling).toBe(false));
+});
+
+// ─── 429 handling ────────────────────────────────────────────────────────────
+//
+// The user hit "Failed to load resource: 429" on /validate/ with no usable
+// message. DRF's body is "Request was throttled. Expected available in 1893
+// seconds." — a raw second count, and no hint that a file they already
+// validated is still sitting there waiting to be submitted. Both of those
+// mattered: their batch was validated and strandable, and they did not know it.
+
+test("a throttled validate explains the wait in minutes and points at the saved file", async () => {
+  mockValidate.mockRejectedValue({
+    response: {
+      status: 429,
+      data: {
+        detail: "Request was throttled. Expected available in 1893 seconds.",
+      },
+    },
+  });
+
+  const view = renderHook(() => useBulkUpload());
+  await act(async () => {
+    await view.result.current.validateFile(new File(["x"], "batch.csv"));
+  });
+
+  const err = view.result.current.uploadError;
+  expect(err).toMatch(/about 32 minutes/);
+  expect(err).toMatch(/already validated is saved/i);
+  // The raw second count must not reach the user.
+  expect(err).not.toMatch(/1893 seconds/);
+});
+
+test("a throttled submit gets the same explanation, not a bare 'Upload failed'", async () => {
+  mockValidate.mockResolvedValue({ id: "validated-1" });
+  mockCreate.mockRejectedValue({
+    response: {
+      status: 429,
+      data: {
+        detail: "Request was throttled. Expected available in 60 seconds.",
+      },
+    },
+  });
+
+  const view = renderHook(() => useBulkUpload());
+  await act(async () => {
+    await view.result.current.validateFile(new File(["x"], "batch.csv"));
+  });
+  await act(async () => {
+    await view.result.current.startUpload();
+  });
+
+  expect(view.result.current.uploadError).toMatch(/Too many upload attempts/);
+  expect(view.result.current.uploadError).toMatch(/about 1 minute\b/);
+});
+
+test("a non-429 validate error is untouched by the throttle path", async () => {
+  mockValidate.mockRejectedValue({
+    response: {
+      status: 400,
+      data: { detail: "Missing required column: reference" },
+    },
+  });
+
+  const view = renderHook(() => useBulkUpload());
+  await act(async () => {
+    await view.result.current.validateFile(new File(["x"], "batch.csv"));
+  });
+
+  expect(view.result.current.uploadError).toBe(
+    "Validation failed: Missing required column: reference",
+  );
 });

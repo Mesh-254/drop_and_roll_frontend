@@ -44,7 +44,12 @@ const POLL_INTERVAL_MS = 2_000;
  *                    poller spins forever and the page looks "stuck".
  * failed           → Task errored; show failure UI
  */
-const TERMINAL_STATES = new Set(["payment_pending", "completed", "partial", "failed"]);
+const TERMINAL_STATES = new Set([
+  "payment_pending",
+  "completed",
+  "partial",
+  "failed",
+]);
 
 /**
  * States that represent a successful processing result we can navigate away
@@ -149,6 +154,26 @@ export function useBulkUpload() {
   };
 
   /**
+   * DRF's 429 body is "Request was throttled. Expected available in 1893
+   * seconds." — a raw second count the user has to divide in their head, with
+   * no hint that the limit is per-hour or that an already-validated batch can
+   * still be submitted. Rewrite it into minutes and say what to do.
+   */
+  const _throttleError = (err) => {
+    if (err?.response?.status !== 429) return null;
+    const detail = err?.response?.data?.detail || "";
+    const retryAfter =
+      Number(err?.response?.headers?.["retry-after"]) ||
+      Number((detail.match(/(\d+)\s*second/) || [])[1]) ||
+      0;
+    const mins = retryAfter ? Math.max(1, Math.ceil(retryAfter / 60)) : null;
+    return (
+      `Too many upload attempts. ${mins ? `Please try again in about ${mins} minute${mins === 1 ? "" : "s"}.` : "Please try again shortly."}` +
+      " Any file you already validated is saved — you can open it from the uploads list and submit it without re-validating."
+    );
+  };
+
+  /**
    * Billing-gate rejections (backend _check_business_access) carry a `code`
    * plus a Pay-Now destination. Return a structured error object for them so
    * the UI can render a CTA, or null for every other failure (string path).
@@ -190,7 +215,11 @@ export function useBulkUpload() {
     } catch (err) {
       const data = err?.response?.data;
       const errorMsg = _extractDrfError(data);
-      setUploadError(_billingGateError(data) || `Validation failed: ${errorMsg}`);
+      setUploadError(
+        _billingGateError(data) ||
+          _throttleError(err) ||
+          `Validation failed: ${errorMsg}`,
+      );
       setSelectedFile(null);
     } finally {
       setIsValidating(false);
@@ -209,7 +238,9 @@ export function useBulkUpload() {
       // validationResult.id was set by the validate() call in step 0/1.
       // We submit by id (PATCH status=submitted) — no second file upload.
       if (!validationResult.id) {
-        throw new Error("No validated upload id — please re-validate the file.");
+        throw new Error(
+          "No validated upload id — please re-validate the file.",
+        );
       }
       const upload = await BulkUploadApi.create(validationResult.id);
 
@@ -221,7 +252,11 @@ export function useBulkUpload() {
       if (!isMountedRef.current) return;
       const data = err?.response?.data;
       const errorMsg = _extractDrfError(data);
-      setUploadError(_billingGateError(data) || `Upload failed: ${errorMsg}`);
+      setUploadError(
+        _billingGateError(data) ||
+          _throttleError(err) ||
+          `Upload failed: ${errorMsg}`,
+      );
     } finally {
       if (isMountedRef.current) setIsUploading(false);
     }
@@ -255,7 +290,9 @@ export function useBulkUpload() {
         // Backend may return status=null while the Celery worker picks up the
         // task.  Treat null/undefined as "processing" so the poller keeps going
         // rather than silently failing the TERMINAL_STATES.has() check.
-        const normalizedStatus = (statusData.status ?? "processing").toLowerCase();
+        const normalizedStatus = (
+          statusData.status ?? "processing"
+        ).toLowerCase();
 
         if (process.env.NODE_ENV === "development") {
           console.debug(
@@ -475,7 +512,13 @@ export function useBulkUpload() {
         setPendingNetNav({ uploadId: latestUpload.id, receivableId });
       }
     }
-  }, [latestUpload, isPolling, isAutoNavQueued, pendingAutoInit, pendingNetNav]);
+  }, [
+    latestUpload,
+    isPolling,
+    isAutoNavQueued,
+    pendingAutoInit,
+    pendingNetNav,
+  ]);
 
   // ─── Manual escape hatch ─────────────────────────────────────────────────────
 
