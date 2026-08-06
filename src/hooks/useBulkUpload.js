@@ -228,39 +228,44 @@ export function useBulkUpload() {
 
   // ─── Upload (start Celery task) ──────────────────────────────────────────────
 
-  const startUpload = useCallback(async () => {
-    if (!selectedFile || !validationResult) return;
+  const startUpload = useCallback(
+    async ({ duplicatePolicy } = {}) => {
+      if (!selectedFile || !validationResult) return;
 
-    setIsUploading(true);
-    setUploadError(null);
+      setIsUploading(true);
+      setUploadError(null);
 
-    try {
-      // validationResult.id was set by the validate() call in step 0/1.
-      // We submit by id (PATCH status=submitted) — no second file upload.
-      if (!validationResult.id) {
-        throw new Error(
-          "No validated upload id — please re-validate the file.",
+      try {
+        // validationResult.id was set by the validate() call in step 0/1.
+        // We submit by id (PATCH status=submitted) — no second file upload.
+        if (!validationResult.id) {
+          throw new Error(
+            "No validated upload id — please re-validate the file.",
+          );
+        }
+        const upload = await BulkUploadApi.create(validationResult.id, {
+          duplicatePolicy,
+        });
+
+        if (!isMountedRef.current) return;
+
+        setLatestUpload(upload);
+        _startPolling(upload.id);
+      } catch (err) {
+        if (!isMountedRef.current) return;
+        const data = err?.response?.data;
+        const errorMsg = _extractDrfError(data);
+        setUploadError(
+          _billingGateError(data) ||
+            _throttleError(err) ||
+            `Upload failed: ${errorMsg}`,
         );
+      } finally {
+        if (isMountedRef.current) setIsUploading(false);
       }
-      const upload = await BulkUploadApi.create(validationResult.id);
-
-      if (!isMountedRef.current) return;
-
-      setLatestUpload(upload);
-      _startPolling(upload.id);
-    } catch (err) {
-      if (!isMountedRef.current) return;
-      const data = err?.response?.data;
-      const errorMsg = _extractDrfError(data);
-      setUploadError(
-        _billingGateError(data) ||
-          _throttleError(err) ||
-          `Upload failed: ${errorMsg}`,
-      );
-    } finally {
-      if (isMountedRef.current) setIsUploading(false);
-    }
-  }, [selectedFile, validationResult]);
+    },
+    [selectedFile, validationResult],
+  );
 
   // ─── Status polling ──────────────────────────────────────────────────────────
 

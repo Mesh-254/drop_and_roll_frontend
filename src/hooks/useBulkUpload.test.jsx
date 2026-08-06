@@ -141,6 +141,63 @@ test("a throttled submit gets the same explanation, not a bare 'Upload failed'",
   expect(view.result.current.uploadError).toMatch(/about 1 minute\b/);
 });
 
+// ─── Duplicate policy wiring ─────────────────────────────────────────────────
+//
+// The confirm step asks "retry or new batch?" and the answer has to survive the
+// trip to the backend. If it is dropped here, the wizard shows the question,
+// the customer answers "book them again", and every row is skipped anyway.
+
+test("startUpload forwards the chosen duplicate policy", async () => {
+  mockValidate.mockResolvedValue({ id: "validated-1" });
+  mockCreate.mockResolvedValue({
+    id: "upload-1",
+    status: "processing",
+    customer_type: "PREPAID",
+  });
+  mockGetStatus.mockResolvedValue({
+    status: "processing",
+    customer_type: "PREPAID",
+  });
+
+  const view = renderHook(() => useBulkUpload());
+  await act(async () => {
+    await view.result.current.validateFile(new File(["x"], "batch.csv"));
+  });
+  await act(async () => {
+    await view.result.current.startUpload({ duplicatePolicy: "book_again" });
+  });
+
+  expect(mockCreate).toHaveBeenCalledWith("validated-1", {
+    duplicatePolicy: "book_again",
+  });
+});
+
+test("startUpload with no options still submits", async () => {
+  // The admin/one-shot path never asks the question; it must not break.
+  mockValidate.mockResolvedValue({ id: "validated-2" });
+  mockCreate.mockResolvedValue({
+    id: "upload-2",
+    status: "processing",
+    customer_type: "PREPAID",
+  });
+  mockGetStatus.mockResolvedValue({
+    status: "processing",
+    customer_type: "PREPAID",
+  });
+
+  const view = renderHook(() => useBulkUpload());
+  await act(async () => {
+    await view.result.current.validateFile(new File(["x"], "batch.csv"));
+  });
+  await act(async () => {
+    await view.result.current.startUpload();
+  });
+
+  expect(mockCreate).toHaveBeenCalledWith("validated-2", {
+    duplicatePolicy: undefined,
+  });
+});
+
 test("a non-429 validate error is untouched by the throttle path", async () => {
   mockValidate.mockRejectedValue({
     response: {

@@ -25,7 +25,7 @@
  *   uploadAndCreate(file, metadata) → POST /api/booking/bulk-uploads/
  */
 
-import { ApiBase } from './ApiBase';
+import { ApiBase } from "./ApiBase";
 
 class BulkUploadApi extends ApiBase {
   /**
@@ -41,21 +41,23 @@ class BulkUploadApi extends ApiBase {
    */
   async validateFile(file, metadata, onProgress) {
     const formData = new FormData();
-    formData.append('file', file);
-    if (metadata.batchName) formData.append('batch_name', metadata.batchName);
-    if (metadata.notes)     formData.append('notes',      metadata.notes);
+    formData.append("file", file);
+    if (metadata.batchName) formData.append("batch_name", metadata.batchName);
+    if (metadata.notes) formData.append("notes", metadata.notes);
 
     // FIX: Use axiosInstance directly — identical to every other method in this class.
     // Previously used this.request() which wraps the result as { data, status }, so
     // response.data was the raw axios response object, NOT the Django payload.
     // That meant uploadResult.id was always undefined, causing the "No upload to submit" error.
     const response = await this.axiosInstance.post(
-      '/api/booking/bulk-uploads/validate/',
+      "/api/booking/bulk-uploads/validate/",
       formData,
       {
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
-            const pct = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            const pct = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total,
+            );
             onProgress?.(pct);
           }
         },
@@ -74,7 +76,7 @@ class BulkUploadApi extends ApiBase {
   async submitBulkUpload(id) {
     const response = await this.axiosInstance.patch(
       `/api/booking/bulk-uploads/${id}/`,
-      { status: 'submitted' },
+      { status: "submitted" },
     );
     return response.data;
   }
@@ -122,11 +124,11 @@ class BulkUploadApi extends ApiBase {
    */
   async uploadAndCreate(file, metadata = {}, onProgress = null) {
     const formData = new FormData();
-    formData.append('file', file);
-    if (metadata.batchName) formData.append('batch_name', metadata.batchName);
-    if (metadata.notes)     formData.append('notes',      metadata.notes);
+    formData.append("file", file);
+    if (metadata.batchName) formData.append("batch_name", metadata.batchName);
+    if (metadata.notes) formData.append("notes", metadata.notes);
 
-    const config = { headers: { 'Content-Type': 'multipart/form-data' } };
+    const config = { headers: { "Content-Type": "multipart/form-data" } };
     if (onProgress) {
       config.onUploadProgress = (e) => {
         onProgress(Math.round((e.loaded * 100) / e.total));
@@ -134,7 +136,7 @@ class BulkUploadApi extends ApiBase {
     }
 
     const response = await this.axiosInstance.post(
-      '/api/booking/bulk-uploads/',
+      "/api/booking/bulk-uploads/",
       formData,
       config,
     );
@@ -149,7 +151,7 @@ class BulkUploadApi extends ApiBase {
    */
   async listUploads(params = {}) {
     const response = await this.axiosInstance.get(
-      '/api/booking/bulk-uploads/',
+      "/api/booking/bulk-uploads/",
       { params },
     );
     // Backend returns the standard DRF paginated envelope: { count, next, previous, results }.
@@ -209,7 +211,7 @@ class BulkUploadApi extends ApiBase {
   async getSkipped(id, params = {}) {
     const response = await this.axiosInstance.get(
       `/api/booking/bulk-uploads/${id}/rows/`,
-      { params: { ...params, status: 'skipped' } },
+      { params: { ...params, status: "skipped" } },
     );
     return response.data;
   }
@@ -223,7 +225,7 @@ class BulkUploadApi extends ApiBase {
    */
   async getStats() {
     const response = await this.axiosInstance.get(
-      '/api/booking/bulk-uploads/stats/',
+      "/api/booking/bulk-uploads/stats/",
     );
     return response.data;
   }
@@ -251,7 +253,7 @@ class BulkUploadApi extends ApiBase {
   async cancelUpload(id) {
     const response = await this.axiosInstance.patch(
       `/api/booking/bulk-uploads/${id}/`,
-      { status: 'cancelled' },
+      { status: "cancelled" },
     );
     return response.data;
   }
@@ -263,12 +265,12 @@ class BulkUploadApi extends ApiBase {
    */
   async downloadTemplate() {
     const response = await this.axiosInstance.get(
-      '/api/booking/bulk-template/',
-      { responseType: 'blob' },
+      "/api/booking/bulk-template/",
+      { responseType: "blob" },
     );
     // FIX: backend returns .xlsx — was incorrectly named .csv which caused
     // Excel to open it in compatibility mode without dropdown validation.
-    this._triggerDownload(response.data, 'drop-n-roll-bulk-template.xlsx');
+    this._triggerDownload(response.data, "drop-n-roll-bulk-template.xlsx");
   }
 
   /**
@@ -281,7 +283,7 @@ class BulkUploadApi extends ApiBase {
   async downloadErrorReport(id) {
     const response = await this.axiosInstance.get(
       `/api/booking/bulk-uploads/${id}/error-report/`,
-      { responseType: 'blob' },
+      { responseType: "blob" },
     );
     this._triggerDownload(response.data, `bulk-errors-${id}.csv`);
   }
@@ -325,14 +327,26 @@ class BulkUploadApi extends ApiBase {
    *   create(id)    → PATCH status=submitted → queues Celery
    *
    * @param {string} uploadId  UUID from validate() response
+   * @param {object} [opts]
+   * @param {"skip"|"book_again"} [opts.duplicatePolicy]
+   *        What to do with references this customer already booked in an
+   *        earlier upload. Sent only when the caller has one, so the backend
+   *        default ("skip") stands for every path that never asks — the admin
+   *        one-shot API, and any older client.
    */
-  async create(uploadId) {
+  async create(uploadId, { duplicatePolicy } = {}) {
     if (import.meta.env.DEV) {
-      console.debug(`[BulkUploadApi] create() — submitting upload ${uploadId}`);
+      console.debug(
+        `[BulkUploadApi] create() — submitting upload ${uploadId}` +
+          (duplicatePolicy ? ` (duplicates: ${duplicatePolicy})` : ""),
+      );
     }
+    const payload = { status: "submitted" };
+    if (duplicatePolicy) payload.duplicate_policy = duplicatePolicy;
+
     const response = await this.axiosInstance.patch(
       `/api/booking/bulk-uploads/${uploadId}/`,
-      { status: "submitted" },
+      payload,
     );
     return response.data;
   }
@@ -366,8 +380,8 @@ class BulkUploadApi extends ApiBase {
 
   _triggerDownload(blob, filename) {
     const url = URL.createObjectURL(blob);
-    const a   = document.createElement('a');
-    a.href     = url;
+    const a = document.createElement("a");
+    a.href = url;
     a.download = filename;
     document.body.appendChild(a);
     a.click();

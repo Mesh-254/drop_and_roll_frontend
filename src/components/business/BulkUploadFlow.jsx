@@ -117,11 +117,11 @@ function deriveStatus(latestUpload, isPolling) {
   if (!latestUpload) return isPolling ? "processing" : null;
   const s = latestUpload.status?.toLowerCase();
   if (s === "payment_pending") return "payment_pending";
-  if (s === "completed")       return "completed";
+  if (s === "completed") return "completed";
   // FIX Bug 2: "partial" is a terminal success for NET — treat same as "completed"
   // so the UI never falls through to "processing" and gets stuck.
-  if (s === "partial")         return "completed";
-  if (s === "failed")          return "failed";
+  if (s === "partial") return "completed";
+  if (s === "failed") return "failed";
   return "processing";
 }
 
@@ -141,27 +141,33 @@ export default function BulkUploadFlow({
 
   // Destructure NEW hook API (see migration note at top of file)
   const {
-    selectedFile,       // File | null
-    validationResult,   // result from validate endpoint
-    isValidating,       // true while validate POST is in-flight
-    validateFile,       // (file: File) => Promise<void>
-    isUploading,        // true while create POST is in-flight
-    startUpload,        // () => Promise<void>  — starts Celery task + polling
-    latestUpload,       // { id, status, customer_type, success_count, total_amount, ... } | null
-    isPolling,          // true while poller is running
-    isAutoNavQueued,    // true as soon as terminal success detected (nav imminent)
+    selectedFile, // File | null
+    validationResult, // result from validate endpoint
+    isValidating, // true while validate POST is in-flight
+    validateFile, // (file: File) => Promise<void>
+    isUploading, // true while create POST is in-flight
+    startUpload, // () => Promise<void>  — starts Celery task + polling
+    latestUpload, // { id, status, customer_type, success_count, total_amount, ... } | null
+    isPolling, // true while poller is running
+    isAutoNavQueued, // true as soon as terminal success detected (nav imminent)
     isWaitingForReceivable, // true while polling for AR record (NET flow)
     manualContinueToPayment, // () => void — escape hatch for PREPAID
-    manualViewInvoice,  // () => void — FIX Bug 4: escape hatch for NET
-    uploadError,        // string | null
-    reset,              // () => void — full reset
+    manualViewInvoice, // () => void — FIX Bug 4: escape hatch for NET
+    uploadError, // string | null
+    reset, // () => void — full reset
   } = h;
 
   // ── Local wizard state ────────────────────────────────────────────────────
   const [currentStep, setCurrentStep] = useState(0);
   const [localError, setLocalError] = useState(null);
 
-  const nextStep = () => setCurrentStep((s) => Math.min(s + 1, STEPS.length - 1));
+  // What to do with references this customer already booked. Defaults to
+  // "skip", matching the backend: a needless skip is visible and re-runnable,
+  // a needless booking is a real van and a real charge with no undo.
+  const [duplicatePolicy, setDuplicatePolicy] = useState("skip");
+
+  const nextStep = () =>
+    setCurrentStep((s) => Math.min(s + 1, STEPS.length - 1));
   const prevStep = () => setCurrentStep((s) => Math.max(s - 1, 0));
 
   // ── React Hook Form for step 1 ────────────────────────────────────────────
@@ -230,7 +236,7 @@ export default function BulkUploadFlow({
   const handleStep2Submit = async () => {
     setLocalError(null);
     try {
-      await startUpload();
+      await startUpload({ duplicatePolicy });
       // Only advance to the processing screen if startUpload() succeeded.
       // If it throws, uploadError will be set in the hook and the user stays
       // on step 2 — the wizard must NOT navigate forward to a polling screen
@@ -282,9 +288,10 @@ export default function BulkUploadFlow({
 
   const derivedStatus = deriveStatus(latestUpload, isPolling);
   const isPaymentPending = derivedStatus === "payment_pending";
-  const isCompleted      = derivedStatus === "completed";
-  const isFailed         = derivedStatus === "failed";
-  const isProcessing     = derivedStatus === "processing" || (!derivedStatus && isPolling);
+  const isCompleted = derivedStatus === "completed";
+  const isFailed = derivedStatus === "failed";
+  const isProcessing =
+    derivedStatus === "processing" || (!derivedStatus && isPolling);
 
   // ── Defensive observability: log status changes in dev ────────────────────
 
@@ -298,8 +305,13 @@ export default function BulkUploadFlow({
 
     // If we've reached payment_pending and auto-nav is queued, log the
     // expected timing so it's visible in dev tools.
-    if (latestUpload.status?.toLowerCase() === "payment_pending" && isAutoNavQueued) {
-      console.debug("[BulkUploadFlow] Auto-nav is queued — expect redirect within ~2s.");
+    if (
+      latestUpload.status?.toLowerCase() === "payment_pending" &&
+      isAutoNavQueued
+    ) {
+      console.debug(
+        "[BulkUploadFlow] Auto-nav is queued — expect redirect within ~2s.",
+      );
     }
   }, [latestUpload, isPolling, isAutoNavQueued]);
 
@@ -367,7 +379,6 @@ export default function BulkUploadFlow({
       {/* ── Step content ───────────────────────────────────────────────────── */}
       <div className="px-6 py-6 min-h-[340px]">
         <AnimatePresence mode="wait">
-
           {/* ════ STEP 0 — File upload ═══════════════════════════════════════ */}
           {currentStep === 0 && (
             <motion.div
@@ -422,7 +433,8 @@ export default function BulkUploadFlow({
                 >
                   {isValidating ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" /> Checking file…
+                      <Loader2 className="h-4 w-4 animate-spin" /> Checking
+                      file…
                     </>
                   ) : (
                     <>
@@ -542,7 +554,9 @@ export default function BulkUploadFlow({
                   <ReviewRow label="File" value={selectedFile?.name} />
                   <ReviewRow
                     label="Valid rows"
-                    value={validationResult.valid_rows ?? validationResult.row_count}
+                    value={
+                      validationResult.valid_rows ?? validationResult.row_count
+                    }
                   />
                   {validationResult.error_count > 0 && (
                     <ReviewRow
@@ -558,6 +572,13 @@ export default function BulkUploadFlow({
                   />
                 </div>
               )}
+
+              <DuplicateChoice
+                count={validationResult?.duplicate_count || 0}
+                references={validationResult?.duplicate_references || []}
+                policy={duplicatePolicy}
+                onChange={setDuplicatePolicy}
+              />
 
               {displayError && <ErrorBanner error={displayError} />}
 
@@ -667,7 +688,8 @@ export default function BulkUploadFlow({
                   {latestUpload?.success_count && (
                     <p className="text-sm text-green-200/80">
                       {latestUpload.success_count} booking
-                      {latestUpload.success_count !== 1 ? "s" : ""} ready for payment (£
+                      {latestUpload.success_count !== 1 ? "s" : ""} ready for
+                      payment (£
                       {formatTotal(latestUpload)}).
                     </p>
                   )}
@@ -712,12 +734,16 @@ export default function BulkUploadFlow({
                     </button>
                   )}
                   <button
-                    onClick={() => { handleClose(); navigate("/billing"); }}
+                    onClick={() => {
+                      handleClose();
+                      navigate("/billing");
+                    }}
                     className="w-full flex items-center justify-center gap-2 py-2.5 border border-blue-500/40
                                text-blue-300 text-sm font-medium rounded-lg
                                transition-colors hover:bg-blue-500/10"
                   >
-                    View Billing &amp; Invoices <ArrowRight className="h-4 w-4" />
+                    View Billing &amp; Invoices{" "}
+                    <ArrowRight className="h-4 w-4" />
                   </button>
                 </motion.div>
               )}
@@ -767,7 +793,6 @@ export default function BulkUploadFlow({
               </div>
             </motion.div>
           )}
-
         </AnimatePresence>
       </div>
     </div>
@@ -807,6 +832,101 @@ function ErrorBanner({ error }) {
         )}
       </div>
     </motion.div>
+  );
+}
+
+/**
+ * DuplicateChoice — the retry-vs-new-batch question.
+ *
+ * Renders NOTHING when there are no matches, which is the common case: a
+ * business sending fresh references every time must never be asked about a
+ * problem it does not have.
+ *
+ * When matches DO exist the question is unavoidable. The same file legitimately
+ * means either "I fixed the bad rows, leave the rest alone" or "this is next
+ * week's run of the same route", nothing in the file distinguishes them, and
+ * guessing wrong in one direction silently skips deliveries while guessing
+ * wrong in the other silently books and charges for them twice.
+ */
+export function DuplicateChoice({ count, references, policy, onChange }) {
+  if (!count) return null;
+
+  const shown = references.slice(0, 3).join(", ");
+  const more = count > 3 ? `, +${count - 3} more` : "";
+
+  return (
+    <div className="rounded-lg border-2 border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/20 p-4">
+      <div className="flex gap-3">
+        <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+        <div className="flex-1">
+          <h4 className="font-bold text-amber-800 dark:text-amber-200">
+            {count} reference{count === 1 ? "" : "s"} already booked
+          </h4>
+          <p className="text-sm text-amber-700 dark:text-amber-300 mt-1 mb-3">
+            {count === 1
+              ? "This reference matches a booking"
+              : "These references match bookings"}{" "}
+            you already have from the last 30 days:{" "}
+            <span className="font-mono">
+              {shown}
+              {more}
+            </span>
+          </p>
+
+          <fieldset className="space-y-2">
+            <legend className="sr-only">
+              What should happen to already-booked references?
+            </legend>
+
+            <label className="flex items-start gap-3 p-3 rounded-lg border border-amber-300 dark:border-amber-700/60 cursor-pointer hover:bg-amber-100/60 dark:hover:bg-amber-900/30">
+              <input
+                type="radio"
+                name="duplicate_policy"
+                value="skip"
+                checked={policy === "skip"}
+                onChange={() => onChange("skip")}
+                className="mt-1"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-amber-900 dark:text-amber-100">
+                  Skip them — I&apos;m re-uploading to fix errors
+                </span>
+                <span className="block text-xs text-amber-700 dark:text-amber-300/80">
+                  The rows that already worked are left alone. Nothing is booked
+                  or charged twice.
+                </span>
+              </span>
+            </label>
+
+            <label className="flex items-start gap-3 p-3 rounded-lg border border-amber-300 dark:border-amber-700/60 cursor-pointer hover:bg-amber-100/60 dark:hover:bg-amber-900/30">
+              <input
+                type="radio"
+                name="duplicate_policy"
+                value="book_again"
+                checked={policy === "book_again"}
+                onChange={() => onChange("book_again")}
+                className="mt-1"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-amber-900 dark:text-amber-100">
+                  Book them again — this is a new batch
+                </span>
+                <span className="block text-xs text-amber-700 dark:text-amber-300/80">
+                  Every row books, including the {count} above, and you are
+                  charged for all of them. Use this for a repeat run of the same
+                  route.
+                </span>
+              </span>
+            </label>
+          </fieldset>
+
+          <p className="text-xs text-amber-600 dark:text-amber-400/70 mt-3">
+            A reference repeated twice inside this one file is always skipped,
+            whichever you pick.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
