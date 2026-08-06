@@ -83,6 +83,7 @@ export default function BulkUploadDetail() {
     handleRetryFailed,
     handleDownloadErrorReport,
     isRetrying,
+    retryError,
     isDraft,
     isStalled,
     submitDraft,
@@ -668,6 +669,7 @@ export default function BulkUploadDetail() {
                 onDownload={handleDownloadErrorReport}
                 onRetry={handleRetryFailed}
                 isRetrying={isRetrying}
+                retryError={retryError}
               />
             </motion.div>
           )}
@@ -812,6 +814,7 @@ function ErrorsTab({
   onDownload,
   onRetry,
   isRetrying,
+  retryError,
 }) {
   if (upload.failed === 0) {
     return (
@@ -826,6 +829,27 @@ function ErrorsTab({
 
   return (
     <div className="space-y-6">
+      {/* Retry is the path that CANNOT re-book anything: it re-runs only the
+          rows that failed, leaving every existing booking alone. Saying so
+          here is the point of the hint — re-uploading the whole file works
+          too, but then the customer has to answer the duplicate question. */}
+      <div className="p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 rounded-lg">
+        <p className="text-sm text-blue-700 dark:text-blue-400">
+          <span className="font-semibold">Fixing these?</span> Download the
+          report, correct the rows, then use{" "}
+          <span className="font-semibold">Retry</span> below. Retry re-runs only
+          the {upload.failed} failed row
+          {upload.failed === 1 ? "" : "s"} — bookings that already worked are
+          never touched or charged again.
+        </p>
+      </div>
+
+      {retryError && (
+        <div className="p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-lg">
+          <p className="text-sm text-red-700 dark:text-red-400">{retryError}</p>
+        </div>
+      )}
+
       <ErrorTable
         errors={errorRows}
         meta={{ ...errorMeta, page: errorPage }}

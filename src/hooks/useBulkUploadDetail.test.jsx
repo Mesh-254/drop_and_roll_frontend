@@ -26,6 +26,7 @@ const mockGetSuccessful = jest.fn();
 const mockGetSkipped = jest.fn();
 const mockCreate = jest.fn();
 const mockCancelUpload = jest.fn();
+const mockRetryFailed = jest.fn();
 
 jest.mock("../api/BulkUploadApi", () => ({
   __esModule: true,
@@ -36,7 +37,7 @@ jest.mock("../api/BulkUploadApi", () => ({
     getSkipped: (...a) => mockGetSkipped(...a),
     create: (...a) => mockCreate(...a),
     cancelUpload: (...a) => mockCancelUpload(...a),
-    retryFailed: jest.fn(),
+    retryFailed: (...a) => mockRetryFailed(...a),
     downloadErrorReport: jest.fn(),
   },
 }));
@@ -70,6 +71,7 @@ beforeEach(() => {
   mockGetSkipped.mockReset().mockResolvedValue(EMPTY_PAGE);
   mockCreate.mockReset();
   mockCancelUpload.mockReset();
+  mockRetryFailed.mockReset();
 });
 
 afterEach(() => {
@@ -231,4 +233,64 @@ test("discardDraft cancels the upload", async () => {
   await waitFor(() =>
     expect(view.result.current.upload.status).toBe("cancelled"),
   );
+});
+
+// ─── Retry ───────────────────────────────────────────────────────────────────
+//
+// Retry used to be admin-only, so every business click 403'd and the hook
+// swallowed it into console.error. The button looked broken and said nothing.
+// Now that owners can retry, a failure has to state its reason.
+
+const FAILED_UPLOAD = {
+  ...DRAFT,
+  status: "partial",
+  celery_task_id: "task-1",
+  is_draft: false,
+  total_rows: 43,
+  successful: 13,
+  failed: 30,
+};
+
+test("a successful retry clears any previous error and refreshes", async () => {
+  const view = await renderWith(FAILED_UPLOAD);
+
+  mockRetryFailed.mockResolvedValue({ detail: "Retrying 30 failed rows." });
+
+  await act(async () => {
+    await view.result.current.handleRetryFailed();
+  });
+
+  expect(mockRetryFailed).toHaveBeenCalledWith("57213101");
+  expect(view.result.current.retryError).toBeNull();
+  expect(view.result.current.isRetrying).toBe(false);
+});
+
+test("a failed retry surfaces the server's reason instead of going quiet", async () => {
+  const view = await renderWith(FAILED_UPLOAD);
+
+  mockRetryFailed.mockRejectedValue({
+    response: {
+      status: 409,
+      data: { detail: "Upload is already processing." },
+    },
+  });
+
+  await act(async () => {
+    await view.result.current.handleRetryFailed();
+  });
+
+  expect(view.result.current.retryError).toBe("Upload is already processing.");
+  expect(view.result.current.isRetrying).toBe(false);
+});
+
+test("a retry failure with no detail still says something usable", async () => {
+  const view = await renderWith(FAILED_UPLOAD);
+
+  mockRetryFailed.mockRejectedValue(new Error("network down"));
+
+  await act(async () => {
+    await view.result.current.handleRetryFailed();
+  });
+
+  expect(view.result.current.retryError).toMatch(/Could not retry these rows/i);
 });

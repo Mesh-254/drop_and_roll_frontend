@@ -58,6 +58,7 @@ export function useBulkUploadDetail(uploadId) {
 
   // Retry state
   const [isRetrying, setIsRetrying] = useState(false);
+  const [retryError, setRetryError] = useState(null);
 
   // Fetch upload details
   const fetchUploadDetail = useCallback(async () => {
@@ -179,8 +180,16 @@ export function useBulkUploadDetail(uploadId) {
       setSuccessfulPage(1);
       await fetchUploadDetail();
       await fetchErrorRows();
+      setRetryError(null);
     } catch (err) {
+      // Retry used to be admin-only, so every business click 403'd and this
+      // catch swallowed it into the console — the button looked broken with no
+      // stated reason. Now that owners can retry, a failure has to say why.
       console.error("[useBulkUploadDetail] Retry failed:", err);
+      setRetryError(
+        err?.response?.data?.detail ||
+          "Could not retry these rows. Please try again.",
+      );
     } finally {
       setIsRetrying(false);
     }
@@ -416,5 +425,6 @@ export function useBulkUploadDetail(uploadId) {
     handleRetryFailed,
     handleDownloadErrorReport,
     isRetrying,
+    retryError,
   };
 }
