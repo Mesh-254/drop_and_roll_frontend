@@ -32,9 +32,12 @@ export const ACCURACY_GOOD_M = 50;
 export const ACCURACY_MAX_M = 200;
 
 /**
- * How long to keep watching for a better fix before taking the best so far.
- * A cold GPS chip needs roughly 3-8 s. A single getCurrentPosition answers long
- * before that from WiFi/IP, which is exactly how the 374 km reading got in.
+ * Upper bound on how long we will wait for the device to produce ANY position.
+ *
+ * This is a timeout, not a sampling window. Nothing waits it out on purpose —
+ * `acquireFirstFix` resolves the moment the first position arrives, which on a
+ * phone is typically well under a second. It only exists so a device that
+ * answers with neither a position nor an error cannot hang the screen forever.
  */
 export const LOCATION_WINDOW_MS = 8000;
 
@@ -83,25 +86,40 @@ export function exifHorizontalError(exif) {
 }
 
 /**
- * Watch for a bounded window and resolve with the BEST fix seen, not the first.
+ * Resolve with the FIRST position the device produces. Never wait for better.
  *
- * Stops early once accuracy is at or under `goodEnoughM`, so a phone with a
- * working GPS lock does not burn the full window or the battery behind it.
+ * WHY FIRST AND NOT BEST
+ * ----------------------
+ * The previous strategy watched for up to 8 s and kept the most accurate fix,
+ * finishing early only at <= ACCURACY_GOOD_M. On a phone that locks GPS quickly
+ * that is nearly free — but on the devices drivers actually complain about, it
+ * never hits the early exit, so every single capture paid the full window. The
+ * component then retried with a LONGER window on a wide fix (8 s, then 16 s,
+ * then 24 s, plus back-off), so a driver standing at a door with a parcel in
+ * their hand could wait the better part of a minute before the button did
+ * anything. That cost is paid on every delivery; the accuracy it buys matters
+ * on the small fraction that are ever disputed.
+ *
+ * Taking the first fix does not lose the evidence, because accuracy was never
+ * a gate — it is metadata. `classifyAccuracy` still labels it, the payload
+ * still carries the metres, and the server's verdict ladder
+ * (tracking/services/pod_location.evaluate) still records `good` / `degraded` /
+ * `rejected` / `off_area` for the admin. The Nairobi record in this module's
+ * header would still be caught and flagged; it would simply be flagged after a
+ * fast submission instead of after a slow one.
  *
  * `geolocation` is injected rather than read off `navigator` so the acquisition
  * strategy is testable without a browser. That is the whole reason this
  * function is here and not in the component.
  *
- * An error AFTER a usable fix has arrived resolves with that fix instead of
- * rejecting: a late timeout on a position we already hold is not a failure, and
- * rejecting would send the driver round the retry loop for nothing.
+ * `timeoutMs` is a ceiling, not a sampling window: a device that answers with
+ * neither a position nor an error must not hang the screen forever.
  */
-export function watchForBestFix(
+export function acquireFirstFix(
   geolocation,
-  { windowMs = LOCATION_WINDOW_MS, goodEnoughM = ACCURACY_GOOD_M } = {},
+  { timeoutMs = LOCATION_WINDOW_MS } = {},
 ) {
   return new Promise((resolve, reject) => {
-    let best = null;
     let settled = false;
     let watchId = null;
 
@@ -110,35 +128,35 @@ export function watchForBestFix(
       if (watchId !== null) geolocation.clearWatch(watchId);
     };
 
-    const finish = () => {
+    const timer = setTimeout(() => {
       if (settled) return;
       settled = true;
       stop();
-      if (best) resolve(best);
-      else reject(new Error("no position acquired"));
-    };
-
-    const timer = setTimeout(finish, windowMs);
+      reject(new Error("no position acquired"));
+    }, timeoutMs);
 
     watchId = geolocation.watchPosition(
       (position) => {
         if (settled) return;
-        const accuracy = position?.coords?.accuracy;
-        if (accuracy == null) return;
-        if (best === null || accuracy < best.coords.accuracy) best = position;
-        if (accuracy <= goodEnoughM) finish();
+        // A position with no accuracy field is still a position. It is graded
+        // "unknown" downstream, which is its own verdict — waiting for a
+        // second reading that may never come would be the exact delay this
+        // function exists to remove.
+        if (position?.coords?.latitude == null) return;
+        settled = true;
+        stop();
+        resolve(position);
       },
       (error) => {
         if (settled) return;
-        if (best !== null) {
-          finish();
-          return;
-        }
         settled = true;
         stop();
         reject(error);
       },
-      { enableHighAccuracy: true, timeout: windowMs, maximumAge: 0 },
+      // enableHighAccuracy still asks the device for its best source. It is a
+      // hint about WHICH sensor to use, not an instruction to wait — so it
+      // costs nothing here and may improve the first reading for free.
+      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 0 },
     );
   });
 }

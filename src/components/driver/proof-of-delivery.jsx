@@ -14,12 +14,11 @@ import {
 import { compressImage } from "../../utils/imageCompression";
 import {
   ACCURACY_GOOD_M,
-  ACCURACY_MAX_M,
   LOCATION_WINDOW_MS,
+  acquireFirstFix,
   classifyAccuracy,
   exifHorizontalError,
   formatAccuracy,
-  watchForBestFix,
 } from "../../utils/geoAccuracy";
 
 // exifr is loaded on demand inside extractExifLocation via a dynamic import(),
@@ -46,7 +45,7 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
     console.log("[ProofOfDelivery] Component mounted");
     return () => {
       console.log(
-        "[ProofOfDelivery] Component unmounting, cleaning up video stream"
+        "[ProofOfDelivery] Component unmounting, cleaning up video stream",
       );
       if (cameraStream) {
         cameraStream.getTracks().forEach((track) => track.stop());
@@ -141,7 +140,7 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
         console.log(
           `[ProofOfDelivery] Attempting to use device: ${
             device.label || device.deviceId
-          }`
+          }`,
         );
         stream = await navigator.mediaDevices.getUserMedia({
           video: { deviceId: device.deviceId, facingMode: "environment" },
@@ -160,7 +159,7 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
           `[ProofOfDelivery] Camera access error for device ${
             device.label || device.deviceId
           }:`,
-          error
+          error,
         );
         continue;
       }
@@ -220,13 +219,13 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
         if (exifLocation) {
           console.log(
             "[ProofOfDelivery] EXIF location extracted:",
-            exifLocation
+            exifLocation,
           );
           setLocation(exifLocation);
           toast.success("Location auto-detected from photo metadata");
         } else {
           console.log(
-            "[ProofOfDelivery] No EXIF location found, attempting geolocation"
+            "[ProofOfDelivery] No EXIF location found, attempting geolocation",
           );
           await getCurrentLocation();
         }
@@ -239,7 +238,7 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
         setCaptureMethod("upload");
       },
       "image/jpeg",
-      0.8
+      0.8,
     );
   };
 
@@ -261,7 +260,7 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
       toast.success("Location auto-detected from photo metadata");
     } else {
       console.log(
-        "[ProofOfDelivery] No EXIF location found, attempting geolocation"
+        "[ProofOfDelivery] No EXIF location found, attempting geolocation",
       );
       await getCurrentLocation();
     }
@@ -310,10 +309,13 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
     }
   };
 
-  const getCurrentLocation = async (retries = 2, windowMs = LOCATION_WINDOW_MS) => {
+  const getCurrentLocation = async (
+    retries = 2,
+    windowMs = LOCATION_WINDOW_MS,
+  ) => {
     console.log(
       "[ProofOfDelivery] Attempting to get current location, retries left:",
-      retries
+      retries,
     );
     if (!navigator.geolocation) {
       console.error("[ProofOfDelivery] Geolocation not supported");
@@ -322,9 +324,8 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
     }
     setLoading(true);
     try {
-      const position = await watchForBestFix(navigator.geolocation, {
-        windowMs,
-        goodEnoughM: ACCURACY_GOOD_M,
+      const position = await acquireFirstFix(navigator.geolocation, {
+        timeoutMs: windowMs,
       });
       const { latitude: lat, longitude: lng, accuracy } = position.coords;
       console.log("[ProofOfDelivery] Geolocation success:", {
@@ -333,26 +334,21 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
         accuracy,
       });
 
-      // A fix this wide is not a location, so retry once or twice for a better
-      // one — a cold GPS chip often just needs a longer window.
+      // NO ACCURACY-DRIVEN RETRY. There used to be one here: a fix wider than
+      // ACCURACY_MAX_M was thrown away and re-acquired with a longer window,
+      // twice, so a driver on a device with a weak fix waited through 8 s, then
+      // 16 s, then 24 s plus back-off before the button did anything — on every
+      // delivery, holding a parcel at a door.
       //
-      // BUT NEVER DEAD-END THE DRIVER. An earlier version cleared the location
-      // and refused to proceed after the retries, which is unfixable on a
-      // device that has no GPS radio at all: no amount of "step outside" makes
-      // a desktop grow one, and the parcel is still delivered. The fix is kept,
-      // labelled `rejected`, and the server records the verdict rather than
-      // refusing the POD. Evidence flagged beats evidence lost.
-      if (accuracy > ACCURACY_MAX_M && retries > 0) {
-        console.warn(
-          `[ProofOfDelivery] Fix too wide (±${Math.round(accuracy)}m), retrying with a longer window`
-        );
-        setTimeout(
-          () => getCurrentLocation(retries - 1, windowMs + LOCATION_WINDOW_MS),
-          500
-        );
-        return;
-      }
-
+      // It also could not succeed where it mattered. The devices that produce a
+      // wide fix are the ones with no GPS radio to warm up, so a longer window
+      // returns the same WiFi estimate more slowly. The retry spent the
+      // driver's time to re-measure a number that was not going to change.
+      //
+      // The fix is kept, labelled, and submitted. Accuracy is metadata, not a
+      // gate: the server's verdict ladder records `rejected` / `off_area` for
+      // the admin either way, so a bad fix is still caught — just not at the
+      // driver's expense. Evidence flagged beats a driver waiting.
       const quality = classifyAccuracy(accuracy);
       setLocation({
         lat,
@@ -369,7 +365,7 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
         toast(
           `Location is only accurate to ±${formatAccuracy(accuracy)}, so it cannot ` +
             "confirm the address. You can still submit — it will be flagged for review.",
-          { id: "location-toast", icon: "⚑", duration: 9000 }
+          { id: "location-toast", icon: "⚑", duration: 9000 },
         );
         return;
       }
@@ -384,7 +380,7 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
         toast(
           `Location captured but only accurate to ±${formatAccuracy(accuracy)}. ` +
             "Tap update outdoors for a better fix.",
-          { id: "location-toast", icon: "⚠️", duration: 6000 }
+          { id: "location-toast", icon: "⚠️", duration: 6000 },
         );
       }
     } catch (error) {
@@ -392,27 +388,30 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
       if (error?.code === error?.PERMISSION_DENIED) {
         toast.error(
           "Location permission is off. Enable it for this site to record proof of delivery.",
-          { id: "location-toast", duration: 8000 }
+          { id: "location-toast", duration: 8000 },
         );
         return;
       }
+      // This retry is for a genuine FAILURE — no position at all — which is a
+      // different thing from a position we merely dislike, and the only way to
+      // get anything is to ask again. The window is NOT extended: a longer wait
+      // does not conjure a GPS radio, and the low-accuracy fallback below is
+      // the actual answer for a device that has none. Growing it only delayed
+      // reaching that fallback.
       if (retries > 0) {
         console.log(
           "[ProofOfDelivery] Retrying location capture, attempts left:",
-          retries - 1
+          retries - 1,
         );
-        setTimeout(
-          () => getCurrentLocation(retries - 1, windowMs + LOCATION_WINDOW_MS),
-          1000
-        );
+        setTimeout(() => getCurrentLocation(retries - 1, windowMs), 1000);
         return;
       }
 
       // LAST RESORT, and the reason the driver is not stranded here.
       //
-      // `watchForBestFix` asks for high accuracy, and a device with no GPS
+      // `acquireFirstFix` asks for high accuracy, and a device with no GPS
       // radio can answer that with neither a position nor an error — the watch
-      // simply stays silent until the window closes ("no position acquired").
+      // simply stays silent until the timeout closes ("no position acquired").
       // Submission requires a location, so without this the driver is stuck on
       // a screen with nothing left to try, holding a parcel they have already
       // delivered.
@@ -442,19 +441,19 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
         toast(
           `Only an approximate location was available (±${formatAccuracy(accuracy)}). ` +
             "You can still submit — it will be flagged for review.",
-          { id: "location-toast", icon: "⚑", duration: 9000 }
+          { id: "location-toast", icon: "⚑", duration: 9000 },
         );
         return;
       } catch (fallbackError) {
         console.error(
           "[ProofOfDelivery] Low-accuracy fallback also failed:",
-          fallbackError
+          fallbackError,
         );
       }
 
       toast.error(
         "Failed to capture location. Ensure location services are enabled.",
-        { id: "location-toast" }
+        { id: "location-toast" },
       );
     } finally {
       setLoading(false);
@@ -471,7 +470,7 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
     if (!location) {
       console.error("[ProofOfDelivery] No location provided");
       toast.error(
-        "Location is required. Please capture location or ensure photo contains GPS metadata."
+        "Location is required. Please capture location or ensure photo contains GPS metadata.",
       );
       return;
     }
@@ -635,7 +634,8 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
               // bare pin from a 374 km fix looks exactly like a good one.
               <p
                 className={`text-sm ${
-                  location.accuracy != null && location.accuracy <= ACCURACY_GOOD_M
+                  location.accuracy != null &&
+                  location.accuracy <= ACCURACY_GOOD_M
                     ? "text-green-400"
                     : "text-amber-400"
                 }`}

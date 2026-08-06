@@ -21,7 +21,7 @@ import {
   exifHorizontalError,
   formatAccuracy,
   isUsableAccuracy,
-  watchForBestFix,
+  acquireFirstFix,
 } from "./geoAccuracy";
 
 // ── The specific record ─────────────────────────────────────────────────────
@@ -138,79 +138,84 @@ function fakeGeolocation() {
   };
 }
 
-describe("watchForBestFix", () => {
+describe("acquireFirstFix", () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
-  test("keeps the best fix, not the first", async () => {
-    // THE core defect. getCurrentPosition would have resolved on the 374 km
-    // network estimate that arrives first, while the GPS chip was still warming
-    // up and about to produce 8 m.
+  // THE CHANGE THIS FILE RECORDS
+  //
+  // The previous strategy watched for up to 8 s and kept the most accurate fix,
+  // exiting early only at <= 50 m. On the devices drivers actually complain
+  // about it never hit that exit, so every capture paid the full window — and
+  // the component then retried on a wide fix with a LONGER one (8 s, 16 s,
+  // 24 s). A driver at a door could wait most of a minute per delivery.
+  //
+  // Accuracy was never a gate, only metadata: the server's verdict ladder still
+  // records good / degraded / rejected / off_area either way. So the wide fix
+  // is now taken immediately and flagged, rather than the driver paying for a
+  // re-measurement that usually returns the same number.
+
+  test("resolves with the first fix, however wide", async () => {
     const geo = fakeGeolocation();
-    const promise = watchForBestFix(geo, { windowMs: 5000, goodEnoughM: 50 });
+    const promise = acquireFirstFix(geo, { timeoutMs: 5000 });
 
-    geo.emit(373816);
-    geo.emit(120);
-    geo.emit(8);
+    geo.emit(373816); // the Nairobi-scale network estimate
+    geo.emit(8); // GPS lock lands a moment later — too late, we already went
 
-    await expect(promise).resolves.toMatchObject({ coords: { accuracy: 8 } });
+    await expect(promise).resolves.toMatchObject({
+      coords: { accuracy: 373816 },
+    });
   });
 
-  test("stops early once the fix is good enough", async () => {
+  test("does not wait for a better fix when the first is already good", async () => {
     const geo = fakeGeolocation();
-    const promise = watchForBestFix(geo, { windowMs: 30000, goodEnoughM: 50 });
+    const promise = acquireFirstFix(geo, { timeoutMs: 30000 });
 
     geo.emit(10);
     await promise;
 
-    // Resolved without burning the 30 s window or the battery behind it.
+    // Settled without burning the window or leaving the GPS radio on.
     expect(geo.cleared).toEqual([42]);
   });
 
-  test("takes the best available when the window expires", async () => {
+  test("resolves immediately without advancing any timer", async () => {
+    // The guarantee that matters to the driver: no part of the happy path is
+    // gated on a clock. If this ever needs jest.advanceTimersByTime to pass,
+    // a wait has been reintroduced.
     const geo = fakeGeolocation();
-    const promise = watchForBestFix(geo, { windowMs: 5000, goodEnoughM: 50 });
+    const promise = acquireFirstFix(geo, { timeoutMs: 8000 });
 
-    geo.emit(140); // usable, but never reaches "good"
-    jest.advanceTimersByTime(5000);
+    geo.emit(120);
 
-    await expect(promise).resolves.toMatchObject({ coords: { accuracy: 140 } });
+    await expect(promise).resolves.toMatchObject({ coords: { accuracy: 120 } });
   });
 
-  test("a later, worse reading does not overwrite a better one", async () => {
+  test("a position with no accuracy is still a position", async () => {
+    // Graded "unknown" downstream, which is its own verdict. Waiting for a
+    // second reading that may never come is the exact delay being removed.
     const geo = fakeGeolocation();
-    const promise = watchForBestFix(geo, { windowMs: 5000, goodEnoughM: 5 });
+    const promise = acquireFirstFix(geo, { timeoutMs: 5000 });
 
-    geo.emit(60);
-    geo.emit(900); // drove into a tunnel
-    jest.advanceTimersByTime(5000);
+    geo.emit(undefined);
 
-    await expect(promise).resolves.toMatchObject({ coords: { accuracy: 60 } });
+    await expect(promise).resolves.toMatchObject({
+      coords: { latitude: 51.9 },
+    });
   });
 
-  test("an error after a usable fix resolves rather than rejecting", async () => {
-    // A late timeout on a position we already hold is not a failure. Rejecting
-    // would send the driver round the retry loop for a fix already in hand.
+  test("an error before any fix rejects", async () => {
     const geo = fakeGeolocation();
-    const promise = watchForBestFix(geo, { windowMs: 5000 });
-
-    geo.emit(30);
-    geo.fail();
-
-    await expect(promise).resolves.toMatchObject({ coords: { accuracy: 30 } });
-  });
-
-  test("an error with no fix at all rejects", async () => {
-    const geo = fakeGeolocation();
-    const promise = watchForBestFix(geo, { windowMs: 5000 });
+    const promise = acquireFirstFix(geo, { timeoutMs: 5000 });
 
     geo.fail(1); // PERMISSION_DENIED
     await expect(promise).rejects.toMatchObject({ code: 1 });
   });
 
-  test("a window that produces nothing rejects rather than hanging", async () => {
+  test("a device that answers with nothing rejects rather than hanging", async () => {
+    // The timeout is a ceiling, not a sampling window: some devices produce
+    // neither a position nor an error, and the screen must not hang forever.
     const geo = fakeGeolocation();
-    const promise = watchForBestFix(geo, { windowMs: 5000 });
+    const promise = acquireFirstFix(geo, { timeoutMs: 5000 });
 
     jest.advanceTimersByTime(5000);
     await expect(promise).rejects.toThrow("no position acquired");
@@ -219,22 +224,21 @@ describe("watchForBestFix", () => {
   test("the watch is always cleared", async () => {
     // A leaked watchPosition keeps the GPS radio on for the rest of the session.
     const geo = fakeGeolocation();
-    const promise = watchForBestFix(geo, { windowMs: 5000 });
+    const promise = acquireFirstFix(geo, { timeoutMs: 5000 });
     jest.advanceTimersByTime(5000);
     await expect(promise).rejects.toThrow();
 
     expect(geo.cleared).toEqual([42]);
   });
 
-  test("positions with no accuracy are ignored, not treated as perfect", async () => {
-    // `undefined < anything` is false, so a naive comparison would have kept a
-    // reading with no radius and then crashed formatting it.
+  test("a late reading after resolution is ignored", async () => {
     const geo = fakeGeolocation();
-    const promise = watchForBestFix(geo, { windowMs: 5000, goodEnoughM: 50 });
+    const promise = acquireFirstFix(geo, { timeoutMs: 5000 });
 
-    geo.emit(undefined);
-    geo.emit(20);
+    geo.emit(200);
+    const settled = await promise;
+    geo.emit(5); // arrives after we already resolved
 
-    await expect(promise).resolves.toMatchObject({ coords: { accuracy: 20 } });
+    expect(settled.coords.accuracy).toBe(200);
   });
 });
