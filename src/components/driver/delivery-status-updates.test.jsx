@@ -54,6 +54,7 @@ jest.mock("./FailureReportModal", () => ({ FailureReportModal: () => null }));
 
 import { DeliveryStatusUpdates } from "./delivery-status-updates";
 import { publishJobStatus } from "../../lib/driver-events";
+import { driverApi } from "../../api/driver-api";
 
 /**
  * A controllable IntersectionObserver.
@@ -787,5 +788,136 @@ describe("job card: leave safe", () => {
     expect(
       screen.queryByText(/Leave safe authorised/i),
     ).not.toBeInTheDocument();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The confirm dialog
+//
+// Marking a job picked up raised `window.confirm("Mark this job as Mark Picked
+// Up?")`. A driver at a door with a parcel in one hand taps the only button on
+// the card and then has to dismiss a modal to make the tap count. It guarded
+// nothing: the transition is recoverable through the issue-report flow, and the
+// dialog blocks the whole page while it is open.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("marking a job picked up", () => {
+  test("posts the status without asking for confirmation", async () => {
+    const confirmSpy = jest
+      .spyOn(window, "confirm")
+      .mockImplementation(() => false);
+
+    await renderJobs([job({ status: "assigned", next_status: "picked_up" })]);
+
+    await act(async () => {
+      screen.getByRole("button", { name: "Mark Picked Up" }).click();
+    });
+
+    // `confirm` was stubbed to CANCEL. If the component still called it, the
+    // update would have been abandoned — so this asserts the dialog is gone
+    // rather than merely that it was answered.
+    expect(confirmSpy).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(driverApi.updateJobStatus).toHaveBeenCalledWith(
+        "booking-1",
+        "picked_up",
+      ),
+    );
+
+    confirmSpy.mockRestore();
+  });
+
+  test.each([
+    ["assigned", "picked_up", "Mark Picked Up"],
+    ["picked_up", "at_hub", "Mark At Hub"],
+    ["at_hub", "in_transit", "Start Delivery"],
+  ])("%s → %s fires on tap with no dialog", async (status, next, label) => {
+    const confirmSpy = jest
+      .spyOn(window, "confirm")
+      .mockImplementation(() => false);
+
+    await renderJobs([job({ status, next_status: next })]);
+    await act(async () => {
+      screen.getByRole("button", { name: label }).click();
+    });
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(driverApi.updateJobStatus).toHaveBeenCalledWith("booking-1", next),
+    );
+
+    confirmSpy.mockRestore();
+  });
+
+  test("completing a delivery still goes through proof capture", async () => {
+    // The one action that must NOT become a bare status flip: the backend
+    // rejects `delivered` without a proof on file (POD_REQUIRED), so the card
+    // opens the capture modal instead of posting.
+    const confirmSpy = jest.spyOn(window, "confirm");
+
+    await renderJobs([job({ status: "in_transit", next_status: "delivered" })]);
+
+    await act(async () => {
+      screen.getByRole("button", { name: "Complete Delivery" }).click();
+    });
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(driverApi.updateJobStatus).not.toHaveBeenCalled();
+
+    confirmSpy.mockRestore();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A stop added after the driver started
+//
+// Requirement 5: a booking an admin drops onto a route that is already under
+// way is inserted at the cheapest position and deliberately gets NO job number,
+// so the numbers the driver is already working to stay ascending and unchanged.
+//
+// The card therefore has to render two different "no number" states, and they
+// mean different things:
+//
+//   on a route, unnumbered  → NEW    (a late addition, do it in list position)
+//   not on a route at all   → –      (a standalone job, no route position)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("job card: an unnumbered stop", () => {
+  test("a routed stop with no number reads NEW", async () => {
+    await renderJobs([job({ stop_id: "stop-late", job_number: null })]);
+
+    expect(screen.getByText("NEW")).toBeInTheDocument();
+  });
+
+  test("a standalone job with no stop still reads as a dash", async () => {
+    await renderJobs([job({ stop_id: null, job_number: null })]);
+
+    expect(screen.queryByText("NEW")).not.toBeInTheDocument();
+    expect(screen.getByText("–")).toBeInTheDocument();
+  });
+
+  test("the NEW badge occupies the same column as a number", async () => {
+    // Same rule as `every card reserves the same width for the number`: the
+    // column is what makes the sequence scannable, and a late addition must not
+    // knock it out of line.
+    await renderJobs([
+      job({
+        id: "a",
+        stop_id: "s-a",
+        job_number: 7,
+        stop_address: { line1: "1 A St", city: "MK", postal_code: "MK1 1AA" },
+      }),
+      job({
+        id: "b",
+        stop_id: "s-b",
+        job_number: null,
+        stop_address: { line1: "2 B St", city: "MK", postal_code: "MK2 2BB" },
+      }),
+    ]);
+
+    const numbered = screen.getByText("7").closest("div").parentElement;
+    const unnumbered = screen.getByText("NEW").closest("div").parentElement;
+
+    expect(numbered.className).toBe(unnumbered.className);
   });
 });

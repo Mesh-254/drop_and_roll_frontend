@@ -55,7 +55,11 @@ import { FailureReportModal } from "./FailureReportModal";
 import { publishJobStatus } from "../../lib/driver-events";
 
 function ProofOfDeliveryView({ proofData, onClose }) {
-  const pods = Array.isArray(proofData) ? proofData : proofData ? [proofData] : [];
+  const pods = Array.isArray(proofData)
+    ? proofData
+    : proofData
+      ? [proofData]
+      : [];
 
   return (
     <div
@@ -214,7 +218,15 @@ function Fact({ icon: Icon, label, value, mono = false }) {
  * which is the difference between "here is the route" and "here is where you
  * are on it".
  */
-function AddressBlock({ kind, address, name, phone, email, scheduledAt, active }) {
+function AddressBlock({
+  kind,
+  address,
+  name,
+  phone,
+  email,
+  scheduledAt,
+  active,
+}) {
   const isDelivery = kind === "delivery";
   const postcode = address?.postal_code || "";
   const rest = [address?.line1, address?.line2, address?.city, address?.region]
@@ -372,7 +384,8 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
   // The leg comes from the stop the driver tapped, never from the booking's
   // status. See the file header: the booking alone cannot distinguish the two
   // halves of a same-day pair.
-  const isDeliveryLeg = (stopContext?.stop_leg || stopContext?.leg) === "delivery";
+  const isDeliveryLeg =
+    (stopContext?.stop_leg || stopContext?.leg) === "delivery";
 
   const nextStatus = useMemo(() => {
     if (stopContext && stopContext.next_status !== undefined) {
@@ -382,7 +395,8 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
     return STATUS_CHAIN[data?.status] ?? null;
   }, [stopContext, data]);
 
-  const blockedReason = !nextStatus && !immutable ? stopContext?.blocked_reason : null;
+  const blockedReason =
+    !nextStatus && !immutable ? stopContext?.blocked_reason : null;
 
   const handleStatusUpdate = useCallback(
     async (newStatus) => {
@@ -394,20 +408,37 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
         setShowProofModal(true);
         return;
       }
-      if (!window.confirm(`Mark job as ${STATUS_LABEL[newStatus] || newStatus}?`)) return;
-
+      // No confirmation dialog — same reasoning as the board card
+      // (delivery-status-updates.jsx). This was the second copy of the same
+      // prompt on the same action, so removing it from one screen and not the
+      // other would have left the driver a dialog on whichever route into the
+      // job they happened to take.
       try {
-        const result = await driverApi.updateJobStatus(data.id, newStatus, currentLocation);
+        const result = await driverApi.updateJobStatus(
+          data.id,
+          newStatus,
+          currentLocation,
+        );
         setJob((prev) => ({
           ...prev,
-          data: { ...prev.data, status: newStatus, updated_at: new Date().toISOString() },
+          data: {
+            ...prev.data,
+            status: newStatus,
+            updated_at: new Date().toISOString(),
+          },
         }));
 
         if (result?.queued) {
-          toast(`Saved offline — will sync when you're back online`, { icon: "📶" });
+          toast(`Saved offline — will sync when you're back online`, {
+            icon: "📶",
+          });
         } else {
           toast.success(`Job marked ${STATUS_LABEL[newStatus] || newStatus}`);
-          publishJobStatus({ booking_id: data.id, status: newStatus, reason: "local" });
+          publishJobStatus({
+            booking_id: data.id,
+            status: newStatus,
+            reason: "local",
+          });
         }
 
         const check = await driverApi.checkImmutable(data.id);
@@ -417,10 +448,12 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
         }
       } catch (error) {
         console.error("[JobDetailPage] Failed to update job status:", error);
-        toast.error(error.response?.data?.detail || "Failed to update job status");
+        toast.error(
+          error.response?.data?.detail || "Failed to update job status",
+        );
       }
     },
-    [data, currentLocation, immutable, immutableReason]
+    [data, currentLocation, immutable, immutableReason],
   );
 
   const handleProofOfDeliverySubmit = useCallback(
@@ -428,28 +461,39 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
       try {
         // One call: submits the proof AND moves the booking to delivered.
         const result = await driverApi.submitProofOfDelivery(data.id, proof);
-        if (!result.success) throw new Error(result.message || "Failed to submit proof");
+        if (!result.success)
+          throw new Error(result.message || "Failed to submit proof");
 
         setShowProofModal(false);
 
         if (result.queued) {
-          toast("Saved offline — proof will sync automatically", { icon: "📶" });
+          toast("Saved offline — proof will sync automatically", {
+            icon: "📶",
+          });
           setJob((prev) => ({
             ...prev,
-            data: { ...prev.data, status: "delivered", updated_at: new Date().toISOString() },
+            data: {
+              ...prev.data,
+              status: "delivered",
+              updated_at: new Date().toISOString(),
+            },
           }));
           return;
         }
 
         toast.success("Delivery completed");
-        publishJobStatus({ booking_id: data.id, status: "delivered", reason: "pod" });
+        publishJobStatus({
+          booking_id: data.id,
+          status: "delivered",
+          reason: "pod",
+        });
         await loadJobDetails();
       } catch (error) {
         console.error("[JobDetailPage] Proof submission error:", error);
         toast.error(error.message || "Failed to complete delivery");
       }
     },
-    [data, loadJobDetails]
+    [data, loadJobDetails],
   );
 
   const handleQRScanSuccess = useCallback(
@@ -466,14 +510,16 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
           });
           await loadJobDetails();
         } else {
-          toast.error(result.message || "Scan failed. Update the status manually.");
+          toast.error(
+            result.message || "Scan failed. Update the status manually.",
+          );
         }
       } catch (error) {
         console.error("[JobDetailPage] QR scan error:", error);
         toast.error("QR scan failed. Please try again.");
       }
     },
-    [loadJobDetails, data]
+    [loadJobDetails, data],
   );
 
   const formatDimensions = useCallback((dimensions) => {
@@ -497,7 +543,8 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
 
   const isUrgentPickup = useCallback((scheduledPickupAt) => {
     if (!scheduledPickupAt) return false;
-    const diffMinutes = (new Date(scheduledPickupAt) - new Date()) / (1000 * 60);
+    const diffMinutes =
+      (new Date(scheduledPickupAt) - new Date()) / (1000 * 60);
     return diffMinutes <= 30 && diffMinutes >= 0;
   }, []);
 
@@ -537,7 +584,9 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
   }
 
   const parcels = quote?.num_parcels || 1;
-  const isSameDay = stopContext?.is_same_day || quote?.service_type?.routing_bucket === "same_day";
+  const isSameDay =
+    stopContext?.is_same_day ||
+    quote?.service_type?.routing_bucket === "same_day";
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-28">
@@ -578,7 +627,8 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
             )}
             <span
               className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-bold uppercase tracking-wide ${
-                STATUS_BADGE[data.status] || "bg-slate-100 text-slate-700 border-slate-200"
+                STATUS_BADGE[data.status] ||
+                "bg-slate-100 text-slate-700 border-slate-200"
               }`}
             >
               {STATUS_LABEL[data.status] || data.status}
@@ -605,7 +655,9 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
           <div className="rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 flex items-start gap-3">
             <Lock className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-bold text-red-900 dark:text-red-200">Job locked</h3>
+              <h3 className="font-bold text-red-900 dark:text-red-200">
+                Job locked
+              </h3>
               <p className="text-sm text-red-700 dark:text-red-300 mt-0.5">
                 {immutableReason ||
                   "This job has been delivered with proof submitted and cannot be modified."}
@@ -665,7 +717,11 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
           <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
               <Fact icon={Package} label="Parcels" value={parcels} />
-              <Fact icon={Weight} label="Weight" value={`${quote?.weight_kg ?? 0} kg`} />
+              <Fact
+                icon={Weight}
+                label="Weight"
+                value={`${quote?.weight_kg ?? 0} kg`}
+              />
               <Fact
                 icon={Ruler}
                 label="Dimensions"
@@ -682,7 +738,12 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
                 label="Shipping"
                 value={quote?.shipping_type?.name || "Parcel"}
               />
-              <Fact icon={Hash} label="Tracking" value={data.tracking_number || "—"} mono />
+              <Fact
+                icon={Hash}
+                label="Tracking"
+                value={data.tracking_number || "—"}
+                mono
+              />
             </div>
 
             {quote?.fragile && (

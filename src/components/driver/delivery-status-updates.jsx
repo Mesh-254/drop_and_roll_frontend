@@ -376,14 +376,19 @@ export function DeliveryStatusUpdates({
         return;
       }
 
-      if (
-        !window.confirm(
-          `Mark this job as ${ACTION_LABEL[newStatus] || newStatus}?`,
-        )
-      ) {
-        return;
-      }
-
+      // NO CONFIRMATION DIALOG.
+      //
+      // This used to raise `window.confirm("Mark this job as Mark Picked
+      // Up?")`. A driver standing at a door with a parcel in one hand taps the
+      // only button on the card and then has to dismiss a modal to make the tap
+      // count. It guarded nothing — the transition is recoverable through the
+      // issue-report flow beside it — and a native dialog blocks the entire
+      // page while it is open, including the live socket's re-render.
+      //
+      // `delivered` never reached here anyway: it returns above, into proof
+      // capture, because the backend rejects it without a POD on file. That
+      // remains the one action with a step in front of it, and it is a step
+      // that does real work rather than asking "are you sure".
       try {
         const result = await driverApi.updateJobStatus(jobId, newStatus);
 
@@ -634,7 +639,26 @@ export function DeliveryStatusUpdates({
                               {job.job_number}
                             </div>
                           </>
+                        ) : job.stop_id ? (
+                          // On a route, but no number: a booking dispatch added
+                          // AFTER this route was under way. It is deliberately
+                          // unnumbered so the sequence the driver is already
+                          // working to stays ascending and unchanged — see
+                          // RouteStopService.plan_policy (INSERT). "NEW" rather
+                          // than a dash because the two say different things:
+                          // this job HAS a position in the list, it just has no
+                          // permanent label.
+                          <>
+                            <div className="text-[10px] uppercase tracking-wide font-semibold text-slate-400 dark:text-slate-500 leading-none">
+                              Job
+                            </div>
+                            <div className="text-sm font-extrabold leading-tight tracking-tight text-orange-600 dark:text-orange-400 pt-1.5">
+                              NEW
+                            </div>
+                          </>
                         ) : (
+                          // Not on a route at all — a standalone job has no stop
+                          // and therefore no route position to label.
                           <div className="text-2xl font-extrabold tabular-nums leading-tight text-slate-300 dark:text-slate-700">
                             –
                           </div>

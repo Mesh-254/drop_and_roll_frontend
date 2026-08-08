@@ -32,7 +32,9 @@ const mockGetJob = jest.fn();
 jest.mock("../../api/driver-api", () => ({
   driverApi: {
     getJob: (...a) => mockGetJob(...a),
-    checkImmutable: jest.fn(() => Promise.resolve({ success: true, immutable: false })),
+    checkImmutable: jest.fn(() =>
+      Promise.resolve({ success: true, immutable: false }),
+    ),
     getProofOfDelivery: jest.fn(() => Promise.resolve({ success: false })),
     getCurrentLocation: jest.fn(() => Promise.resolve(null)),
     updateJobStatus: jest.fn(),
@@ -59,8 +61,16 @@ const BOOKING = {
   receiver_name: "Rita Receiver",
   receiver_phone: "+447700900123",
   receiver_email: "rita@example.com",
-  pickup_address: { line1: "12 Elm St", city: "Milton Keynes", postal_code: "MK9 1AA" },
-  dropoff_address: { line1: "8 Oak Rd", city: "Oxford", postal_code: "OX1 2BB" },
+  pickup_address: {
+    line1: "12 Elm St",
+    city: "Milton Keynes",
+    postal_code: "MK9 1AA",
+  },
+  dropoff_address: {
+    line1: "8 Oak Rd",
+    city: "Oxford",
+    postal_code: "OX1 2BB",
+  },
   quote: {
     num_parcels: 3,
     weight_kg: 7.5,
@@ -77,10 +87,18 @@ beforeEach(() => {
 });
 
 async function renderDetail(stopContext = null) {
-  render(<JobDetailPage jobId="booking-1" onBack={() => {}} stopContext={stopContext} />);
+  render(
+    <JobDetailPage
+      jobId="booking-1"
+      onBack={() => {}}
+      stopContext={stopContext}
+    />,
+  );
   // getAllByText: the tracking number appears twice on purpose — as the header
   // subtitle, and as a copyable reference in the shipment grid.
-  await waitFor(() => expect(screen.getAllByText("BK-J7OCUNIJ").length).toBeGreaterThan(0));
+  await waitFor(() =>
+    expect(screen.getAllByText("BK-J7OCUNIJ").length).toBeGreaterThan(0),
+  );
 }
 
 describe("both ends of the route", () => {
@@ -105,18 +123,20 @@ describe("both ends of the route", () => {
   test("both phones are tap-to-call", async () => {
     await renderDetail();
 
-    expect(screen.getByRole("link", { name: /\+447700900999/ })).toHaveAttribute(
-      "href",
-      "tel:+447700900999"
-    );
-    expect(screen.getByRole("link", { name: /\+447700900123/ })).toHaveAttribute(
-      "href",
-      "tel:+447700900123"
-    );
+    expect(
+      screen.getByRole("link", { name: /\+447700900999/ }),
+    ).toHaveAttribute("href", "tel:+447700900999");
+    expect(
+      screen.getByRole("link", { name: /\+447700900123/ }),
+    ).toHaveAttribute("href", "tel:+447700900123");
   });
 
   test("marks the collection as the current stop when that is the leg tapped", async () => {
-    await renderDetail({ stop_leg: "pickup", job_number: 4, next_status: "picked_up" });
+    await renderDetail({
+      stop_leg: "pickup",
+      job_number: 4,
+      next_status: "picked_up",
+    });
 
     const here = screen.getByText("You are here").closest("div").parentElement;
     expect(within(here).getByText("MK9 1AA")).toBeInTheDocument();
@@ -126,7 +146,11 @@ describe("both ends of the route", () => {
     // Same booking, same status, different stop. Only `stopContext` differs —
     // if the page were deriving the leg from the booking it could not tell
     // these two apart at all.
-    await renderDetail({ stop_leg: "delivery", job_number: 5, next_status: null });
+    await renderDetail({
+      stop_leg: "delivery",
+      job_number: 5,
+      next_status: null,
+    });
 
     const here = screen.getByText("You are here").closest("div").parentElement;
     expect(within(here).getByText("OX1 2BB")).toBeInTheDocument();
@@ -172,7 +196,9 @@ describe("the detail the card no longer carries", () => {
     // Service fact in the shipment grid.
     expect(screen.getAllByText("Same Day")).toHaveLength(2);
     expect(screen.getByText(/Fragile/)).toBeInTheDocument();
-    expect(screen.getByText("Leave with the neighbour if out")).toBeInTheDocument();
+    expect(
+      screen.getByText("Leave with the neighbour if out"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Access via the rear gate")).toBeInTheDocument();
   });
 
@@ -197,8 +223,12 @@ describe("the action bar", () => {
     });
     await renderDetail({ stop_leg: "pickup", next_status: "in_transit" });
 
-    expect(screen.getByRole("button", { name: "Start Delivery" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Mark At Hub" })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Start Delivery" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Mark At Hub" }),
+    ).not.toBeInTheDocument();
   });
 
   test("offers Scan on an assigned job", async () => {
@@ -215,7 +245,9 @@ describe("the action bar", () => {
     });
 
     expect(screen.getByText("Collect at job 4 first.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Mark Picked Up" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Mark Picked Up" }),
+    ).not.toBeInTheDocument();
   });
 
   test("locks every action once the job is immutable", async () => {
@@ -225,12 +257,63 @@ describe("the action bar", () => {
       immutable: true,
       reason: "Delivery completed with POD submitted.",
     });
-    mockGetJob.mockResolvedValue({ success: true, data: { ...BOOKING, status: "delivered" } });
+    mockGetJob.mockResolvedValue({
+      success: true,
+      data: { ...BOOKING, status: "delivered" },
+    });
 
     await renderDetail({ stop_leg: "delivery", next_status: null });
 
     expect(screen.getByText("Job locked")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Scan/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Report an issue/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Scan/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Report an issue/ }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The confirm dialog
+//
+// This page carried a SECOND copy of the board card's prompt on the same
+// action. Removing it from one screen and not the other would have left the
+// driver a dialog on whichever route into the job they happened to take.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("status actions", () => {
+  test("post immediately with no confirmation dialog", async () => {
+    const { driverApi } = require("../../api/driver-api");
+    // The immutability test above leaves `checkImmutable` resolving true, and
+    // a locked job renders no action button at all.
+    driverApi.checkImmutable.mockResolvedValue({
+      success: true,
+      immutable: false,
+    });
+    driverApi.updateJobStatus.mockResolvedValue({ id: BOOKING.id });
+    const confirmSpy = jest
+      .spyOn(window, "confirm")
+      .mockImplementation(() => false);
+
+    await renderDetail({ stop_leg: "pickup", next_status: "picked_up" });
+
+    const { act } = require("@testing-library/react");
+    await act(async () => {
+      screen.getByRole("button", { name: "Mark Picked Up" }).click();
+    });
+
+    // `confirm` was stubbed to CANCEL, so a surviving dialog would abandon the
+    // update rather than merely be answered.
+    expect(confirmSpy).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(driverApi.updateJobStatus).toHaveBeenCalledWith(
+        BOOKING.id,
+        "picked_up",
+        null,
+      ),
+    );
+
+    confirmSpy.mockRestore();
   });
 });
