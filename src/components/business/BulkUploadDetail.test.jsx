@@ -175,7 +175,9 @@ test("a genuinely queued upload still shows processing progress", () => {
   };
   render(<BulkUploadDetail />);
 
-  expect(screen.getByText(/Processing: 0 \/ 43 rows/)).toBeInTheDocument();
+  // One wording across both screens now: BulkUploadProgressBar owns the
+  // counts, so the detail page and the wizard cannot drift apart.
+  expect(screen.getByText("0 of 43 rows processed")).toBeInTheDocument();
   expect(screen.queryByText(/Not Submitted Yet/i)).not.toBeInTheDocument();
 });
 

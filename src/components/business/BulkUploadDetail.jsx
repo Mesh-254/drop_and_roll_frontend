@@ -545,11 +545,7 @@ export default function BulkUploadDetail() {
               Excluded for a draft: "Processing: 0 / 0 rows" on a batch nobody
               is processing is the exact lie this screen used to tell. */}
           {!isDraft && ["pending", "processing"].includes(upload.status) && (
-            <BulkUploadProgressBar
-              pct={upload.progress_pct || 0}
-              label={`Processing: ${(upload.successful || 0) + (upload.failed || 0) + (upload.skipped || 0)} / ${upload.total_rows} rows`}
-              status="processing"
-            />
+            <BulkUploadProgressBar upload={upload} status="processing" />
           )}
         </motion.div>
 
@@ -588,7 +584,11 @@ export default function BulkUploadDetail() {
         {/* Overview progress indicator — always visible, not just while
            actively processing, so the KPI grid and progress bar agree even
            after a page refresh mid- or post-run. */}
-        {!isDraft && (
+        {/* Not while the live block above is already showing one. A queued
+            upload used to render TWO progress bars stacked on this page; it
+            went unnoticed only because the two carried different label text.
+            They share one wording now, so the duplication became visible. */}
+        {!isDraft && !["pending", "processing"].includes(upload.status) && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -596,8 +596,7 @@ export default function BulkUploadDetail() {
             className="mb-8"
           >
             <BulkUploadProgressBar
-              pct={upload.progress_pct ?? 0}
-              label={statusLabel}
+              upload={upload}
               status={
                 upload.status === "completed"
                   ? "completed"
