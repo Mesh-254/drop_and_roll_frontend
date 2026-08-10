@@ -228,6 +228,33 @@ class BulkUploadApi extends ApiBase {
    * payment_pending with an unpaid invoice raised; NET invoices on terms and
    * dispatches. Paying without calling this returns 409.
    */
+  /**
+   * CORRECTIONS — send a fixed file back against the batch it corrects.
+   *
+   * The whole point of this route rather than a fresh upload: the system KNOWS
+   * these are corrections because of which action was taken, so it never has to
+   * infer whether a repeat is a fix or a genuine second batch. Anything already
+   * booked is skipped, always, and no duplicate dialog is shown.
+   */
+  async uploadCorrections(parentId, file) {
+    const body = new FormData();
+    body.append("file", file);
+    const response = await this.axiosInstance.post(
+      `/api/booking/bulk-uploads/${parentId}/corrections/`,
+      body,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return response.data;
+  }
+
+  /**
+   * The failed rows in TEMPLATE shape — fix them and send them straight back.
+   * `as=`, not `format=`: DRF reserves `format` for content negotiation.
+   */
+  correctionsTemplateUrl(id) {
+    return `/api/booking/bulk-uploads/${id}/error-report/?as=template`;
+  }
+
   async continueToPayment(id) {
     const response = await this.axiosInstance.post(
       `/api/booking/bulk-uploads/${id}/continue/`,
@@ -299,12 +326,19 @@ class BulkUploadApi extends ApiBase {
    *
    * @param {string} id
    */
-  async downloadErrorReport(id) {
+  async downloadErrorReport(id, { as } = {}) {
+    // `as: "template"` returns the failed rows in TEMPLATE shape -- no
+    // diagnostic columns -- so the customer can fix them and send the same file
+    // straight back. The default report is unchanged for anyone reading errors
+    // rather than correcting them.
     const response = await this.axiosInstance.get(
       `/api/booking/bulk-uploads/${id}/error-report/`,
-      { responseType: "blob" },
+      { responseType: "blob", params: as ? { as } : undefined },
     );
-    this._triggerDownload(response.data, `bulk-errors-${id}.csv`);
+    this._triggerDownload(
+      response.data,
+      as === "template" ? `corrections-${id}.csv` : `bulk-errors-${id}.csv`,
+    );
   }
 
   // ── Aliases ───────────────────────────────────────────────────────────────
