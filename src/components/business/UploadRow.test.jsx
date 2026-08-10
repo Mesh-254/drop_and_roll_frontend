@@ -171,15 +171,67 @@ test("cancelled (abandoned draft) shows 'Never submitted', not a progress bar", 
   expect(screen.queryByText(/% complete/i)).not.toBeInTheDocument();
 });
 
-test("failed upload exposes a Re-upload action that calls onReupload", () => {
+test("failed upload exposes a Retry action that calls onReupload", () => {
+  // Renamed from "Re-upload": the brief calls this Retry, and the word matters
+  // because the customer is resuming a batch they already have, not starting
+  // an unrelated one.
   const { onReupload } = renderRow({ status: "failed", total_rows: 0 });
-  const btn = screen.getByRole("button", { name: /Re-upload/i });
+  const btn = screen.getByRole("button", { name: /Retry/i });
   fireEvent.click(btn);
   expect(onReupload).toHaveBeenCalledTimes(1);
 });
 
 test("non-terminal upload still shows the progress bar", () => {
-  renderRow({ status: "processing", total_rows: 10, successful: 5, failed: 0 });
-  expect(screen.getByText(/% complete/i)).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: /Re-upload/i })).not.toBeInTheDocument();
+  renderRow({ status: "processing", total_rows: 10, successful: 5, failed: 0, progress_pct: 50 });
+  // "% processed", not "% complete": while a batch is running the bar tracks
+  // lifecycle, and only once it stops does the row report the outcome.
+  expect(screen.getByText(/% processed/i)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Retry/i })).not.toBeInTheDocument();
+});
+
+// ─── Task 10: the action a row offers ────────────────────────────────────────
+//
+// The dashboard is where an abandoned upload has to be recoverable, so the
+// button it shows is the whole feature. Before this there was no Retry branch
+// at all: a failed batch rendered View and nothing else, and the bar under a
+// finished batch showed its SUCCESS RATE under the words "% complete" — a
+// 43-row batch with 13 successes read "30% complete" forever.
+
+test("a finished batch does not describe its success rate as completion", () => {
+  renderRow({ status: "partial", total_rows: 43, successful: 13, failed: 30 });
+
+  expect(screen.queryByText(/30% complete/)).not.toBeInTheDocument();
+  expect(screen.getByText("13 of 43 succeeded")).toBeInTheDocument();
+});
+
+test("a processing batch shows lifecycle progress, not outcome", () => {
+  renderRow({ status: "processing", total_rows: 43, successful: 4, progress_pct: 40 });
+
+  expect(screen.getByText("40% processed")).toBeInTheDocument();
+});
+
+test("a batch awaiting review offers Review and never Pay", () => {
+  renderRow({ status: "awaiting_review", successful: 13, total_rows: 43 });
+
+  expect(screen.getByRole("button", { name: /review/i })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /^pay/i })).not.toBeInTheDocument();
+});
+
+test("a failed batch offers Retry and never Pay", () => {
+  renderRow({ status: "failed", successful: 0, failed: 10, total_rows: 10 });
+
+  expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /^pay/i })).not.toBeInTheDocument();
+});
+
+test("an abandoned prepaid batch still offers Pay", () => {
+  renderRow({
+    status: "payment_pending",
+    payment_path: "prepaid",
+    successful: 13,
+    total_rows: 43,
+    outstanding: "423.43",
+  });
+
+  expect(screen.getByRole("button", { name: /pay/i })).toBeInTheDocument();
 });

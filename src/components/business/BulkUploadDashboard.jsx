@@ -542,6 +542,21 @@ export function UploadRow({ upload, onViewDetail, onReupload }) {
     upload.receivable_status === "paid" ||
     (upload.payment_path === "prepaid" && upload.status === "completed");
 
+  // The batch has processed but nobody has looked at it. Review is the ONLY way
+  // forward: offering Pay here would be the payment-before-errors flow the
+  // review gate exists to remove.
+  const isAwaitingReview = upload.status === "awaiting_review";
+
+  // Still moving. Its bar must show lifecycle progress; every other state shows
+  // the outcome. Conflating the two is how a finished 43-row batch with 13
+  // successes read "30% complete" forever.
+  const isProcessing = ["pending", "processing"].includes(upload.status);
+
+  // Retry is offered exactly when processing did not finish or produced
+  // failures, and never next to a Pay button: the two describe different
+  // problems, and showing both asks the customer to diagnose their own batch.
+  const canRetry = isTerminalFailure;
+
   const awaitingPayment = isPaymentPending || isNetUnpaid;
   const style = getStatusColors(upload.status);
   const statusLabel = getStatusLabel(upload.status);
@@ -610,12 +625,16 @@ export function UploadRow({ upload, onViewDetail, onReupload }) {
               <div className="w-full bg-slate-600 rounded-full h-1.5 overflow-hidden">
                 <motion.div
                   initial={{ width: 0 }}
-                  animate={{ width: `${successRate}%` }}
+                  animate={{ width: `${isProcessing ? (upload.progress_pct ?? 0) : successRate}%` }}
                   transition={{ duration: 0.8, ease: "easeOut" }}
                   className="h-full bg-gradient-to-r from-orange-500 to-orange-600"
                 />
               </div>
-              <p className="text-xs text-slate-400 mt-1">{successRate}% complete</p>
+              <p className="text-xs text-slate-400 mt-1">
+                {isProcessing
+                  ? `${upload.progress_pct ?? 0}% processed`
+                  : `${upload.successful || 0} of ${upload.total_rows || 0} succeeded`}
+              </p>
             </>
           )}
         </div>
@@ -637,6 +656,20 @@ export function UploadRow({ upload, onViewDetail, onReupload }) {
 
         {/* Actions */}
         <div className="sm:col-span-2 flex gap-2 justify-end">
+          {isAwaitingReview && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/bulk-upload/${upload.id}/review`);
+              }}
+              className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              Review
+            </motion.button>
+          )}
           {isPaymentPending && (
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -672,18 +705,19 @@ export function UploadRow({ upload, onViewDetail, onReupload }) {
               Settled
             </span>
           )}
-          {isTerminalFailure && onReupload && (
+          {canRetry && (
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={(e) => {
                 e.stopPropagation();
-                onReupload();
+                if (onReupload) onReupload();
+                else navigate(`/bulk-upload/${upload.id}`);
               }}
               className="px-3 py-1.5 bg-red-500/15 hover:bg-red-500/25 text-red-300 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
             >
               <RotateCcw className="h-3.5 w-3.5" />
-              Re-upload
+              Retry
             </motion.button>
           )}
           <motion.button
