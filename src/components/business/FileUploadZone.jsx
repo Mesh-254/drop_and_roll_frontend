@@ -3,6 +3,23 @@ import { motion } from 'framer-motion';
 import { Upload, FileText, FileSpreadsheet, AlertCircle, Loader2, X } from 'lucide-react';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
+// Mirrors the server (serializers_bulk.MAX_ROWS_HARD_LIMIT and
+// REQUIRED_COLUMNS). The server stays authoritative -- this only fails fast, so
+// a missing column is caught before a 10 MB upload rather than after it.
+const MAX_ROWS = 1000;
+const REQUIRED_HEADERS = [
+  'pickup_postal_code',
+  'pickup_address_line1',
+  'dropoff_postal_code',
+  'dropoff_address_line1',
+  'dropoff_phone',
+  'receiver_name',
+  'leave_safe_spot',
+  'weight_kg',
+  'num_parcels',
+  'service_type_name',
+];
 const ALLOWED_FORMATS = ['.csv', '.xlsx', '.xls'];
 
 /**
@@ -33,6 +50,58 @@ const FileUploadZone = ({
     const sizes = ['Bytes', 'KB', 'MB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  /**
+   * Content checks that need the file READ, not just its metadata.
+   *
+   * CSV only. Parsing .xlsx in the browser would mean shipping a spreadsheet
+   * library to every visitor to catch a mistake the server already catches, so
+   * those fall through to server-side validation as before. Better to check
+   * nothing than to check it wrongly.
+   *
+   * Cheap by construction: it slices the first 64 KB rather than reading a
+   * 10 MB file into memory to look at line one.
+   */
+  const inspectCsv = async (file) => {
+    if (!file.name.toLowerCase().endsWith('.csv')) return null;
+
+    let text;
+    try {
+      text = await file.slice(0, 64 * 1024).text();
+    } catch {
+      return null; // Unreadable here is the server's problem to report.
+    }
+
+    const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
+    if (!lines.length) {
+      return { title: 'That file is empty', message: 'There are no rows to upload.' };
+    }
+
+    const headers = lines[0]
+      .split(',')
+      .map((h) => h.trim().toLowerCase().replace(/^"|"$/g, ''));
+    const missing = REQUIRED_HEADERS.filter((h) => !headers.includes(h));
+    if (missing.length) {
+      // Name them. "Invalid file" sends the customer back to a spreadsheet with
+      // no idea which of fifteen columns is wrong.
+      return {
+        title: `Missing ${missing.length === 1 ? 'a required column' : 'required columns'}`,
+        message: `Add ${missing.join(', ')} to your file, then upload it again.`,
+      };
+    }
+
+    // Only meaningful when the whole file fits in the slice; a truncated read
+    // undercounts, and refusing a file for a count we did not actually take
+    // would be worse than letting the server decide.
+    if (file.size <= 64 * 1024 && lines.length - 1 > MAX_ROWS) {
+      return {
+        title: 'Too many rows',
+        message: `This file has ${lines.length - 1} rows. The maximum is ${MAX_ROWS} per upload.`,
+      };
+    }
+
+    return null;
   };
 
   const validateFile = (file) => {
@@ -75,7 +144,7 @@ const FileUploadZone = ({
   };
 
   const handleDrop = useCallback(
-    (e) => {
+    async (e) => {
       e.preventDefault();
       e.stopPropagation();
       setIsDragActive(false);
@@ -90,6 +159,12 @@ const FileUploadZone = ({
           return;
         }
 
+        const contentError = await inspectCsv(file);
+        if (contentError) {
+          setValidationError(contentError);
+          return;
+        }
+
         setValidationError(null);
         onFileSelect(file);
       }
@@ -98,7 +173,7 @@ const FileUploadZone = ({
   );
 
   const handleChange = useCallback(
-    (e) => {
+    async (e) => {
       const files = e.target.files;
       if (files && files[0]) {
         const file = files[0];
@@ -106,6 +181,12 @@ const FileUploadZone = ({
 
         if (!validation.valid) {
           setValidationError(validation.error);
+          return;
+        }
+
+        const contentError = await inspectCsv(file);
+        if (contentError) {
+          setValidationError(contentError);
           return;
         }
 
