@@ -209,9 +209,28 @@ class BulkUploadApi extends ApiBase {
    * @returns {Promise<{count:number, page:number, results:Array}>}
    */
   async getSkipped(id, params = {}) {
+    // Repointed from the generic /rows/?status=skipped to the dedicated
+    // endpoint: only that one serves WHAT each row matched (booking, batch and
+    // whether it matched on a reference or on contents). A skipped row without
+    // that evidence is just a row the customer sent that produced no delivery,
+    // which is indistinguishable from a bug.
     const response = await this.axiosInstance.get(
-      `/api/booking/bulk-uploads/${id}/rows/`,
-      { params: { ...params, status: "skipped" } },
+      `/api/booking/bulk-uploads/${id}/skipped/`,
+      { params },
+    );
+    return response.data;
+  }
+
+  /**
+   * CONTINUE — the customer has reviewed the results and chosen to proceed.
+   *
+   * The only route from a processed batch to money. Prepaid moves to
+   * payment_pending with an unpaid invoice raised; NET invoices on terms and
+   * dispatches. Paying without calling this returns 409.
+   */
+  async continueToPayment(id) {
+    const response = await this.axiosInstance.post(
+      `/api/booking/bulk-uploads/${id}/continue/`,
     );
     return response.data;
   }

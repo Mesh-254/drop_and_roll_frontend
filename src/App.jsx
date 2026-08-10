@@ -67,6 +67,7 @@ import ProtectedRoute from "./components/auth/ProtectedRoute";
 import {
   BulkUploadDashboard,
   BulkUploadDetail,
+  BulkUploadReviewPage,
   BusinessProfileOnboarding,
   BusinessProfilePage,
 } from "./components/business";
@@ -372,6 +373,16 @@ function App() {
               <ProtectedRoute allowedRoles={["customer"]}>
                 <MainLayout>
                   <BulkUploadDashboard />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/bulk-upload/:id/review"
+            element={
+              <ProtectedRoute allowedRoles={["customer"]}>
+                <MainLayout>
+                  <BulkUploadReviewPage />
                 </MainLayout>
               </ProtectedRoute>
             }

@@ -1,6 +1,7 @@
 export { default as BulkUploadDashboard } from './BulkUploadDashboard';
 export { default as BulkUploadFlow } from './BulkUploadFlow';
 export { default as BulkUploadDetail } from './BulkUploadDetail';
+export { default as BulkUploadReviewPage } from './BulkUploadReviewPage';
 export { default as FileUploadZone } from './FileUploadZone';
 export { default as ProgressTracker } from './ProgressTracker';
 export { default as ErrorSummary } from './ErrorSummary';
