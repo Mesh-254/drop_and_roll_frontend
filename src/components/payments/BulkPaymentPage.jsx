@@ -39,6 +39,16 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import BulkUploadApi from "../../api/BulkUploadApi";
 import PaymentApi from "../../api/PaymentApi";
+import { loadStripe } from "@stripe/stripe-js";
+import {
+  EmbeddedCheckout,
+  EmbeddedCheckoutProvider,
+} from "@stripe/react-stripe-js";
+
+// Module scope, deliberately. loadStripe() inside the component would fire a
+// fresh network load on every render and hand the provider a new promise each
+// time, which remounts the iframe underneath a customer mid-payment.
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -177,7 +187,7 @@ export default function BulkPaymentPage() {
   const [loadError, setLoadError] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isPaid, setIsPaid] = useState(false);
-  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [clientSecret, setClientSecret] = useState(null);
   const [confirmError, setConfirmError] = useState(null);
 
   // Store transaction_id from initiate-bulk so we can pass it to confirm-success
@@ -261,20 +271,19 @@ export default function BulkPaymentPage() {
         return;
       }
 
-      const checkoutUrl = intent?.checkout_url;
-      if (!checkoutUrl) {
-        setLoadError("Could not retrieve Stripe checkout URL. Please try refreshing or contact support.");
+      // ── Mount Stripe Embedded Checkout ────────────────────────────────────
+      // The customer stays here. Previously this redirected to
+      // checkout.stripe.com, which is where "do not close this tab" came from.
+      const secret = intent?.client_secret;
+      if (!secret) {
+        setLoadError(
+          "Could not start the secure checkout. Please refresh, or contact support if it keeps happening.",
+        );
         setIsLoading(false);
         return;
       }
-
-      // ── Redirect to Stripe Checkout ───────────────────────────────────────
-      setIsRedirecting(true);
+      setClientSecret(secret);
       setIsLoading(false);
-      // Small breathing room so the UI paints "Redirecting…" before we leave
-      setTimeout(() => {
-        window.location.href = checkoutUrl;
-      }, 350);
 
     } catch (err) {
       const detail =
@@ -342,26 +351,23 @@ export default function BulkPaymentPage() {
           {/* Order summary */}
           {upload && <OrderSummary upload={upload} amount={amount} />}
 
-          {/* Redirect status */}
-          <div style={styles.redirectBox}>
-            {isRedirecting ? (
-              <>
-                <div style={styles.spinner} />
-                <p style={styles.redirectTitle}>Redirecting to secure checkout…</p>
-                <p style={styles.redirectHint}>
-                  You'll be taken to Stripe's hosted payment page. Do not close this tab.
-                </p>
-              </>
+          {/* Payment. Rendered in place -- the customer never leaves. */}
+          <div style={styles.redirectBox} data-testid="checkout-area">
+            {clientSecret ? (
+              <EmbeddedCheckoutProvider
+                stripe={stripePromise}
+                options={{ clientSecret }}
+              >
+                <div data-testid="embedded-checkout">
+                  <EmbeddedCheckout />
+                </div>
+              </EmbeddedCheckoutProvider>
             ) : (
               <>
                 <p style={styles.bodyText}>
-                  Click below to open the secure Stripe checkout for this batch.
+                  Preparing your secure checkout…
                 </p>
-                <button
-                  style={styles.btnPrimary}
-                  onClick={loadAndPay}
-                  disabled={isRedirecting}
-                >
+                <button style={styles.btnPrimary} onClick={loadAndPay}>
                   Pay £{amount} securely
                 </button>
               </>
