@@ -644,7 +644,11 @@ export function DeliveryStatusUpdates({
                           // AFTER this route was under way. It is deliberately
                           // unnumbered so the sequence the driver is already
                           // working to stays ascending and unchanged — see
-                          // RouteStopService.plan_policy (INSERT). "NEW" rather
+                          // RouteStopService.plan_policy, under INSERT *or*
+                          // FROZEN (route_stops.py:741 numbers only under FREE).
+                          // This said "(INSERT)" alone, which understated it:
+                          // absorption appends to a live route under FROZEN and
+                          // lands here too. "NEW" rather
                           // than a dash because the two say different things:
                           // this job HAS a position in the list, it just has no
                           // permanent label.
