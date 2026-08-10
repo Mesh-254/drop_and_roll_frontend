@@ -161,10 +161,20 @@ export default function BulkUploadFlow({
   const [currentStep, setCurrentStep] = useState(0);
   const [localError, setLocalError] = useState(null);
 
-  // What to do with references this customer already booked. Defaults to
-  // "skip", matching the backend: a needless skip is visible and re-runnable,
-  // a needless booking is a real van and a real charge with no undo.
-  const [duplicatePolicy, setDuplicatePolicy] = useState("skip");
+  // What to do with rows this customer already booked.
+  //
+  // No default, deliberately. Preselecting "skip" meant the system answered the
+  // retry-vs-new-batch question on the customer's behalf on every upload. Both
+  // wrong answers cost money and only one of them is visible: a needless
+  // booking appears on an invoice, a needless skip is a parcel that never ships
+  // and nobody notices. So Continue stays disabled until a human picks, and the
+  // backend rejects a submit with no policy independently. See DuplicateChoice.
+  const [duplicatePolicy, setDuplicatePolicy] = useState(null);
+
+  // Only gates the step when there is actually something to ask about, so a
+  // clean file is never slowed down by a question it does not have.
+  const mustChooseDuplicatePolicy =
+    (validationResult?.duplicate_count || 0) > 0 && duplicatePolicy === null;
 
   const nextStep = () =>
     setCurrentStep((s) => Math.min(s + 1, STEPS.length - 1));
@@ -576,6 +586,8 @@ export default function BulkUploadFlow({
               <DuplicateChoice
                 count={validationResult?.duplicate_count || 0}
                 references={validationResult?.duplicate_references || []}
+                rows={validationResult?.duplicate_rows || []}
+                matchedUpload={validationResult?.duplicate_matched_upload || null}
                 policy={duplicatePolicy}
                 onChange={setDuplicatePolicy}
               />
@@ -594,7 +606,7 @@ export default function BulkUploadFlow({
                 </button>
                 <button
                   onClick={handleStep2Submit}
-                  disabled={isUploading}
+                  disabled={isUploading || mustChooseDuplicatePolicy}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm
                              font-semibold text-white bg-orange-500 hover:bg-orange-600
                              disabled:bg-gray-300 dark:disabled:bg-gray-600 rounded-lg
@@ -847,12 +859,39 @@ function ErrorBanner({ error }) {
  * week's run of the same route", nothing in the file distinguishes them, and
  * guessing wrong in one direction silently skips deliveries while guessing
  * wrong in the other silently books and charges for them twice.
+ *
+ * NOTHING IS PRESELECTED. "skip" used to be the default, which meant the
+ * system quietly answered on the customer's behalf on every upload. Both wrong
+ * answers are expensive and only one of them is visible: a needless booking
+ * shows up on an invoice, a needless skip is a parcel that never ships and
+ * nobody notices. So the wizard asks and the Continue button stays disabled
+ * until a human picks. The backend enforces the same rule independently
+ * (400 on submit with no policy) -- a disabled button is not a rule.
+ *
+ * Matches are counted in ROWS, not references: a row whose reference column was
+ * left blank is matched on its content fingerprint instead, and telling that
+ * customer about a "duplicate reference" would read as a system error.
  */
-export function DuplicateChoice({ count, references, policy, onChange }) {
+export function DuplicateChoice({
+  count,
+  rows = [],
+  matchedUpload = null,
+  policy,
+  onChange,
+}) {
   if (!count) return null;
 
-  const shown = references.slice(0, 3).join(", ");
+  // Each listed row identifies itself the way it was actually matched.
+  const shown = rows
+    .slice(0, 3)
+    .map((r) =>
+      r.matched_by === "reference" && r.reference
+        ? r.reference
+        : `Row ${r.row_number} (matched by contents)`,
+    )
+    .join(", ");
   const more = count > 3 ? `, +${count - 3} more` : "";
+  const batch = matchedUpload?.batch_name;
 
   return (
     <div className="rounded-lg border-2 border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/20 p-4">
@@ -860,13 +899,20 @@ export function DuplicateChoice({ count, references, policy, onChange }) {
         <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
         <div className="flex-1">
           <h4 className="font-bold text-amber-800 dark:text-amber-200">
-            {count} reference{count === 1 ? "" : "s"} already booked
+            {count} row{count === 1 ? "" : "s"} already booked
           </h4>
           <p className="text-sm text-amber-700 dark:text-amber-300 mt-1 mb-3">
-            {count === 1
-              ? "This reference matches a booking"
-              : "These references match bookings"}{" "}
-            you already have from the last 30 days:{" "}
+            {count === 1 ? "This row matches a booking" : "These rows match bookings"}{" "}
+            you already have
+            {batch ? (
+              <>
+                {" "}
+                in <span className="font-semibold">{batch}</span>
+              </>
+            ) : (
+              " from the last 30 days"
+            )}
+            :{" "}
             <span className="font-mono">
               {shown}
               {more}
@@ -920,9 +966,15 @@ export function DuplicateChoice({ count, references, policy, onChange }) {
             </label>
           </fieldset>
 
+          {policy === null || policy === undefined ? (
+            <p className="text-sm font-semibold text-amber-900 dark:text-amber-100 mt-3">
+              Choose one to continue.
+            </p>
+          ) : null}
+
           <p className="text-xs text-amber-600 dark:text-amber-400/70 mt-3">
-            A reference repeated twice inside this one file is always skipped,
-            whichever you pick.
+            A row repeated inside this one file is always skipped, whichever you
+            pick.
           </p>
         </div>
       </div>
