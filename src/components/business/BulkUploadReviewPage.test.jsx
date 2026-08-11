@@ -57,7 +57,6 @@ jest.mock("../../api/BulkUploadApi", () => ({
     getSkipped: jest.fn(),
     continueToPayment: jest.fn(),
     downloadErrorReport: jest.fn(),
-    uploadCorrections: jest.fn(),
   },
 }));
 
@@ -83,7 +82,6 @@ function setup(upload = {}, rows = {}) {
   BulkUploadApi.getSuccessful.mockResolvedValue({ results: rows.successful || [] });
   BulkUploadApi.getSkipped.mockResolvedValue({ results: rows.skipped || [] });
   BulkUploadApi.continueToPayment.mockResolvedValue({ id: "u1" });
-  BulkUploadApi.uploadCorrections.mockResolvedValue({ id: "child-1" });
   BulkUploadApi.downloadErrorReport.mockResolvedValue(undefined);
   return render(<BulkUploadReviewPage />);
 }
@@ -185,16 +183,30 @@ test("a failed continue leaves the customer on the page with an explanation", as
   expect(mockNavigate).not.toHaveBeenCalled();
 });
 
-// ── Task 23: corrections upload ──────────────────────────────────────────────
+// ── Corrections: a NEW upload, never sent from this screen ───────────────────
 //
-// The path that makes double-booking impossible rather than merely detected.
-// Everywhere else the system has to infer whether a repeat is a fix or a genuine
-// second batch; here the customer answered by using this control.
+// This batch is never modified. The declaration happens at Review & Confirm on a
+// fresh upload, which is the last point at which the answer can still change the
+// outcome. A file input here would be a second, differently-behaved corrections
+// model living beside the first.
 
-test("the failures section offers a template download and a corrections upload", async () => {
+test("the review screen never accepts a file", async () => {
+  const { container } = setup();
+  await screen.findByRole("button", { name: /download failed rows/i });
+  expect(container.querySelector('input[type="file"]')).toBeNull();
+});
+
+test("the failures section offers the download and a route to a new upload", async () => {
   setup();
   expect(await screen.findByRole("button", { name: /download failed rows/i })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /upload corrections/i })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /start a corrections upload/i })).toBeInTheDocument();
+});
+
+test("it tells the customer that already-booked rows are skipped", async () => {
+  setup();
+  expect(
+    await screen.findByText(/mark it as\s+corrections to this batch/i)
+  ).toBeInTheDocument();
 });
 
 test("the download asks for the template shape, not the diagnostic report", async () => {
@@ -204,25 +216,9 @@ test("the download asks for the template shape, not the diagnostic report", asyn
   expect(BulkUploadApi.downloadErrorReport).toHaveBeenCalledWith("u1", { as: "template" });
 });
 
-test("upload is disabled until a file is chosen", async () => {
-  setup();
-  expect(await screen.findByRole("button", { name: /upload corrections/i })).toBeDisabled();
-});
-
-test("choosing a file and uploading posts it against this batch", async () => {
-  setup();
-  const input = await screen.findByLabelText(/corrections file/i);
-  const file = new File(["reference\nR-1\n"], "fix.csv", { type: "text/csv" });
-  await act(async () => { fireEvent.change(input, { target: { files: [file] } }); });
-
-  const btn = screen.getByRole("button", { name: /upload corrections/i });
-  await act(async () => { fireEvent.click(btn); });
-
-  await waitFor(() => expect(BulkUploadApi.uploadCorrections).toHaveBeenCalledWith("u1", file));
-});
-
 test("a batch with no failures offers no corrections section", async () => {
   setup({ failed: 0, successful: 43 });
   await screen.findByRole("tab", { name: /booked/i });
-  expect(screen.queryByRole("button", { name: /upload corrections/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /start a corrections upload/i })).not.toBeInTheDocument();
 });
+

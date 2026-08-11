@@ -229,25 +229,6 @@ class BulkUploadApi extends ApiBase {
    * dispatches. Paying without calling this returns 409.
    */
   /**
-   * CORRECTIONS — send a fixed file back against the batch it corrects.
-   *
-   * The whole point of this route rather than a fresh upload: the system KNOWS
-   * these are corrections because of which action was taken, so it never has to
-   * infer whether a repeat is a fix or a genuine second batch. Anything already
-   * booked is skipped, always, and no duplicate dialog is shown.
-   */
-  async uploadCorrections(parentId, file) {
-    const body = new FormData();
-    body.append("file", file);
-    const response = await this.axiosInstance.post(
-      `/api/booking/bulk-uploads/${parentId}/corrections/`,
-      body,
-      { headers: { "Content-Type": "multipart/form-data" } },
-    );
-    return response.data;
-  }
-
-  /**
    * The failed rows in TEMPLATE shape — fix them and send them straight back.
    * `as=`, not `format=`: DRF reserves `format` for content negotiation.
    */

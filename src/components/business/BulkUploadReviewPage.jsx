@@ -65,8 +65,6 @@ export default function BulkUploadReviewPage() {
   const [isContinuing, setIsContinuing] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [now, setNow] = useState(Date.now());
-  const [correctionsFile, setCorrectionsFile] = useState(null);
-  const [isUploadingCorrections, setIsUploadingCorrections] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -114,21 +112,6 @@ export default function BulkUploadReviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [upload?.auto_effect_at, now],
   );
-
-  const handleUploadCorrections = async () => {
-    if (!correctionsFile) return;
-    setIsUploadingCorrections(true);
-    try {
-      const child = await BulkUploadApi.uploadCorrections(id, correctionsFile);
-      toast.success("Corrections uploaded. Nothing already booked will be booked again.");
-      navigate(`/bulk-upload/${child.id}`);
-    } catch (err) {
-      toast.error(
-        err?.response?.data?.detail || "Could not upload the corrections.",
-      );
-      setIsUploadingCorrections(false);
-    }
-  };
 
   const handleContinue = async () => {
     setIsContinuing(true);
@@ -222,13 +205,15 @@ export default function BulkUploadReviewPage() {
       {upload.failed > 0 && (
         <section className="rounded-lg border border-slate-700 p-4 space-y-3">
           <h2 className="font-semibold text-white">Fix the {upload.failed} failed rows</h2>
-          {/* The path that makes double-booking impossible rather than merely
-              detected: send the corrections back against THIS batch and the
-              system knows they are corrections. Anything already booked is
-              skipped, so pasting the whole original file back in is harmless. */}
+          {/* This batch is never modified. Corrections are a NEW upload that
+              the customer marks as corrections at Review & Confirm, which is the
+              last point at which that answer can still change the outcome. Rows
+              already booked here are skipped, so pasting the whole original file
+              back in is harmless. */}
           <p className="text-sm text-slate-300">
-            Download them, fix them, and send them back. Anything already booked
-            is skipped, so nothing is booked or charged twice.
+            Download them, fix them, then start a new upload and mark it as
+            corrections to this batch. Anything already booked is skipped, so
+            nothing is booked or charged twice.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <button
@@ -244,28 +229,11 @@ export default function BulkUploadReviewPage() {
               <Download className="h-4 w-4" /> Download failed rows
             </button>
 
-            <label className="text-sm text-slate-300">
-              <span className="sr-only">Corrections file</span>
-              <input
-                type="file"
-                accept=".csv,.xlsx"
-                aria-label="Corrections file"
-                onChange={(e) => setCorrectionsFile(e.target.files?.[0] || null)}
-                className="text-sm text-slate-300 file:mr-3 file:rounded-md file:border-0 file:bg-slate-700 file:px-3 file:py-1.5 file:text-slate-200"
-              />
-            </label>
-
             <button
-              onClick={handleUploadCorrections}
-              disabled={!correctionsFile || isUploadingCorrections}
-              className="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-slate-700 hover:bg-slate-600 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+              onClick={() => navigate("/bulk-upload")}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold"
             >
-              {isUploadingCorrections ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Upload className="h-4 w-4" />
-              )}
-              Upload corrections
+              <Upload className="h-4 w-4" /> Start a corrections upload
             </button>
           </div>
         </section>
