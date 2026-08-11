@@ -235,3 +235,73 @@ test("an abandoned prepaid batch still offers Pay", () => {
 
   expect(screen.getByRole("button", { name: /pay/i })).toBeInTheDocument();
 });
+
+// ── Resumability: every non-terminal batch needs a way back in ───────────────
+//
+// Closing the tab mid-processing used to leave the read-only detail drawer as
+// the only action, and a never-submitted draft was indistinguishable from a
+// batch queued behind a busy worker. That second one had already been
+// misdiagnosed once as a dead Celery worker, when the truth was that nobody had
+// ever pressed submit.
+
+test("a processing batch offers a way back into the progress view", () => {
+  renderRow({ status: "processing", is_draft: false, progress_pct: 23 });
+  expect(screen.getByRole("button", { name: /view progress/i })).toBeInTheDocument();
+});
+
+test("a processing batch shows its live percentage", () => {
+  renderRow({ status: "processing", is_draft: false, progress_pct: 23 });
+  expect(screen.getByText(/23%/)).toBeInTheDocument();
+});
+
+test("view progress navigates back into the batch", () => {
+  renderRow({ status: "processing", is_draft: false, progress_pct: 5 });
+  fireEvent.click(screen.getByRole("button", { name: /view progress/i }));
+  expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining("up-1"));
+});
+
+test("a never-submitted draft says so and offers to continue setup", () => {
+  renderRow({ status: "pending", is_draft: true, successful: 0, failed: 0 });
+  expect(screen.getByRole("button", { name: /continue setup/i })).toBeInTheDocument();
+  expect(screen.getByText(/not submitted/i)).toBeInTheDocument();
+});
+
+test("a dispatched batch reads as queued, not as a draft", () => {
+  renderRow({ status: "pending", is_draft: false, successful: 0, failed: 0 });
+  expect(screen.queryByRole("button", { name: /continue setup/i })).not.toBeInTheDocument();
+  expect(screen.getByText(/queued/i)).toBeInTheDocument();
+});
+
+test("a draft offers no progress view, because there is no progress", () => {
+  renderRow({ status: "pending", is_draft: true, successful: 0, failed: 0 });
+  expect(screen.queryByRole("button", { name: /view progress/i })).not.toBeInTheDocument();
+});
+
+test("awaiting_review offers Review and never Pay", () => {
+  renderRow({ status: "awaiting_review", successful: 12, failed: 30, receivable_is_payable: false });
+  expect(screen.getByRole("button", { name: /^review$/i })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /pay/i })).not.toBeInTheDocument();
+});
+
+test.each([
+  ["pending-draft", { status: "pending", is_draft: true }],
+  ["pending-queued", { status: "pending", is_draft: false }],
+  ["processing", { status: "processing", is_draft: false }],
+  ["awaiting_review", { status: "awaiting_review", successful: 1 }],
+])("%s has at least one action", (_name, overrides) => {
+  renderRow({ ...overrides, successful: overrides.successful ?? 0, failed: 0 });
+  expect(screen.getAllByRole("button").length).toBeGreaterThan(0);
+});
+
+// ── Corrections lineage ─────────────────────────────────────────────────────
+
+test("a corrections batch says which batch it continues", () => {
+  renderRow({ corrects_upload: "parent-1", corrects_upload_name: "March Week 2" });
+  expect(screen.getByText(/continues/i)).toBeInTheDocument();
+  expect(screen.getByText(/March Week 2/)).toBeInTheDocument();
+});
+
+test("an ordinary batch says nothing about lineage", () => {
+  renderRow({ corrects_upload: null, corrects_upload_name: null });
+  expect(screen.queryByText(/continues/i)).not.toBeInTheDocument();
+});

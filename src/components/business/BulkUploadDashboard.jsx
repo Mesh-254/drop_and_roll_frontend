@@ -35,6 +35,7 @@ import {
   ChevronLeft,
   ChevronRight,
   RotateCcw,
+  ArrowRight,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "../../contexts/AuthContext";
@@ -552,6 +553,15 @@ export function UploadRow({ upload, onViewDetail, onReupload }) {
   // successes read "30% complete" forever.
   const isProcessing = ["pending", "processing"].includes(upload.status);
 
+  // `pending` splits in two, and the split is the whole point. A DRAFT was
+  // never submitted and needs a human; a QUEUED batch is waiting on a worker and
+  // needs nothing. They rendered identically, and that ambiguity was already
+  // misdiagnosed once as a dead Celery worker when the truth was that nobody had
+  // pressed submit.
+  const isDraft = upload.is_draft === true;
+  const isQueued = upload.status === "pending" && !isDraft;
+  const isRunning = upload.status === "processing";
+
   // Retry is offered exactly when processing did not finish or produced
   // failures, and never next to a Pay button: the two describe different
   // problems, and showing both asks the customer to diagnose their own batch.
@@ -584,6 +594,13 @@ export function UploadRow({ upload, onViewDetail, onReupload }) {
           <div className="flex items-center gap-3 mb-2">
             <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${style.dot}`} />
             <h4 className="text-white font-semibold truncate">{upload.batch_name || "Unnamed"}</h4>
+            {/* Two batches for one job are only legible if the second says what
+                it continues. Display only -- no query depends on it. */}
+            {upload.corrects_upload && (
+              <p className="text-xs text-slate-400 truncate">
+                continues &ldquo;{upload.corrects_upload_name || "an earlier batch"}&rdquo;
+              </p>
+            )}
           </div>
           <span className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${style.bg} ${style.text}`}>
             {statusLabel}
@@ -631,9 +648,13 @@ export function UploadRow({ upload, onViewDetail, onReupload }) {
                 />
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                {isProcessing
-                  ? `${upload.progress_pct ?? 0}% processed`
-                  : `${upload.successful || 0} of ${upload.total_rows || 0} succeeded`}
+                {isDraft
+                  ? "Draft — not submitted"
+                  : isQueued
+                    ? "Queued — waiting for a worker"
+                    : isRunning
+                      ? `${upload.progress_pct ?? 0}% processed`
+                      : `${upload.successful || 0} of ${upload.total_rows || 0} succeeded`}
               </p>
             </>
           )}
@@ -656,6 +677,34 @@ export function UploadRow({ upload, onViewDetail, onReupload }) {
 
         {/* Actions */}
         <div className="sm:col-span-2 flex gap-2 justify-end">
+          {isDraft && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/bulk-upload/${upload.id}`);
+              }}
+              className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
+            >
+              <ArrowRight className="h-3.5 w-3.5" />
+              Continue setup
+            </motion.button>
+          )}
+          {(isRunning || isQueued) && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/bulk-upload/${upload.id}?step=processing`);
+              }}
+              className="px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              View progress
+            </motion.button>
+          )}
           {isAwaitingReview && (
             <motion.button
               whileHover={{ scale: 1.05 }}
