@@ -16,7 +16,7 @@
 // This file pins the fixed contract: the row renders `is_payable`, the tabs send
 // `view`, and the tiles render the server's `summary`.
 
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 
 const mockNavigate = jest.fn();
 jest.mock("react-router-dom", () => ({
@@ -207,4 +207,110 @@ test("a fetch failure surfaces an error and a retry, not a silent empty ledger",
   render(<BillingPage />);
   expect(await screen.findByText(/Failed to load invoices/i)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Retry/i })).toBeInTheDocument();
+});
+
+// ── Prepaid and NET share one list ──────────────────────────────────────────
+//
+// Prepaid uploads only started appearing here when the review gate began
+// raising their Receivable at Continue. Before that a prepaid customer's
+// /billing page was permanently empty however much they had spent, which is why
+// the Outstanding tile read £0.00 while nine batches were owed.
+//
+// Two rows for different kinds of money now sit side by side, so each has to say
+// which it is -- and the row must use the same word as the PDF it links to. A
+// row reading "Issued" over a document headed "Proforma Invoice" is two
+// descriptions of one debt.
+
+const PREPAID_PROFORMA = {
+  ...DRAFT_OWING,
+  id: "rec-prepaid",
+  invoice_number: "INV-2026-0003",
+  payment_terms: "prepaid",
+  payment_terms_display: "Prepaid",
+  amount: "423.43",
+  outstanding: "423.43",
+  status: "issued",
+  status_display: "Issued",
+  kind_label: "prepaid",
+  document_status: "proforma",
+};
+
+const NET_UNPAID = {
+  ...DRAFT_OWING,
+  id: "rec-net",
+  invoice_number: "INV-2026-0004",
+  status: "issued",
+  kind_label: "net_30",
+  document_status: "unpaid",
+};
+
+test("a prepaid row says it is prepaid", async () => {
+  mockList.mockResolvedValue(response([PREPAID_PROFORMA]));
+  render(<BillingPage />);
+  await screen.findByText("INV-2026-0003");
+  expect(screen.getByText(/prepaid/i)).toBeInTheDocument();
+});
+
+test("an unpaid prepaid row is called a payment request, not an invoice", async () => {
+  mockList.mockResolvedValue(response([PREPAID_PROFORMA]));
+  render(<BillingPage />);
+  await screen.findByText("INV-2026-0003");
+  expect(screen.getByText(/payment request/i)).toBeInTheDocument();
+});
+
+test("an unpaid NET row is not called a payment request", async () => {
+  mockList.mockResolvedValue(response([NET_UNPAID]));
+  render(<BillingPage />);
+  await screen.findByText("INV-2026-0004");
+  expect(screen.queryByText(/payment request/i)).not.toBeInTheDocument();
+  expect(screen.getByText(/unpaid/i)).toBeInTheDocument();
+});
+
+test("a paid row says paid", async () => {
+  mockList.mockResolvedValue(
+    response([{ ...PAID, kind_label: "prepaid", document_status: "paid" }]),
+  );
+  render(<BillingPage />);
+  // Scoped to the row: the filter tabs also contain the word "Paid", and a
+  // page-wide matcher would pass on the tab alone even if the badge vanished.
+  const number = await screen.findByText("INV-2026-0002");
+  const row = number.closest("div.group");
+  expect(within(row).getByText(/^paid$/i)).toBeInTheDocument();
+});
+
+test("a cancelled row says cancelled, so nobody settles a dead request", async () => {
+  mockList.mockResolvedValue(
+    response([
+      {
+        ...PREPAID_PROFORMA,
+        status: "cancelled",
+        document_status: "cancelled",
+        is_payable: false,
+        is_outstanding: false,
+      },
+    ]),
+  );
+  render(<BillingPage />);
+  await screen.findByText("INV-2026-0003");
+  expect(screen.getByText(/cancelled/i)).toBeInTheDocument();
+});
+
+test("a row with a rendered document offers it for download", async () => {
+  mockList.mockResolvedValue(
+    response([{ ...PREPAID_PROFORMA, pdf_url: "/media/invoices/2026/08/INV-2026-0003-proforma.pdf" }]),
+  );
+  render(<BillingPage />);
+  await screen.findByText("INV-2026-0003");
+  expect(screen.getByTitle(/download pdf/i)).toBeInTheDocument();
+});
+
+test("an older API without the new fields still renders the row", async () => {
+  // A frontend deployed ahead of the backend must degrade, not blank the page.
+  const legacy = { ...DRAFT_OWING };
+  delete legacy.kind_label;
+  delete legacy.document_status;
+  mockList.mockResolvedValue(response([legacy]));
+
+  render(<BillingPage />);
+  expect(await screen.findByText("INV-2026-0001")).toBeInTheDocument();
 });

@@ -52,8 +52,21 @@ const STATUS_CONFIG = {
   cancelled: { label: "Cancelled",      color: "text-slate-400  bg-slate-800   border-slate-700" },
 };
 
-function StatusBadge({ status }) {
-  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.draft;
+// What the DOCUMENT calls itself. The row must use the same word as the PDF it
+// links to: a row reading "Issued" over a document headed "Proforma Invoice" is
+// two descriptions of one debt, and the customer has to guess which is true.
+const DOCUMENT_STATUS_CONFIG = {
+  proforma:  { label: "Payment request", color: "text-amber-300  bg-amber-900/40 border-amber-700" },
+  unpaid:    { label: "Unpaid",          color: "text-amber-300  bg-amber-900/40 border-amber-700" },
+  paid:      { label: "Paid",            color: "text-green-300  bg-green-900/40 border-green-700" },
+  cancelled: { label: "Cancelled",       color: "text-slate-400  bg-slate-800   border-slate-700" },
+};
+
+function StatusBadge({ status, documentStatus }) {
+  // Prefer the document's own vocabulary; fall back to the ledger status so a
+  // frontend deployed ahead of the backend degrades instead of blanking.
+  const cfg =
+    DOCUMENT_STATUS_CONFIG[documentStatus] || STATUS_CONFIG[status] || STATUS_CONFIG.draft;
   return (
     <span
       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${cfg.color}`}
@@ -83,7 +96,7 @@ function InvoiceRow({ invoice, onPay, onDownload, onView }) {
             <span className="font-mono text-base font-bold text-white">
               {invoice.invoice_number}
             </span>
-            <StatusBadge status={invoice.status} />
+            <StatusBadge status={invoice.status} documentStatus={invoice.document_status} />
             {isOverdue && (
               <span className="flex items-center gap-1 text-xs text-red-400">
                 <AlertTriangle className="w-3.5 h-3.5" />
@@ -99,7 +112,7 @@ function InvoiceRow({ invoice, onPay, onDownload, onView }) {
               <span>{invoice.booking_count} booking{invoice.booking_count !== 1 ? "s" : ""}</span>
             )}
             <span>
-              {invoice.payment_terms_display || invoice.payment_terms}
+              {invoice.kind_label || invoice.payment_terms_display || invoice.payment_terms}
             </span>
             {dueDate && (
               <span className={isOverdue ? "text-red-400 font-medium" : ""}>
