@@ -72,6 +72,7 @@ import { useBulkUpload } from "../../hooks/useBulkUpload";
 import BulkUploadApi from "../../api/BulkUploadApi";
 import FileUploadZone from "./FileUploadZone";
 import BulkUploadProgressBar from "./BulkUploadProgressBar";
+import { UploadKindChoice } from "./UploadKindChoice";
 import ErrorTable from "./ErrorTable";
 
 // ─── Form validation ──────────────────────────────────────────────────────────
@@ -171,10 +172,22 @@ export default function BulkUploadFlow({
   // backend rejects a submit with no policy independently. See DuplicateChoice.
   const [duplicatePolicy, setDuplicatePolicy] = useState(null);
 
+  // "New batch" or "corrections to an earlier upload", declared at the confirm
+  // step. Unlike duplicatePolicy this HAS a default, and safely: if the file
+  // really does contain already-booked rows, DuplicateChoice still fires and
+  // still refuses to guess, so the default can never cause a silent
+  // double-booking. See UploadKindChoice.
+  const [uploadKind, setUploadKind] = useState("new");
+  const [correctsUpload, setCorrectsUpload] = useState("");
+  const [correctable, setCorrectable] = useState([]);
+
   // Only gates the step when there is actually something to ask about, so a
   // clean file is never slowed down by a question it does not have.
   const mustChooseDuplicatePolicy =
     (validationResult?.duplicate_count || 0) > 0 && duplicatePolicy === null;
+
+  // "Corrections to nothing" is not a declaration, so Continue waits for a batch.
+  const mustPickCorrectedBatch = uploadKind === "corrections" && !correctsUpload;
 
   const nextStep = () =>
     setCurrentStep((s) => Math.min(s + 1, STEPS.length - 1));
@@ -229,6 +242,26 @@ export default function BulkUploadFlow({
     }
   });
 
+  // Load the correctable batches when the confirm step opens.
+  //
+  // Failing open on purpose: if this request fails, the list is empty, the
+  // picker says so, and a NEW batch still submits normally. A picker outage must
+  // never block an ordinary upload, which is the overwhelmingly common case.
+  useEffect(() => {
+    if (currentStep !== 2) return;
+    let cancelled = false;
+    BulkUploadApi.listCorrectable()
+      .then((data) => {
+        if (!cancelled) setCorrectable(data?.results || []);
+      })
+      .catch(() => {
+        if (!cancelled) setCorrectable([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentStep]);
+
   // When validation completes (hook sets validationResult), advance to step 2
   // if the user had already clicked "Continue" (i.e. we are still on step 1).
   // This replaces the stale `if (validationResult) nextStep()` that read the
@@ -246,7 +279,10 @@ export default function BulkUploadFlow({
   const handleStep2Submit = async () => {
     setLocalError(null);
     try {
-      await startUpload({ duplicatePolicy });
+      await startUpload({
+        duplicatePolicy,
+        correctsUpload: uploadKind === "corrections" ? correctsUpload : "",
+      });
       // Only advance to the processing screen if startUpload() succeeded.
       // If it throws, uploadError will be set in the hook and the user stays
       // on step 2 — the wizard must NOT navigate forward to a polling screen
@@ -583,6 +619,16 @@ export default function BulkUploadFlow({
                 </div>
               )}
 
+              <UploadKindChoice
+                kind={uploadKind}
+                correctsUpload={correctsUpload}
+                correctable={correctable}
+                onChange={({ kind, correctsUpload: parent }) => {
+                  setUploadKind(kind);
+                  setCorrectsUpload(parent);
+                }}
+              />
+
               <DuplicateChoice
                 count={validationResult?.duplicate_count || 0}
                 references={validationResult?.duplicate_references || []}
@@ -606,7 +652,11 @@ export default function BulkUploadFlow({
                 </button>
                 <button
                   onClick={handleStep2Submit}
-                  disabled={isUploading || mustChooseDuplicatePolicy}
+                  disabled={
+                    isUploading ||
+                    mustChooseDuplicatePolicy ||
+                    mustPickCorrectedBatch
+                  }
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm
                              font-semibold text-white bg-orange-500 hover:bg-orange-600
                              disabled:bg-gray-300 dark:disabled:bg-gray-600 rounded-lg

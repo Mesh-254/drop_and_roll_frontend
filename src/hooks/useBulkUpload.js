@@ -229,7 +229,7 @@ export function useBulkUpload() {
   // ─── Upload (start Celery task) ──────────────────────────────────────────────
 
   const startUpload = useCallback(
-    async ({ duplicatePolicy } = {}) => {
+    async ({ duplicatePolicy, correctsUpload } = {}) => {
       if (!selectedFile || !validationResult) return;
 
       setIsUploading(true);
@@ -245,6 +245,7 @@ export function useBulkUpload() {
         }
         const upload = await BulkUploadApi.create(validationResult.id, {
           duplicatePolicy,
+          correctsUpload,
         });
 
         if (!isMountedRef.current) return;

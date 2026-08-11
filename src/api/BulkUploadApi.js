@@ -232,6 +232,21 @@ class BulkUploadApi extends ApiBase {
    * The failed rows in TEMPLATE shape — fix them and send them straight back.
    * `as=`, not `format=`: DRF reserves `format` for content negotiation.
    */
+  /**
+   * The batches this customer could upload corrections against.
+   *
+   * Finished, with failures, inside the dedupe window — the backend narrows it,
+   * because the window has to be the same one the skip itself uses. Two
+   * independent windows would eventually disagree and the picker would offer a
+   * batch whose rows the skip can no longer match.
+   */
+  async listCorrectable() {
+    const response = await this.axiosInstance.get(
+      "/api/booking/bulk-uploads/correctable/",
+    );
+    return response.data;
+  }
+
   correctionsTemplateUrl(id) {
     return `/api/booking/bulk-uploads/${id}/error-report/?as=template`;
   }
@@ -368,15 +383,27 @@ class BulkUploadApi extends ApiBase {
    *        default ("skip") stands for every path that never asks — the admin
    *        one-shot API, and any older client.
    */
-  async create(uploadId, { duplicatePolicy } = {}) {
+  async create(uploadId, { duplicatePolicy, correctsUpload } = {}) {
     if (import.meta.env.DEV) {
       console.debug(
         `[BulkUploadApi] create() — submitting upload ${uploadId}` +
-          (duplicatePolicy ? ` (duplicates: ${duplicatePolicy})` : ""),
+          (correctsUpload
+            ? ` (corrections to ${correctsUpload})`
+            : duplicatePolicy
+              ? ` (duplicates: ${duplicatePolicy})`
+              : ""),
       );
     }
     const payload = { status: "submitted" };
-    if (duplicatePolicy) payload.duplicate_policy = duplicatePolicy;
+    // Mutually exclusive, and the declaration wins. Choosing "corrections"
+    // already answers skip-or-book-again, and the backend rejects a conflicting
+    // policy sent alongside it -- so forwarding a stale duplicatePolicy here
+    // would 400 a submit the customer filled in correctly.
+    if (correctsUpload) {
+      payload.corrects_upload = correctsUpload;
+    } else if (duplicatePolicy) {
+      payload.duplicate_policy = duplicatePolicy;
+    }
 
     const response = await this.axiosInstance.patch(
       `/api/booking/bulk-uploads/${uploadId}/`,
