@@ -50,7 +50,19 @@ jest.mock("../../api/PaymentApi", () => ({
   default: {
     getOrCreateBulkIntent: jest.fn(),
     confirmBulkPayment: jest.fn(),
+    capturePaypalOrder: jest.fn(),
   },
+}));
+
+// The SDK is a network script; this asserts the component is mounted and wired,
+// not that PayPal itself works.
+jest.mock("./PayPalButtons", () => ({
+  __esModule: true,
+  default: () => {
+    const React = require("react");
+    return React.createElement("div", { "data-testid": "paypal-buttons" });
+  },
+  loadPayPalSdk: jest.fn(),
 }));
 
 import BulkUploadApi from "../../api/BulkUploadApi";
@@ -127,4 +139,14 @@ test("an already-paid batch does not create a second intent screen", async () =>
   render(<BulkPaymentPage />);
 
   await waitFor(() => expect(screen.queryByTestId("embedded-checkout")).not.toBeInTheDocument());
+});
+
+// ── PayPal on the bulk page ──────────────────────────────────────────────────
+// This page offered card or nothing. The order is created by the SERVER, so the
+// amount is the same whichever button is used.
+
+test("PayPal is offered alongside the card checkout", async () => {
+  render(<BulkPaymentPage />);
+  await screen.findByTestId("embedded-checkout");
+  expect(screen.getByTestId("paypal-buttons")).toBeInTheDocument();
 });

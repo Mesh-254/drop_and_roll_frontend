@@ -44,6 +44,7 @@ import {
   EmbeddedCheckout,
   EmbeddedCheckoutProvider,
 } from "@stripe/react-stripe-js";
+import PayPalButtons from "./PayPalButtons";
 
 // Module scope, deliberately. loadStripe() inside the component would fire a
 // fresh network load on every render and hand the provider a new promise each
@@ -188,6 +189,10 @@ export default function BulkPaymentPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isPaid, setIsPaid] = useState(false);
   const [clientSecret, setClientSecret] = useState(null);
+  // PayPal issues its order id and tx id at click time, not on page load, so
+  // they are refs rather than state -- nothing re-renders because of them.
+  const paypalTxIdRef = useRef(null);
+  const paypalApprovalRef = useRef(null);
   const [confirmError, setConfirmError] = useState(null);
 
   // Store transaction_id from initiate-bulk so we can pass it to confirm-success
@@ -372,6 +377,39 @@ export default function BulkPaymentPage() {
                 </button>
               </>
             )}
+          </div>
+
+          {/* PayPal. This page offered card or nothing before. The order is
+              created by the SERVER, so the amount here is the same amount the
+              invoice says either way. */}
+          <div style={{ marginTop: 16 }}>
+            <PayPalButtons
+              currency={upload?.currency || "GBP"}
+              createOrder={async () => {
+                const intent = await PaymentApi.getOrCreateBulkIntent(uploadId, "paypal");
+                paypalTxIdRef.current = intent?.transaction_id || null;
+                paypalApprovalRef.current = intent?.approval_url || null;
+                return intent?.order_id;
+              }}
+              onApprove={async (data) => {
+                await PaymentApi.capturePaypalOrder(
+                  paypalTxIdRef.current,
+                  data?.orderID,
+                );
+                navigate(`/bulk-upload/${uploadId}?paid=1`);
+              }}
+              onFallback={() => {
+                // The SDK could not load. Rather than leave someone with no way
+                // to pay, hand them the redirect this replaced.
+                if (paypalApprovalRef.current) {
+                  window.location.href = paypalApprovalRef.current;
+                } else {
+                  PaymentApi.getOrCreateBulkIntent(uploadId, "paypal").then((i) => {
+                    if (i?.approval_url) window.location.href = i.approval_url;
+                  });
+                }
+              }}
+            />
           </div>
 
           <SecurityBadge />
