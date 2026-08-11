@@ -54,8 +54,12 @@ function minutesUntil(iso) {
   return Math.max(0, Math.floor(ms / 60000));
 }
 
-export default function BulkUploadReviewPage() {
-  const { id } = useParams();
+export default function BulkUploadReviewPage({ uploadId = null, embedded = false }) {
+  // Two mounts, one implementation: the /bulk-upload/:id/review route and the
+  // wizard's fifth step. Rendering different components in the two places is how
+  // "you can close this page and come back" quietly stops being true.
+  const params = useParams();
+  const id = uploadId || params.id;
   const navigate = useNavigate();
 
   const [upload, setUpload] = useState(null);
@@ -142,7 +146,7 @@ export default function BulkUploadReviewPage() {
 
   if (loadError) {
     return (
-      <div className="max-w-3xl mx-auto p-6">
+      <div className={embedded ? "" : "max-w-3xl mx-auto p-6"}>
         <p className="text-red-300">{loadError}</p>
       </div>
     );
@@ -151,7 +155,13 @@ export default function BulkUploadReviewPage() {
   const nothingSucceeded = successful === 0;
 
   return (
-    <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
+    <div
+      className={
+        embedded
+          ? "space-y-6"
+          : "max-w-5xl mx-auto p-4 sm:p-6 space-y-6"
+      }
+    >
       <header className="space-y-2">
         <h1 className="text-2xl font-bold text-white">
           {upload.batch_name || upload.original_filename}

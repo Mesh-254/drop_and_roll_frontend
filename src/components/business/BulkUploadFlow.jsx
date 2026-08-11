@@ -73,6 +73,8 @@ import BulkUploadApi from "../../api/BulkUploadApi";
 import FileUploadZone from "./FileUploadZone";
 import BulkUploadProgressBar from "./BulkUploadProgressBar";
 import { UploadKindChoice } from "./UploadKindChoice";
+import BulkUploadReviewPage from "./BulkUploadReviewPage";
+import { STEPS, REVIEW_STEP, deriveStatus, stepForStatus } from "./bulkUploadSteps";
 import ErrorTable from "./ErrorTable";
 
 // ─── Form validation ──────────────────────────────────────────────────────────
@@ -91,12 +93,6 @@ const metadataSchema = z.object({
 
 // ─── Step labels ──────────────────────────────────────────────────────────────
 
-const STEPS = [
-  { label: "Upload File" },
-  { label: "Batch Details" },
-  { label: "Review & Confirm" },
-  { label: "Processing" },
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -114,17 +110,7 @@ function formatTotal(upload) {
  * Derive a display-friendly status from the latestUpload snapshot.
  * Returns one of: "processing" | "payment_pending" | "completed" | "failed"
  */
-function deriveStatus(latestUpload, isPolling) {
-  if (!latestUpload) return isPolling ? "processing" : null;
-  const s = latestUpload.status?.toLowerCase();
-  if (s === "payment_pending") return "payment_pending";
-  if (s === "completed") return "completed";
-  // FIX Bug 2: "partial" is a terminal success for NET — treat same as "completed"
-  // so the UI never falls through to "processing" and gets stuck.
-  if (s === "partial") return "completed";
-  if (s === "failed") return "failed";
-  return "processing";
-}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BulkUploadFlow component
@@ -338,6 +324,15 @@ export default function BulkUploadFlow({
   const isFailed = derivedStatus === "failed";
   const isProcessing =
     derivedStatus === "processing" || (!derivedStatus && isPolling);
+
+  // Move to the Review step when processing lands. Without this the wizard sat
+  // on "Please wait while we process your bookings…" over a finished batch,
+  // with Close as the only way forward and the Review screen reachable only
+  // from the dashboard.
+  useEffect(() => {
+    const target = stepForStatus(derivedStatus);
+    if (target !== null) setCurrentStep((s) => (s < target ? target : s));
+  }, [derivedStatus]);
 
   // ── Defensive observability: log status changes in dev ────────────────────
 
@@ -853,6 +848,23 @@ export default function BulkUploadFlow({
                   Close
                 </button>
               </div>
+            </motion.div>
+          )}
+
+          {/* ── STEP 4: Results review ────────────────────────────────────── */}
+          {currentStep === REVIEW_STEP && latestUpload?.id && (
+            <motion.div
+              key="step4"
+              initial={{ opacity: 0, x: 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -40 }}
+              transition={{ duration: 0.25 }}
+            >
+              {/* The same component the /bulk-upload/:id/review route renders.
+                  One implementation, so closing the tab and coming back through
+                  the dashboard lands on identical UI -- which is what makes
+                  "you can close this page" true rather than a promise. */}
+              <BulkUploadReviewPage uploadId={latestUpload.id} embedded />
             </motion.div>
           )}
         </AnimatePresence>
