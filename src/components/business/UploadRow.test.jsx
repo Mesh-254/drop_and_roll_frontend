@@ -90,14 +90,21 @@ test("NET upload with outstanding balance shows Pay now → invoice pay route", 
   expect(mockNavigate).toHaveBeenCalledWith("/invoices/rec-9?action=pay");
 });
 
-test("NET partial payment surfaces the remaining balance, not the total", () => {
+test("NET partial payment surfaces the remaining balance, not just the total", () => {
+  // The row now renders both halves (bulkMoney.js): a part-paid invoice has to
+  // say what was received AND what is still owed, because either figure alone
+  // is a number the customer cannot act on. `receivable_amount` and
+  // `receivable_paid_amount` are served alongside `outstanding` now.
   renderRow({
     receivable_id: "rec-9",
+    receivable_amount: "500.00",
+    receivable_paid_amount: "200.00",
     outstanding: "300.00",
     receivable_status: "partial",
     receivable_is_payable: true,
   });
-  expect(screen.getByText(/Outstanding: £300\.00/)).toBeInTheDocument();
+  expect(screen.getByText(/£300\.00 outstanding/)).toBeInTheDocument();
+  expect(screen.getByText(/£200\.00 paid/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Pay now/i })).toBeInTheDocument();
 });
 
@@ -106,11 +113,13 @@ test("NET partial payment surfaces the remaining balance, not the total", () => 
 test("DRAFT invoice with a balance shows Pay now (the prod bug: £16.00 owed, View only)", () => {
   renderRow({
     receivable_id: "rec-16",
+    receivable_amount: "16.00",
+    receivable_paid_amount: "0.00",
     outstanding: "16.00",
     receivable_status: "draft",
     receivable_is_payable: true,
   });
-  expect(screen.getByText(/Outstanding: £16\.00/)).toBeInTheDocument();
+  expect(screen.getByText(/£16\.00 due/)).toBeInTheDocument();
   const btn = screen.getByRole("button", { name: /Pay now/i });
   fireEvent.click(btn);
   expect(mockNavigate).toHaveBeenCalledWith("/invoices/rec-16?action=pay");

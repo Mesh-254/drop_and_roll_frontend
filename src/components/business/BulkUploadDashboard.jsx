@@ -43,6 +43,7 @@ import BulkUploadApi from "../../api/BulkUploadApi";
 import BulkUploadWizard from "./BulkUploadWizard";
 import { useBulkUpload } from "../../hooks/useBulkUpload";
 import { getStatusColors, getStatusLabel } from "../../utils/bulkUploadValidation";
+import { bulkMoneyLine, MONEY_TONE_CLASS } from "./bulkMoney";
 
 const PAGE_SIZES = [10, 25, 50];
 const STATUSES = [
@@ -571,11 +572,12 @@ export function UploadRow({ upload, onViewDetail, onReupload }) {
   const style = getStatusColors(upload.status);
   const statusLabel = getStatusLabel(upload.status);
   const successRate = upload.total_rows > 0 ? Math.round((upload.successful / upload.total_rows) * 100) : 0;
-  const amount = upload.computed_total
-    ? parseFloat(upload.computed_total).toFixed(2)
-    : upload.effective_total
-      ? parseFloat(upload.effective_total).toFixed(2)
-      : null;
+
+  // Owed vs paid, decided in bulkMoney.js. This used to be a bare
+  // `computed_total`, which told the customer what the batch cost and never
+  // whether any of it had been paid — a settled batch and an unpaid one
+  // rendered the same figure in the same colour.
+  const moneyLine = bulkMoneyLine(upload);
 
   return (
     <motion.div
@@ -662,14 +664,17 @@ export function UploadRow({ upload, onViewDetail, onReupload }) {
 
         {/* Amount & Date */}
         <div className="sm:col-span-2">
-          {amount && (
-            <div className={`text-sm font-semibold mb-1 ${awaitingPayment ? "text-amber-400" : "text-slate-300"}`}>
-              £{amount}
+          {moneyLine && (
+            <div
+              className={`text-sm font-semibold mb-1 ${MONEY_TONE_CLASS[moneyLine.tone]}`}
+              data-testid="upload-money-primary"
+            >
+              {moneyLine.primary}
             </div>
           )}
-          {isNetUnpaid && (
-            <div className="text-xs text-amber-300/90 mb-1">
-              Outstanding: £{outstanding.toFixed(2)}
+          {moneyLine?.secondary && (
+            <div className="text-xs text-amber-300/90 mb-1" data-testid="upload-money-secondary">
+              {moneyLine.secondary}
             </div>
           )}
           <p className="text-xs text-slate-500">{formatDistanceToNow(new Date(upload.created_at), { addSuffix: true })}</p>
