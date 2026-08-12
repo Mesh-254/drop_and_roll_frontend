@@ -3,6 +3,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * `dark:` follows OUR theme class, not the visitor's operating system.
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Tailwind v4 resolves `dark:` from `prefers-color-scheme` unless told
+ * otherwise, and this project never told it otherwise. Every `dark:bg-gray-800`
+ * / `text-gray-900 dark:text-white` pair in the codebase — 42 of them in the
+ * bulk-upload wizard alone — was therefore being decided by a setting the app
+ * does not control and cannot see, while `body` was unconditionally
+ * `bg-black text-white` and ProfilePage was writing a `.dark` class on <html>
+ * that nothing read.
+ *
+ * The visible cost: on a light-mode machine the bulk-upload wizard rendered as
+ * a WHITE card inside a black app, and every element styled for the dark half
+ * of the pair (the review step's `text-white`, `text-slate-300`,
+ * `text-slate-400`) came out white-on-white or light-grey-on-white. The step
+ * that lists which rows failed was, for those users, blank.
+ *
+ * Class-based restores the authors' intent and makes ProfilePage's existing
+ * light/dark toggle do what it always looked like it did. `<html class="dark">`
+ * in index.html sets the default before first paint, so there is no flash and
+ * no dependence on JS having run.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Base styles */
 @layer base {
   html {

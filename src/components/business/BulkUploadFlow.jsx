@@ -848,8 +848,17 @@ export default function BulkUploadFlow({
               {/* The same component the /bulk-upload/:id/review route renders.
                   One implementation, so closing the tab and coming back through
                   the dashboard lands on identical UI -- which is what makes
-                  "you can close this page" true rather than a promise. */}
-              <BulkUploadReviewPage uploadId={latestUpload.id} embedded />
+                  "you can close this page" true rather than a promise.
+
+                  `surface` is passed rather than inferred. This modal is
+                  `bg-white dark:bg-gray-800` and the review step's palette has
+                  to match whichever of those is actually painted. It used to
+                  hardcode the dark half, which on a light-mode machine put
+                  white text on the white card -- the step that lists which rows
+                  failed rendered blank. The app now pins `dark:` to its own
+                  theme class (see index.css), so "gray-800" is the answer here
+                  and it no longer depends on the visitor's OS. */}
+              <BulkUploadReviewPage uploadId={latestUpload.id} embedded surface="dark" />
             </motion.div>
           )}
         </AnimatePresence>
