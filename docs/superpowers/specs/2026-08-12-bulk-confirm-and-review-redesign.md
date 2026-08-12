@@ -261,7 +261,10 @@ Footer:
 * `Continue to payment — £X` (prepaid) or `Confirm and invoice — £X` (NET)
 
 Zero booked: no payment button (there is nothing to pay for), a sentence saying
-so, the download, and `← Back to uploads`.
+so, the download, and `← Back to uploads`. An ALL-SKIPPED batch (0 booked, 0
+failed, N skipped) gets its own sentence — every row of it already has a
+delivery against it, and "no rows could be booked" reads as an outage to someone
+looking at 43 parcels that are on their way.
 
 Header is unchanged: counts, total, "Nothing has been charged yet", and the NET
 auto-effect countdown.
@@ -279,6 +282,11 @@ row_number,reference,column_name,error_code,error_message,suggested_fix,<origina
 * A row with several errors joins them with `"; "` in each of the four
   diagnostic fields, de-duplicated in first-seen order (three errors on the same
   column must not print that column three times).
+* When and only when there is more than one value, a trailing full stop is
+  dropped from each part. Validator messages are whole sentences
+  ("Weight (kg) is required."), so a verbatim join reads `required.; Num
+  parcels…`. A single value is never rewritten — it is the message the API and
+  the details page show, and this must not become a second wording of it.
 * `error_code` collapses to the single code when every error shares one.
 * Original data columns follow, so the file is fixable and re-uploadable as-is:
   `validate_file` only rejects *missing* required columns, extra ones are ignored.
@@ -369,10 +377,14 @@ Backend
 * `bookings/tests/tests_bulk*.py` — the cases above
 
 Frontend
+* `src/components/business/confirmChoice.js` (new) + test — the three rules
 * `src/components/business/ConfirmUploadChoice.jsx` (new) + test
-* `src/components/business/UploadKindChoice.jsx` (deleted, and its test)
+* `src/components/business/UploadKindChoice.jsx` (deleted, and its test, and
+  `DuplicateChoice.test.jsx`)
 * `src/components/business/BulkUploadFlow.jsx` — step 2 render, `DuplicateChoice`
   removed
+* `src/components/business/BulkUploadFlow.confirm.test.jsx` (new) — the wiring
+  from the merged question to the request body
 * `src/components/business/BulkUploadReviewPage.jsx` — accordions, footer
 * `src/components/business/BulkUploadDetail.jsx` — draft banner
 * `src/hooks/useBulkUploadDetail.js` — confirm-context, `submitDraft(choice)`
