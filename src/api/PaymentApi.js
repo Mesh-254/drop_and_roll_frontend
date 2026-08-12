@@ -118,6 +118,27 @@ export class PaymentApi extends ApiBase {
       return { success: true, data: resp.data };
     } catch (err) {
       if (err.response?.status === 409) {
+        // 409 is now TWO different things, and telling the customer the wrong
+        // one is worse than telling them nothing.
+        //
+        // USE_BATCH_CHECKOUT: a prepaid batch's proforma. It is genuinely
+        // payable and genuinely unpaid — it just isn't payable HERE, because
+        // the batch owns one embedded Checkout Session and this endpoint builds
+        // a bare PaymentIntent. Opening a second one against the same debt is
+        // what put two payment records on one bulk upload. The server hands
+        // back the URL that works; pass it on rather than reporting this as
+        // "Invoice already paid", which is a false statement about money.
+        const body = err.response?.data || {};
+        if (body.code === "USE_BATCH_CHECKOUT") {
+          return {
+            success: false,
+            code: "USE_BATCH_CHECKOUT",
+            payUrl: body.pay_url,
+            bulkUploadId: body.bulk_upload_id,
+            message:
+              body.error || "This batch is prepaid — pay it from the batch checkout.",
+          };
+        }
         return { success: false, code: "ALREADY_PAID", message: "Invoice already paid." };
       }
       return this._err("INITIATE_INVOICE_ERROR", err);

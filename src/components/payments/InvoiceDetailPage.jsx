@@ -262,6 +262,15 @@ function PaymentPanel({ invoice, onPaid }) {
       );
 
       if (!result.success) {
+        // A prepaid batch's proforma. Unpaid, payable, and not payable here:
+        // the batch owns one embedded Checkout Session, and building a second
+        // gateway object against the same debt is what put two payment records
+        // on one bulk upload. Send them to the checkout that works instead of
+        // showing an error for money they are trying to pay.
+        if (result.code === "USE_BATCH_CHECKOUT" && result.payUrl) {
+          window.location.href = result.payUrl;
+          return;
+        }
         // FIX-INV-3: handle ALREADY_PAID gracefully
         if (result.code === "ALREADY_PAID") {
           setPhase("success");

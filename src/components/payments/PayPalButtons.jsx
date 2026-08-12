@@ -24,6 +24,34 @@ import React, { useEffect, useRef, useState } from "react";
 const SDK_ID = "paypal-sdk";
 
 /**
+ * THE FALLBACK BUTTON MUST STATE ITS OWN TEXT COLOUR.
+ *
+ * It had `background: #fff` and no `color`, so it inherited — and this app sets
+ * `body { @apply bg-black text-white }`. White text on a white button: the
+ * customer saw an empty bordered rectangle under "You can still pay through
+ * PayPal directly", which is the ONE control left when the SDK has failed to
+ * load. The degrade-rather-than-block path degraded to nothing.
+ *
+ * Every colour on this button is now explicit and none of them inherit, because
+ * this component renders on the light payment page AND anywhere else a caller
+ * mounts it, and an invisible money button must not be one stylesheet away.
+ */
+const styles = {
+  fallbackButton: {
+    padding: "10px 16px",
+    borderRadius: 8,
+    border: "1px solid #cbd5e1",
+    background: "#ffffff",
+    color: "#0f172a",
+    fontSize: 14,
+    fontWeight: 600,
+    lineHeight: 1.2,
+    cursor: "pointer",
+    marginTop: 8,
+  },
+};
+
+/**
  * Load the PayPal SDK once per page. Resolves with window.paypal, or rejects if
  * the script cannot be fetched.
  */
@@ -119,13 +147,7 @@ export default function PayPalButtons({
             <button
               type="button"
               onClick={onFallback}
-              style={{
-                padding: "8px 14px",
-                borderRadius: 8,
-                border: "1px solid #cbd5e1",
-                background: "#fff",
-                cursor: "pointer",
-              }}
+              style={styles.fallbackButton}
             >
               Continue to PayPal
             </button>

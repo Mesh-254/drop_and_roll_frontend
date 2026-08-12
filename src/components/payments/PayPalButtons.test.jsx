@@ -156,3 +156,44 @@ test("an error inside PayPal does not imply the payment succeeded or failed", as
   const alert = await screen.findByRole("alert");
   expect(alert.textContent).toMatch(/do not pay again/i);
 });
+
+// ── The fallback button has to be visible ────────────────────────────────────
+//
+// It had `background: #fff` and no `color`, so it inherited from
+// `body { @apply bg-black text-white }`. White text on a white button: the
+// customer saw an empty bordered rectangle where the only remaining way to pay
+// should have been. The degrade-rather-than-block path degraded to nothing.
+
+test("the fallback button states its own colours instead of inheriting", async () => {
+  render(
+    <PayPalButtons
+      clientId="test-client"
+      sdkLoader={() => Promise.reject(new Error("blocked"))}
+      createOrder={jest.fn()}
+      onApprove={jest.fn()}
+      onFallback={jest.fn()}
+    />,
+  );
+
+  const btn = await screen.findByRole("button", { name: /continue to paypal/i });
+
+  // Not "inherit", not "" — an explicit dark value against the white ground.
+  expect(btn.style.color).toBe("rgb(15, 23, 42)");
+  expect(btn.style.background).toBe("rgb(255, 255, 255)");
+});
+
+test("the fallback button is still wired to the redirect it replaces", async () => {
+  const onFallback = jest.fn();
+  render(
+    <PayPalButtons
+      clientId="test-client"
+      sdkLoader={() => Promise.reject(new Error("blocked"))}
+      createOrder={jest.fn()}
+      onApprove={jest.fn()}
+      onFallback={onFallback}
+    />,
+  );
+
+  fireEvent.click(await screen.findByRole("button", { name: /continue to paypal/i }));
+  expect(onFallback).toHaveBeenCalledTimes(1);
+});

@@ -45,6 +45,7 @@ import {
   EmbeddedCheckoutProvider,
 } from "@stripe/react-stripe-js";
 import PayPalButtons from "./PayPalButtons";
+import { chooseCheckoutStrategy } from "../../utils/checkoutStrategy";
 
 // Module scope, deliberately. loadStripe() inside the component would fire a
 // fresh network load on every render and hand the provider a new promise each
@@ -64,6 +65,7 @@ function getSessionIdFromUrl() {
   const params = new URLSearchParams(window.location.search);
   return params.get("session_id") || null;
 }
+
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -279,16 +281,27 @@ export default function BulkPaymentPage() {
       // ── Mount Stripe Embedded Checkout ────────────────────────────────────
       // The customer stays here. Previously this redirected to
       // checkout.stripe.com, which is where "do not close this tab" came from.
-      const secret = intent?.client_secret;
-      if (!secret) {
-        setLoadError(
-          "Could not start the secure checkout. Please refresh, or contact support if it keeps happening.",
-        );
+      const strategy = chooseCheckoutStrategy(intent);
+
+      if (strategy.kind === "embedded") {
+        setClientSecret(strategy.value);
         setIsLoading(false);
         return;
       }
-      setClientSecret(secret);
+
+      if (strategy.kind === "hosted") {
+        // A worse experience than embedded, but a working one. See
+        // chooseCheckoutStrategy for why this branch exists at all.
+        console.warn("[BulkPaymentPage] no client_secret — falling back to hosted checkout");
+        window.location.href = strategy.value;
+        return;
+      }
+
+      setLoadError(
+        "Could not start the secure checkout. Please refresh, or contact support if it keeps happening.",
+      );
       setIsLoading(false);
+      return;
 
     } catch (err) {
       const detail =

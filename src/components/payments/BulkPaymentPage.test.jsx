@@ -68,6 +68,7 @@ jest.mock("./PayPalButtons", () => ({
 import BulkUploadApi from "../../api/BulkUploadApi";
 import PaymentApi from "../../api/PaymentApi";
 import BulkPaymentPage from "./BulkPaymentPage";
+import { chooseCheckoutStrategy } from "../../utils/checkoutStrategy";
 
 const UPLOAD = {
   id: "u1",
@@ -113,13 +114,66 @@ test("the old redirect copy is gone", async () => {
   expect(screen.queryByText(/redirecting to secure checkout/i)).not.toBeInTheDocument();
 });
 
-test("a missing client secret is surfaced, not swallowed", async () => {
+test("an intent with nothing to pay with is surfaced, not swallowed", async () => {
   PaymentApi.getOrCreateBulkIntent.mockResolvedValue({ transaction_id: "tx1" });
 
   render(<BulkPaymentPage />);
 
   expect(await screen.findByText(/could not start the secure checkout/i)).toBeInTheDocument();
   expect(screen.queryByTestId("embedded-checkout")).not.toBeInTheDocument();
+});
+
+// ── "Payment Unavailable" ────────────────────────────────────────────────────
+//
+// The reported fault: the dashboard's Pay button and the "Pay Now to Schedule
+// Pickup" link in the payment email both landed here and both showed "Payment
+// Unavailable", while the same page reached from the wizard worked.
+//
+// It was never about those two buttons. The server has a CREATE path (returns
+// client_secret) and a CACHED path (returned checkout_url and no client_secret,
+// because it predates embedded checkout). The wizard's auto-navigation is the
+// FIRST visit and takes create; the dashboard button and the emailed link are
+// by definition LATER visits and take cache. So the page worked exactly once
+// per batch, and the two entry points that could only ever be second never
+// worked at all.
+//
+// Fixed at the source in PaymentService._bulk_intent_from_cached. These pin the
+// client's half: never dead-end on a money screen when there IS something to
+// pay with.
+
+describe("chooseCheckoutStrategy", () => {
+  test("prefers the embedded secret, so the customer stays on Drop & Roll", () => {
+    expect(
+      chooseCheckoutStrategy({ client_secret: "cs_x", checkout_url: "https://checkout.test/x" }),
+    ).toEqual({ kind: "embedded", value: "cs_x" });
+  });
+
+  test("falls back to a hosted URL rather than refusing money", () => {
+    // Exactly the shape the cached path used to return.
+    expect(chooseCheckoutStrategy({ checkout_url: "https://checkout.test/x" })).toEqual({
+      kind: "hosted",
+      value: "https://checkout.test/x",
+    });
+  });
+
+  test("errors only when there is genuinely nothing to pay with", () => {
+    expect(chooseCheckoutStrategy({ transaction_id: "tx1" }).kind).toBe("error");
+    expect(chooseCheckoutStrategy(null).kind).toBe("error");
+  });
+});
+
+test("a cached intent carrying only a checkout_url does not show Payment Unavailable", async () => {
+  PaymentApi.getOrCreateBulkIntent.mockResolvedValue({
+    transaction_id: "tx1",
+    checkout_url: "https://checkout.test/cached",
+    from_cache: true,
+  });
+
+  render(<BulkPaymentPage />);
+
+  await waitFor(() => expect(PaymentApi.getOrCreateBulkIntent).toHaveBeenCalled());
+  expect(screen.queryByText(/payment unavailable/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/could not start the secure checkout/i)).not.toBeInTheDocument();
 });
 
 test("a batch that is not awaiting payment never reaches checkout", async () => {
