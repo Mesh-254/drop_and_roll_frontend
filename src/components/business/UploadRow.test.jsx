@@ -63,10 +63,10 @@ const baseUpload = {
 function renderRow(overrides = {}) {
   const onViewDetail = jest.fn();
   const onReupload = jest.fn();
-  render(
+  const { container } = render(
     <UploadRow upload={{ ...baseUpload, ...overrides }} onViewDetail={onViewDetail} onReupload={onReupload} />,
   );
-  return { onViewDetail, onReupload };
+  return { onViewDetail, onReupload, container };
 }
 
 beforeEach(() => mockNavigate.mockClear());
@@ -388,6 +388,88 @@ test("pay_action null wins over payment_pending too", () => {
   });
 
   expect(screen.queryByRole("button", { name: /pay/i })).not.toBeInTheDocument();
+});
+
+// ── Layout: the row has to survive a phone ──────────────────────────────────
+//
+// This is a 12-column table row that used to become five stacked full-width
+// cells below `sm`. A phone got ~300px of vertical space per batch, in source
+// order (name, counts, progress, money, actions), and the counts rendered as
+// three `flex justify-between` rows — label pinned to the left edge of a 343px
+// card, value pinned to the right, nothing between them.
+//
+// These assert the structural decisions rather than the pixels: jsdom computes
+// no layout, so a screenshot test would prove nothing here either. What is
+// pinned is what a regression would actually break — ordering, wrapping, and
+// the fact that the counts are one line.
+
+test("the counts are one line, not three stretched rows", () => {
+  renderRow({ total_rows: 43, successful: 12, failed: 30 });
+
+  // "43 rows · 12 booked · 30 failed" — the three facts, inline.
+  expect(screen.getByText("43")).toBeInTheDocument();
+  expect(screen.getByText("rows")).toBeInTheDocument();
+  expect(screen.getByText("booked")).toBeInTheDocument();
+  expect(screen.getByText("failed")).toBeInTheDocument();
+
+  // The old labels are gone: they existed only to caption a justify-between row.
+  expect(screen.queryByText("Rows:")).not.toBeInTheDocument();
+  expect(screen.queryByText("Success:")).not.toBeInTheDocument();
+});
+
+test("a clean batch says nothing about failures", () => {
+  renderRow({ total_rows: 43, successful: 43, failed: 0 });
+  expect(screen.queryByText("failed")).not.toBeInTheDocument();
+});
+
+test("money is ordered above the counts on mobile", () => {
+  // The question this screen gets opened for is "what does this batch owe".
+  // Source order puts counts first; `order-*` overrides it below `sm`.
+  const { container } = renderRow({
+    payment_path: "prepaid",
+    status: "payment_pending",
+    pay_action: "prepaid",
+    outstanding: "392.97",
+  });
+
+  const money = container.querySelector('[data-testid="upload-money-primary"]').closest("div.order-2");
+  expect(money).not.toBeNull();
+  expect(money.className).toContain("sm:order-4");
+});
+
+test("the action area wraps instead of overflowing", () => {
+  // A payment_pending batch shows Pay + View inside two of twelve columns.
+  const { container } = renderRow({
+    payment_path: "prepaid",
+    status: "payment_pending",
+    pay_action: "prepaid",
+  });
+
+  const actions = container.querySelector(".order-5");
+  expect(actions.className).toContain("flex-wrap");
+});
+
+test("action labels never break mid-word", () => {
+  const { container } = renderRow({ status: "pending", is_draft: true });
+  const btn = screen.getByRole("button", { name: /continue setup/i });
+  expect(btn.className).toContain("whitespace-nowrap");
+});
+
+test("action targets are taller on mobile than on desktop", () => {
+  // py-1.5 is a 28px tap target. Coarse pointers want closer to 44.
+  renderRow({ status: "pending", is_draft: true });
+  const btn = screen.getByRole("button", { name: /continue setup/i });
+  expect(btn.className).toContain("py-2");
+  expect(btn.className).toContain("sm:py-1.5");
+});
+
+test("the batch name and its lineage do not compete for one line", () => {
+  // Both truncate. Sharing a flex row meant both lost.
+  renderRow({ batch_name: "March Week 2", corrects_upload: "p1", corrects_upload_name: "March Week 1" });
+
+  const name = screen.getByText("March Week 2");
+  const lineage = screen.getByText(/continues/i);
+  expect(name.parentElement).not.toBe(lineage.parentElement);
 });
 
 // ── Corrections lineage ─────────────────────────────────────────────────────
