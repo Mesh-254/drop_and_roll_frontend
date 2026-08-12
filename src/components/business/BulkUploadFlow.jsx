@@ -72,7 +72,8 @@ import { useBulkUpload } from "../../hooks/useBulkUpload";
 import BulkUploadApi from "../../api/BulkUploadApi";
 import FileUploadZone from "./FileUploadZone";
 import BulkUploadProgressBar from "./BulkUploadProgressBar";
-import { UploadKindChoice } from "./UploadKindChoice";
+import { ConfirmUploadChoice } from "./ConfirmUploadChoice";
+import { confirmPayload, isConfirmIncomplete } from "./confirmChoice";
 import BulkUploadReviewPage from "./BulkUploadReviewPage";
 import { STEPS, REVIEW_STEP, deriveStatus, stepForStatus } from "./bulkUploadSteps";
 import ErrorTable from "./ErrorTable";
@@ -148,32 +149,26 @@ export default function BulkUploadFlow({
   const [currentStep, setCurrentStep] = useState(0);
   const [localError, setLocalError] = useState(null);
 
-  // What to do with rows this customer already booked.
+  // ONE question at Review & Confirm: "a new batch, or corrections to an earlier
+  // upload?" It used to be two — that, and "skip the already-booked rows or book
+  // them again" directly below it — which is the same question in different
+  // words, since choosing corrections already answers skip-or-book-again.
   //
-  // No default, deliberately. Preselecting "skip" meant the system answered the
-  // retry-vs-new-batch question on the customer's behalf on every upload. Both
-  // wrong answers cost money and only one of them is visible: a needless
-  // booking appears on an invoice, a needless skip is a parcel that never ships
-  // and nobody notices. So Continue stays disabled until a human picks, and the
-  // backend rejects a submit with no policy independently. See DuplicateChoice.
-  const [duplicatePolicy, setDuplicatePolicy] = useState(null);
-
-  // "New batch" or "corrections to an earlier upload", declared at the confirm
-  // step. Unlike duplicatePolicy this HAS a default, and safely: if the file
-  // really does contain already-booked rows, DuplicateChoice still fires and
-  // still refuses to guess, so the default can never cause a silent
-  // double-booking. See UploadKindChoice.
-  const [uploadKind, setUploadKind] = useState("new");
+  // `null` until the customer picks. See confirmChoice.resolveKind for when that
+  // resolves to a default and why it cannot when money is at stake.
+  const [uploadKind, setUploadKind] = useState(null);
   const [correctsUpload, setCorrectsUpload] = useState("");
   const [correctable, setCorrectable] = useState([]);
 
+  const duplicateCount = validationResult?.duplicate_count || 0;
+
   // Only gates the step when there is actually something to ask about, so a
   // clean file is never slowed down by a question it does not have.
-  const mustChooseDuplicatePolicy =
-    (validationResult?.duplicate_count || 0) > 0 && duplicatePolicy === null;
-
-  // "Corrections to nothing" is not a declaration, so Continue waits for a batch.
-  const mustPickCorrectedBatch = uploadKind === "corrections" && !correctsUpload;
+  const confirmIncomplete = isConfirmIncomplete({
+    kind: uploadKind,
+    correctsUpload,
+    duplicateCount,
+  });
 
   const nextStep = () =>
     setCurrentStep((s) => Math.min(s + 1, STEPS.length - 1));
@@ -265,10 +260,9 @@ export default function BulkUploadFlow({
   const handleStep2Submit = async () => {
     setLocalError(null);
     try {
-      await startUpload({
-        duplicatePolicy,
-        correctsUpload: uploadKind === "corrections" ? correctsUpload : "",
-      });
+      await startUpload(
+        confirmPayload({ kind: uploadKind, correctsUpload, duplicateCount }),
+      );
       // Only advance to the processing screen if startUpload() succeeded.
       // If it throws, uploadError will be set in the hook and the user stays
       // on step 2 — the wizard must NOT navigate forward to a polling screen
@@ -614,23 +608,18 @@ export default function BulkUploadFlow({
                 </div>
               )}
 
-              <UploadKindChoice
+              <ConfirmUploadChoice
                 kind={uploadKind}
                 correctsUpload={correctsUpload}
                 correctable={correctable}
+                duplicateCount={duplicateCount}
+                duplicateRows={validationResult?.duplicate_rows || []}
+                matchedUpload={validationResult?.duplicate_matched_upload || null}
+                idPrefix="wizard"
                 onChange={({ kind, correctsUpload: parent }) => {
                   setUploadKind(kind);
                   setCorrectsUpload(parent);
                 }}
-              />
-
-              <DuplicateChoice
-                count={validationResult?.duplicate_count || 0}
-                references={validationResult?.duplicate_references || []}
-                rows={validationResult?.duplicate_rows || []}
-                matchedUpload={validationResult?.duplicate_matched_upload || null}
-                policy={duplicatePolicy}
-                onChange={setDuplicatePolicy}
               />
 
               {displayError && <ErrorBanner error={displayError} />}
@@ -647,11 +636,7 @@ export default function BulkUploadFlow({
                 </button>
                 <button
                   onClick={handleStep2Submit}
-                  disabled={
-                    isUploading ||
-                    mustChooseDuplicatePolicy ||
-                    mustPickCorrectedBatch
-                  }
+                  disabled={isUploading || confirmIncomplete}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm
                              font-semibold text-white bg-orange-500 hover:bg-orange-600
                              disabled:bg-gray-300 dark:disabled:bg-gray-600 rounded-lg
@@ -906,141 +891,6 @@ function ErrorBanner({ error }) {
         )}
       </div>
     </motion.div>
-  );
-}
-
-/**
- * DuplicateChoice — the retry-vs-new-batch question.
- *
- * Renders NOTHING when there are no matches, which is the common case: a
- * business sending fresh references every time must never be asked about a
- * problem it does not have.
- *
- * When matches DO exist the question is unavoidable. The same file legitimately
- * means either "I fixed the bad rows, leave the rest alone" or "this is next
- * week's run of the same route", nothing in the file distinguishes them, and
- * guessing wrong in one direction silently skips deliveries while guessing
- * wrong in the other silently books and charges for them twice.
- *
- * NOTHING IS PRESELECTED. "skip" used to be the default, which meant the
- * system quietly answered on the customer's behalf on every upload. Both wrong
- * answers are expensive and only one of them is visible: a needless booking
- * shows up on an invoice, a needless skip is a parcel that never ships and
- * nobody notices. So the wizard asks and the Continue button stays disabled
- * until a human picks. The backend enforces the same rule independently
- * (400 on submit with no policy) -- a disabled button is not a rule.
- *
- * Matches are counted in ROWS, not references: a row whose reference column was
- * left blank is matched on its content fingerprint instead, and telling that
- * customer about a "duplicate reference" would read as a system error.
- */
-export function DuplicateChoice({
-  count,
-  rows = [],
-  matchedUpload = null,
-  policy,
-  onChange,
-}) {
-  if (!count) return null;
-
-  // Each listed row identifies itself the way it was actually matched.
-  const shown = rows
-    .slice(0, 3)
-    .map((r) =>
-      r.matched_by === "reference" && r.reference
-        ? r.reference
-        : `Row ${r.row_number} (matched by contents)`,
-    )
-    .join(", ");
-  const more = count > 3 ? `, +${count - 3} more` : "";
-  const batch = matchedUpload?.batch_name;
-
-  return (
-    <div className="rounded-lg border-2 border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/20 p-4">
-      <div className="flex gap-3">
-        <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-        <div className="flex-1">
-          <h4 className="font-bold text-amber-800 dark:text-amber-200">
-            {count} row{count === 1 ? "" : "s"} already booked
-          </h4>
-          <p className="text-sm text-amber-700 dark:text-amber-300 mt-1 mb-3">
-            {count === 1 ? "This row matches a booking" : "These rows match bookings"}{" "}
-            you already have
-            {batch ? (
-              <>
-                {" "}
-                in <span className="font-semibold">{batch}</span>
-              </>
-            ) : (
-              " from the last 30 days"
-            )}
-            :{" "}
-            <span className="font-mono">
-              {shown}
-              {more}
-            </span>
-          </p>
-
-          <fieldset className="space-y-2">
-            <legend className="sr-only">
-              What should happen to already-booked references?
-            </legend>
-
-            <label className="flex items-start gap-3 p-3 rounded-lg border border-amber-300 dark:border-amber-700/60 cursor-pointer hover:bg-amber-100/60 dark:hover:bg-amber-900/30">
-              <input
-                type="radio"
-                name="duplicate_policy"
-                value="skip"
-                checked={policy === "skip"}
-                onChange={() => onChange("skip")}
-                className="mt-1"
-              />
-              <span>
-                <span className="block text-sm font-semibold text-amber-900 dark:text-amber-100">
-                  Skip them — I&apos;m re-uploading to fix errors
-                </span>
-                <span className="block text-xs text-amber-700 dark:text-amber-300/80">
-                  The rows that already worked are left alone. Nothing is booked
-                  or charged twice.
-                </span>
-              </span>
-            </label>
-
-            <label className="flex items-start gap-3 p-3 rounded-lg border border-amber-300 dark:border-amber-700/60 cursor-pointer hover:bg-amber-100/60 dark:hover:bg-amber-900/30">
-              <input
-                type="radio"
-                name="duplicate_policy"
-                value="book_again"
-                checked={policy === "book_again"}
-                onChange={() => onChange("book_again")}
-                className="mt-1"
-              />
-              <span>
-                <span className="block text-sm font-semibold text-amber-900 dark:text-amber-100">
-                  Book them again — this is a new batch
-                </span>
-                <span className="block text-xs text-amber-700 dark:text-amber-300/80">
-                  Every row books, including the {count} above, and you are
-                  charged for all of them. Use this for a repeat run of the same
-                  route.
-                </span>
-              </span>
-            </label>
-          </fieldset>
-
-          {policy === null || policy === undefined ? (
-            <p className="text-sm font-semibold text-amber-900 dark:text-amber-100 mt-3">
-              Choose one to continue.
-            </p>
-          ) : null}
-
-          <p className="text-xs text-amber-600 dark:text-amber-400/70 mt-3">
-            A row repeated inside this one file is always skipped, whichever you
-            pick.
-          </p>
-        </div>
-      </div>
-    </div>
   );
 }
 
