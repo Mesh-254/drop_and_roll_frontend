@@ -374,13 +374,29 @@ export default function BulkUploadFlow({
         </button>
       </div>
 
-      {/* ── Step indicator ─────────────────────────────────────────────────── */}
+      {/* ── Step indicator ───────────────────────────────────────────────────
+          THE FIFTH STEP USED TO BE CUT IN HALF. Each step and its trailing
+          connector were one flex child with FIXED widths — a 32px circle, a
+          label, and a `w-14` rule — inside a card that is `max-w-2xl` and
+          `overflow-hidden`. Five of those exceed the 592px of content width the
+          modal actually has at any viewport, so the row was clipped at the right
+          edge and the customer's current step was the half that vanished.
+
+          Labels now sit UNDER their circle instead of beside it, which removes
+          the horizontal pressure entirely, and the connectors are `flex-1` so
+          they absorb whatever slack is left rather than demanding a fixed size.
+          The row now fits by construction at every width instead of by
+          arithmetic that happened to hold until a fifth step was added. */}
       <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between">
+        <div className="flex items-start" role="list" aria-label="Upload progress">
           {STEPS.map((step, idx) => (
-            <div key={idx} className="flex items-center">
+            <React.Fragment key={idx}>
               <div
-                className={`flex items-center gap-2 ${idx <= currentStep ? "opacity-100" : "opacity-40"}`}
+                role="listitem"
+                aria-current={idx === currentStep ? "step" : undefined}
+                className={`flex flex-col items-center gap-1.5 flex-shrink-0 w-8 sm:w-20 ${
+                  idx <= currentStep ? "opacity-100" : "opacity-40"
+                }`}
               >
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
@@ -393,20 +409,22 @@ export default function BulkUploadFlow({
                 >
                   {idx < currentStep ? "✓" : idx + 1}
                 </div>
-                <span className="hidden sm:block text-xs font-medium text-gray-600 dark:text-gray-300">
+                {/* Hidden below sm, where five labels cannot fit however they
+                    are arranged. The circles still carry the position, and the
+                    step's own heading names it on screen. */}
+                <span className="hidden sm:block text-[11px] leading-tight text-center font-medium text-gray-600 dark:text-gray-300">
                   {step.label}
                 </span>
               </div>
               {idx < STEPS.length - 1 && (
                 <div
-                  className={`w-6 sm:w-14 h-0.5 mx-2 transition-colors ${
-                    idx < currentStep
-                      ? "bg-green-500"
-                      : "bg-gray-200 dark:bg-gray-600"
+                  aria-hidden="true"
+                  className={`flex-1 h-0.5 mt-4 mx-1 sm:mx-1.5 transition-colors ${
+                    idx < currentStep ? "bg-green-500" : "bg-gray-200 dark:bg-gray-600"
                   }`}
                 />
               )}
-            </div>
+            </React.Fragment>
           ))}
         </div>
       </div>
