@@ -27,6 +27,7 @@ const mockGetSkipped = jest.fn();
 const mockCreate = jest.fn();
 const mockCancelUpload = jest.fn();
 const mockRetryFailed = jest.fn();
+const mockGetConfirmContext = jest.fn();
 
 jest.mock("../api/BulkUploadApi", () => ({
   __esModule: true,
@@ -38,6 +39,7 @@ jest.mock("../api/BulkUploadApi", () => ({
     create: (...a) => mockCreate(...a),
     cancelUpload: (...a) => mockCancelUpload(...a),
     retryFailed: (...a) => mockRetryFailed(...a),
+    getConfirmContext: (...a) => mockGetConfirmContext(...a),
     downloadErrorReport: jest.fn(),
   },
 }));
@@ -72,6 +74,13 @@ beforeEach(() => {
   mockCreate.mockReset();
   mockCancelUpload.mockReset();
   mockRetryFailed.mockReset();
+  mockGetConfirmContext.mockReset().mockResolvedValue({
+    row_count: 0,
+    duplicate_count: 0,
+    duplicate_rows: [],
+    duplicate_matched_upload: null,
+    correctable: [],
+  });
 });
 
 afterEach(() => {
@@ -191,8 +200,81 @@ test("submitDraft dispatches the upload and refreshes it", async () => {
     await view.result.current.submitDraft();
   });
 
-  expect(mockCreate).toHaveBeenCalledWith("57213101");
+  expect(mockCreate).toHaveBeenCalledWith("57213101", {});
   await waitFor(() => expect(view.result.current.isDraft).toBe(false));
+});
+
+test("submitDraft forwards the Review & Confirm answer", async () => {
+  // The whole point of asking on this page: a draft whose file holds
+  // already-booked rows is refused until the answer travels with the submit.
+  const view = await renderWith(DRAFT);
+  mockCreate.mockResolvedValue({ ...QUEUED, status: "processing" });
+  mockGetDetail.mockResolvedValue({ ...QUEUED, status: "processing" });
+
+  await act(async () => {
+    await view.result.current.submitDraft({ duplicatePolicy: "book_again" });
+  });
+
+  expect(mockCreate).toHaveBeenCalledWith("57213101", { duplicatePolicy: "book_again" });
+});
+
+test("a draft loads the context its confirm question needs", async () => {
+  mockGetConfirmContext.mockResolvedValue({
+    row_count: 43,
+    duplicate_count: 14,
+    duplicate_rows: [{ row_number: 7, reference: "R-7", matched_by: "reference" }],
+    duplicate_matched_upload: { id: "b1", batch_name: "March Week 2" },
+    correctable: [{ id: "b1", label: "March Week 2 · 30 failed · 11 Aug 2026" }],
+  });
+
+  const view = await renderWith(DRAFT);
+
+  await waitFor(() => expect(view.result.current.confirmContext?.duplicate_count).toBe(14));
+  expect(mockGetConfirmContext).toHaveBeenCalledWith("57213101");
+});
+
+test("a submitted upload never asks for confirm context", async () => {
+  // It parses the stored file, and there is nothing left to declare once the
+  // batch is dispatched.
+  await renderWith(QUEUED);
+  expect(mockGetConfirmContext).not.toHaveBeenCalled();
+});
+
+test("a context outage leaves the draft submittable", async () => {
+  // Failing open: the question still renders, and the backend still refuses a
+  // submit that genuinely needs an answer.
+  mockGetConfirmContext.mockRejectedValue(new Error("boom"));
+
+  const view = await renderWith(DRAFT);
+
+  await waitFor(() => expect(view.result.current.isLoadingConfirmContext).toBe(false));
+  expect(view.result.current.confirmContext).toBeNull();
+  expect(view.result.current.isDraft).toBe(true);
+});
+
+test("a field-error refusal is shown verbatim, not as 'please try again'", async () => {
+  // The reported dead end. The body carries no `detail`, so reading only that
+  // key replaced the one sentence explaining the problem with advice to retry
+  // an action that could not succeed.
+  const view = await renderWith(DRAFT);
+  mockCreate.mockRejectedValue({
+    response: {
+      status: 400,
+      data: {
+        duplicate_policy: [
+          "This file contains rows you have already booked. Choose skip or book_again explicitly.",
+        ],
+      },
+    },
+  });
+
+  await act(async () => {
+    await view.result.current.submitDraft();
+  });
+
+  expect(view.result.current.draftActionError).toBe(
+    "This file contains rows you have already booked. Choose skip or book_again explicitly.",
+  );
 });
 
 test("a failed submitDraft surfaces the reason and leaves the draft submittable", async () => {

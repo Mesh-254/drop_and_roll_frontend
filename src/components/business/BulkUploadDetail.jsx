@@ -51,6 +51,8 @@ import {
 } from "../../utils/bulkUploadValidation";
 import BulkUploadProgressBar from "./BulkUploadProgressBar";
 import ErrorTable from "./ErrorTable";
+import { ConfirmUploadChoice } from "./ConfirmUploadChoice";
+import { confirmPayload, isConfirmIncomplete } from "./confirmChoice";
 
 const STEPS_PREPAID = [
   "Uploaded",
@@ -90,9 +92,23 @@ export default function BulkUploadDetail() {
     discardDraft,
     isSubmittingDraft,
     draftActionError,
+    confirmContext,
+    isLoadingConfirmContext,
   } = useBulkUploadDetail(id);
 
   const [activeTab, setActiveTab] = useState("overview");
+
+  // The Review & Confirm answer, asked here rather than in the wizard because
+  // this page is where a draft whose tab was closed comes back to life. Same
+  // component, same rules, same wire payload — see confirmChoice.
+  const [uploadKind, setUploadKind] = useState(null);
+  const [correctsUpload, setCorrectsUpload] = useState("");
+  const duplicateCount = confirmContext?.duplicate_count || 0;
+  const confirmIncomplete = isConfirmIncomplete({
+    kind: uploadKind,
+    correctsUpload,
+    duplicateCount,
+  });
 
   // ─── Derived state ────────────────────────────────────────────────────────
   const isPrepaid = upload?.payment_path === "prepaid";
@@ -463,10 +479,33 @@ export default function BulkUploadDetail() {
                     Not Submitted Yet
                   </h3>
                   <p className="text-sm text-amber-600 dark:text-amber-400/80 mt-1">
-                    This file was uploaded and checked, but never sent for
-                    processing — no bookings have been created and nothing has
-                    been charged. Submit it now, or discard it and start again.
+                    {confirmContext?.row_count
+                      ? `${confirmContext.row_count} rows were uploaded and checked, but never sent for processing`
+                      : "This file was uploaded and checked, but never sent for processing"}
+                    {" "}— no bookings have been created and nothing has been
+                    charged. Submit it now, or discard it and start again.
                   </p>
+
+                  {/* The question the wizard asks at Review & Confirm. Without
+                      it this button submitted with no answer, and a file holding
+                      already-booked rows was refused every time — the reported
+                      "Could not submit this upload" loop. */}
+                  <div className="mt-4">
+                    <ConfirmUploadChoice
+                      kind={uploadKind}
+                      correctsUpload={correctsUpload}
+                      correctable={confirmContext?.correctable || []}
+                      duplicateCount={duplicateCount}
+                      duplicateRows={confirmContext?.duplicate_rows || []}
+                      matchedUpload={confirmContext?.duplicate_matched_upload || null}
+                      idPrefix="draft"
+                      onChange={({ kind, correctsUpload: parent }) => {
+                        setUploadKind(kind);
+                        setCorrectsUpload(parent);
+                      }}
+                    />
+                  </div>
+
                   {draftActionError && (
                     <p className="text-sm text-red-600 dark:text-red-400 mt-2">
                       {draftActionError}
@@ -475,8 +514,25 @@ export default function BulkUploadDetail() {
                   <div className="flex flex-wrap gap-3 mt-4">
                     <button
                       type="button"
-                      onClick={submitDraft}
-                      disabled={isSubmittingDraft}
+                      onClick={() =>
+                        submitDraft(
+                          confirmPayload({
+                            kind: uploadKind,
+                            correctsUpload,
+                            duplicateCount,
+                          }),
+                        )
+                      }
+                      /* Disabled while the context loads too: until it lands,
+                         duplicateCount reads 0 and the question looks answered
+                         by default. Clicking in that window submits with no
+                         answer, which the backend refuses — an error the
+                         customer did nothing to earn. */
+                      disabled={
+                        isSubmittingDraft ||
+                        isLoadingConfirmContext ||
+                        confirmIncomplete
+                      }
                       className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white text-sm font-semibold"
                     >
                       {isSubmittingDraft

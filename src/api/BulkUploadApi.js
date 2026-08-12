@@ -247,6 +247,24 @@ class BulkUploadApi extends ApiBase {
     return response.data;
   }
 
+  /**
+   * Everything the Review & Confirm question needs about a DRAFT, in one call.
+   *
+   * The wizard already holds this from /validate/. A customer who closed the tab
+   * and came back through "Continue setup" holds nothing, and the detail page
+   * used to submit with no answer at all — which the backend refused, correctly,
+   * leaving the batch unsubmittable.
+   *
+   * Returns { row_count, duplicate_count, duplicate_rows,
+   *           duplicate_matched_upload, correctable }.
+   */
+  async getConfirmContext(id) {
+    const response = await this.axiosInstance.get(
+      `/api/booking/bulk-uploads/${id}/confirm-context/`,
+    );
+    return response.data;
+  }
+
   correctionsTemplateUrl(id) {
     return `/api/booking/bulk-uploads/${id}/error-report/?as=template`;
   }
@@ -316,17 +334,24 @@ class BulkUploadApi extends ApiBase {
   }
 
   /**
-   * ERROR REPORT — Download enhanced error CSV for a completed upload.
-   *
-   * Phase 4 enhanced: includes column_name, error_code, suggested_fix.
+   * ERROR REPORT — Download the failed rows of a processed upload.
    *
    * @param {string} id
+   * @param {object} [opts]
+   * @param {"rows"|"enhanced"|"template"} [opts.as]  Shape; see below.
    */
   async downloadErrorReport(id, { as } = {}) {
-    // `as: "template"` returns the failed rows in TEMPLATE shape -- no
-    // diagnostic columns -- so the customer can fix them and send the same file
-    // straight back. The default report is unchanged for anyone reading errors
-    // rather than correcting them.
+    // Three shapes, all served by the same endpoint:
+    //
+    //   default / "rows"  one line per failed ROW. Carries row_number,
+    //                     reference, column_name, error_code, error_message and
+    //                     suggested_fix alongside the original data columns, so
+    //                     the same file is both the diagnosis and the thing you
+    //                     fix and send back.
+    //   "enhanced"        one line per ERROR. For reading failures one at a
+    //                     time; a row with three problems appears three times,
+    //                     so re-uploading it would book that parcel three times.
+    //   "template"        template columns only, no diagnostics.
     const response = await this.axiosInstance.get(
       `/api/booking/bulk-uploads/${id}/error-report/`,
       { responseType: "blob", params: as ? { as } : undefined },

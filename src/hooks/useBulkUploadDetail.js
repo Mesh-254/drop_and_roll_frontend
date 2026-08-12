@@ -16,6 +16,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import BulkUploadApi from "../api/BulkUploadApi";
+import { extractApiError } from "../api/extractApiError";
 
 /**
  * How long a genuinely-submitted upload may sit without its status changing
@@ -312,31 +313,78 @@ export function useBulkUploadDetail(uploadId) {
   ]);
 
   /**
+   * What Review & Confirm needs to ask its question about THIS draft.
+   *
+   * The wizard holds this in memory from /validate/. A customer who closed the
+   * tab and returned through "Continue setup" holds nothing, which is exactly
+   * how the reported failure happened: the page submitted with no answer, the
+   * backend refused to guess whether 14 already-booked rows should book again,
+   * and the batch became unsubmittable.
+   *
+   * Fetched only for a draft — a submitted batch has nothing left to declare —
+   * and never on the poll: it parses the stored file.
+   */
+  const [confirmContext, setConfirmContext] = useState(null);
+  const [isLoadingConfirmContext, setIsLoadingConfirmContext] = useState(false);
+
+  useEffect(() => {
+    if (!uploadId || !isDraft) return;
+    let cancelled = false;
+    setIsLoadingConfirmContext(true);
+    BulkUploadApi.getConfirmContext(uploadId)
+      .then((data) => {
+        if (!cancelled) setConfirmContext(data);
+      })
+      .catch((err) => {
+        // Failing open: with no context the page still shows the question with
+        // no warning panel, and the backend still refuses a submit that needs
+        // an answer. A context outage must not strand a draft that is fine.
+        console.error("[useBulkUploadDetail] Confirm context failed:", err);
+        if (!cancelled) setConfirmContext(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingConfirmContext(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [uploadId, isDraft]);
+
+  /**
    * Submit a draft for processing (PATCH status=submitted → queues Celery).
    * Exposed here so the detail page can rescue a draft the wizard abandoned,
    * rather than leaving the user to re-upload the same file.
+   *
+   * `choice` is the answer to "a new batch, or corrections to an earlier
+   * upload?", already mapped to wire keys by confirmChoice.confirmPayload.
    */
   const [isSubmittingDraft, setIsSubmittingDraft] = useState(false);
   const [draftActionError, setDraftActionError] = useState(null);
 
-  const submitDraft = useCallback(async () => {
-    if (!uploadId || isSubmittingDraft) return;
-    setIsSubmittingDraft(true);
-    setDraftActionError(null);
-    try {
-      await BulkUploadApi.create(uploadId);
-      setIsStalled(false);
-      await fetchUploadDetail();
-    } catch (err) {
-      console.error("[useBulkUploadDetail] Draft submit failed:", err);
-      setDraftActionError(
-        err?.response?.data?.detail ||
-          "Could not submit this upload. Please try again.",
-      );
-    } finally {
-      setIsSubmittingDraft(false);
-    }
-  }, [uploadId, isSubmittingDraft, fetchUploadDetail]);
+  const submitDraft = useCallback(
+    async (choice = {}) => {
+      if (!uploadId || isSubmittingDraft) return;
+      setIsSubmittingDraft(true);
+      setDraftActionError(null);
+      try {
+        await BulkUploadApi.create(uploadId, choice);
+        setIsStalled(false);
+        await fetchUploadDetail();
+      } catch (err) {
+        console.error("[useBulkUploadDetail] Draft submit failed:", err);
+        // extractApiError, not `data.detail`: the refusal that blocked this
+        // path arrives as {"duplicate_policy": [...]}, and reading only
+        // `detail` replaced the one sentence explaining the problem with
+        // "Please try again" — advice that could not work.
+        setDraftActionError(
+          extractApiError(err, "Could not submit this upload. Please try again."),
+        );
+      } finally {
+        setIsSubmittingDraft(false);
+      }
+    },
+    [uploadId, isSubmittingDraft, fetchUploadDetail],
+  );
 
   /** Discard a draft (PATCH status=cancelled) so it stops cluttering the list. */
   const discardDraft = useCallback(async () => {
@@ -349,8 +397,7 @@ export function useBulkUploadDetail(uploadId) {
     } catch (err) {
       console.error("[useBulkUploadDetail] Draft discard failed:", err);
       setDraftActionError(
-        err?.response?.data?.detail ||
-          "Could not discard this upload. Please try again.",
+        extractApiError(err, "Could not discard this upload. Please try again."),
       );
     } finally {
       setIsSubmittingDraft(false);
@@ -403,6 +450,8 @@ export function useBulkUploadDetail(uploadId) {
     discardDraft,
     isSubmittingDraft,
     draftActionError,
+    confirmContext,
+    isLoadingConfirmContext,
 
     // Error rows
     errorRows,

@@ -91,6 +91,17 @@ const BASE_HOOK = {
   discardDraft: mockDiscardDraft,
   isSubmittingDraft: false,
   draftActionError: null,
+  confirmContext: null,
+  isLoadingConfirmContext: false,
+};
+
+/** confirm-context for a draft whose file repeats an earlier batch. */
+const DIRTY_CONTEXT = {
+  row_count: 43,
+  duplicate_count: 14,
+  duplicate_rows: [{ row_number: 7, reference: "VALID-STD-02", matched_by: "reference" }],
+  duplicate_matched_upload: { id: "b1", batch_name: "bulk_upload_test_new" },
+  correctable: [{ id: "b1", label: "bulk_upload_test_new · 30 failed · 11 Aug 2026" }],
 };
 
 /** The stuck upload from the report, byte for byte. */
@@ -148,6 +159,125 @@ test("a draft offers Submit and Discard", () => {
 
   fireEvent.click(screen.getByRole("button", { name: /^Discard$/i }));
   expect(mockDiscardDraft).toHaveBeenCalled();
+});
+
+// ─── Draft: the Review & Confirm question, asked here ────────────────────────
+//
+// A draft resumed through "Continue setup" used to submit with no answer at
+// all. When the file held already-booked rows the backend refused — correctly,
+// since it must not decide whether 14 parcels ship and are charged for twice —
+// and the page had no way to supply one. The batch was unsubmittable.
+
+test("a draft asks the same question the wizard asks", () => {
+  mockHookState = {
+    ...BASE_HOOK,
+    upload: DRAFT_UPLOAD,
+    isDraft: true,
+    confirmContext: DIRTY_CONTEXT,
+  };
+  render(<BulkUploadDetail />);
+
+  expect(screen.getByText(/what is this upload\?/i)).toBeInTheDocument();
+  expect(screen.getByText(/14 rows already booked/i)).toBeInTheDocument();
+  expect(screen.getByRole("radio", { name: /a new batch/i })).toBeInTheDocument();
+  expect(screen.getByRole("radio", { name: /corrections/i })).toBeInTheDocument();
+});
+
+test("submit is blocked until the duplicate question is answered", () => {
+  mockHookState = {
+    ...BASE_HOOK,
+    upload: DRAFT_UPLOAD,
+    isDraft: true,
+    confirmContext: DIRTY_CONTEXT,
+  };
+  render(<BulkUploadDetail />);
+
+  const submit = () => screen.getByRole("button", { name: /Submit for Processing/i });
+  expect(submit()).toBeDisabled();
+
+  fireEvent.click(screen.getByRole("radio", { name: /a new batch/i }));
+
+  // Re-queried: the banner re-mounts its subtree on state change, so a node
+  // captured before the click is a detached copy that never updates.
+  expect(submit()).toBeEnabled();
+});
+
+test("the answer travels with the submit", () => {
+  mockHookState = {
+    ...BASE_HOOK,
+    upload: DRAFT_UPLOAD,
+    isDraft: true,
+    confirmContext: DIRTY_CONTEXT,
+  };
+  render(<BulkUploadDetail />);
+
+  fireEvent.click(screen.getByRole("radio", { name: /a new batch/i }));
+  fireEvent.click(screen.getByRole("button", { name: /Submit for Processing/i }));
+
+  expect(mockSubmitDraft).toHaveBeenCalledWith({ duplicatePolicy: "book_again" });
+});
+
+test("a corrections answer names the batch it corrects", () => {
+  mockHookState = {
+    ...BASE_HOOK,
+    upload: DRAFT_UPLOAD,
+    isDraft: true,
+    confirmContext: DIRTY_CONTEXT,
+  };
+  render(<BulkUploadDetail />);
+
+  // The matched batch is preselected, so choosing corrections is one click.
+  fireEvent.click(screen.getByRole("radio", { name: /corrections/i }));
+  fireEvent.click(screen.getByRole("button", { name: /Submit for Processing/i }));
+
+  expect(mockSubmitDraft).toHaveBeenCalledWith({ correctsUpload: "b1" });
+});
+
+test("a clean draft submits in one click with no policy attached", () => {
+  mockHookState = {
+    ...BASE_HOOK,
+    upload: DRAFT_UPLOAD,
+    isDraft: true,
+    confirmContext: { ...DIRTY_CONTEXT, duplicate_count: 0, duplicate_rows: [], duplicate_matched_upload: null },
+  };
+  render(<BulkUploadDetail />);
+
+  const submit = screen.getByRole("button", { name: /Submit for Processing/i });
+  expect(submit).toBeEnabled();
+
+  fireEvent.click(submit);
+
+  expect(mockSubmitDraft).toHaveBeenCalledWith({});
+});
+
+test("submit waits for the context rather than submitting a default answer", () => {
+  // Until it lands duplicateCount reads 0, so the question looks answered.
+  // Clicking in that window sends no answer and earns a 400 the customer did
+  // nothing to cause.
+  mockHookState = {
+    ...BASE_HOOK,
+    upload: DRAFT_UPLOAD,
+    isDraft: true,
+    confirmContext: null,
+    isLoadingConfirmContext: true,
+  };
+  render(<BulkUploadDetail />);
+
+  expect(screen.getByRole("button", { name: /Submit for Processing/i })).toBeDisabled();
+});
+
+test("a draft states its row count instead of the zero the record holds", () => {
+  // total_rows is 0 until processing creates rows, so the page read
+  // "TOTAL ROWS 0" over a 43-row file.
+  mockHookState = {
+    ...BASE_HOOK,
+    upload: DRAFT_UPLOAD,
+    isDraft: true,
+    confirmContext: DIRTY_CONTEXT,
+  };
+  render(<BulkUploadDetail />);
+
+  expect(screen.getByText(/43 rows were uploaded and checked/i)).toBeInTheDocument();
 });
 
 test("a draft surfaces a failed submit rather than swallowing it", () => {
