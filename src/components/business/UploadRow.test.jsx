@@ -302,6 +302,94 @@ test.each([
   expect(screen.getAllByRole("button").length).toBeGreaterThan(0);
 });
 
+// ── ONE debt, ONE button (pay_action) ───────────────────────────────────────
+//
+// The reported bug: a prepaid batch rendered "Pay" AND "Pay now" on the same
+// row. Both were reachable, both opened a checkout, and each opened its own
+// PaymentTransaction against the same £392.97.
+//
+// Neither boolean was wrong on its own. `receivable_is_payable` never asked "is
+// this NET" — it asks "does this batch have a payable invoice", and prepaid
+// batches gained one when `ensure_prepaid_receivable` began raising a proforma
+// at the review gate so that money owed would be visible in Billing before it
+// was paid. Two correct predicates, one debt, two buttons.
+//
+// `pay_action` is now computed server-side and is the only input to this
+// decision. The rows below pin that, and the fallback (field absent) is pinned
+// by every test above, all of which omit it.
+
+test("a prepaid batch with a payable proforma shows ONE pay button, not two", () => {
+  renderRow({
+    payment_path: "prepaid",
+    status: "payment_pending",
+    pay_action: "prepaid",
+    // The proforma is real and IS payable — that is not the bug, and the field
+    // stays honest. What changed is that the row no longer reads it.
+    receivable_id: "rec-1",
+    outstanding: "392.97",
+    receivable_status: "issued",
+    receivable_is_payable: true,
+  });
+
+  expect(screen.getAllByRole("button", { name: /^pay/i })).toHaveLength(1);
+  expect(screen.queryByRole("button", { name: /pay now/i })).not.toBeInTheDocument();
+});
+
+test("that one button is the batch checkout, which is what the email links to", () => {
+  renderRow({
+    payment_path: "prepaid",
+    status: "payment_pending",
+    pay_action: "prepaid",
+    receivable_id: "rec-1",
+    outstanding: "392.97",
+    receivable_is_payable: true,
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: /^Pay$/i }));
+  expect(mockNavigate).toHaveBeenCalledWith("/pay/bulk/up-1");
+});
+
+test("a NET batch is sent to its invoice", () => {
+  renderRow({
+    payment_path: "net",
+    status: "completed",
+    pay_action: "invoice",
+    receivable_id: "rec-9",
+    outstanding: "500.00",
+    receivable_is_payable: true,
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: /pay now/i }));
+  expect(mockNavigate).toHaveBeenCalledWith("/invoices/rec-9?action=pay");
+});
+
+test("pay_action null wins over a payable invoice", () => {
+  // A prepaid batch settled by a bank transfer an admin recorded: the batch is
+  // COMPLETED, so nothing more is owed, whatever the invoice row still says.
+  renderRow({
+    payment_path: "prepaid",
+    status: "completed",
+    pay_action: null,
+    receivable_id: "rec-1",
+    outstanding: "392.97",
+    receivable_is_payable: true,
+  });
+
+  expect(screen.queryByRole("button", { name: /pay/i })).not.toBeInTheDocument();
+  expect(screen.getByText(/Settled/i)).toBeInTheDocument();
+});
+
+test("pay_action null wins over payment_pending too", () => {
+  renderRow({
+    payment_path: "prepaid",
+    status: "payment_pending",
+    pay_action: null,
+    receivable_is_payable: false,
+  });
+
+  expect(screen.queryByRole("button", { name: /pay/i })).not.toBeInTheDocument();
+});
+
 // ── Corrections lineage ─────────────────────────────────────────────────────
 
 test("a corrections batch says which batch it continues", () => {

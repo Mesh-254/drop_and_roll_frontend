@@ -516,27 +516,43 @@ export function UploadRow({ upload, onViewDetail, onReupload }) {
   // business user. Show a static state line + a one-click re-upload instead.
   const isTerminalFailure = upload.status === "failed" || upload.status === "cancelled";
 
-  // Shared with BulkUploadDetail.jsx via utils/bulkUploadValidation.js so
-  // status styling can't drift between the dashboard and detail views.
-  const isPaymentPending = upload.status === "payment_pending" && upload.payment_path === "prepaid";
-
-  // NET-terms inline pay-now (spec §C): a NET upload finishes as
-  // completed/partial with a linked Receivable. Surface a "Pay now" action here
-  // (instead of forcing the user into /billing) whenever the server says the
-  // invoice is payable.
+  // ── ONE debt, ONE button ──────────────────────────────────────────────────
   //
-  // This used to hold a local ["issued","partial","overdue"] whitelist and
-  // claimed to mirror the pay-via-gateway endpoint. It stopped mirroring it when
-  // DRAFT became payable, and the claim in the comment is what stopped anyone
-  // rechecking: a production batch with £16.00 owed rendered View only, so the
-  // customer had no way to pay. `receivable_is_payable` is computed by
-  // Receivable.is_payable, the same property that guards the endpoint, so the
-  // button and the API cannot disagree again.
+  // `pay_action` is computed by the serializer and is either "prepaid",
+  // "invoice" or null. This row used to decide for itself, from two booleans
+  // that were each individually correct:
+  //
+  //   isPaymentPending = status === payment_pending && payment_path === prepaid
+  //   isNetUnpaid      = receivable_is_payable
+  //
+  // The second one is not a NET test — it never was. It asks "does this batch
+  // have a payable invoice", and prepaid batches acquired one the moment
+  // `ensure_prepaid_receivable` started raising a proforma at the review gate.
+  // So a prepaid batch matched BOTH, rendered "Pay" and "Pay now" side by side,
+  // and the two buttons led to two different checkouts that opened two
+  // PaymentTransactions against one £392.97.
+  //
+  // The server answers it now, and `pay_via_gateway` refuses a prepaid batch
+  // with USE_BATCH_CHECKOUT, so the button and the endpoint cannot disagree.
+  // The `??` branch keeps an older API response working: the field is new, and
+  // a dashboard that renders no pay button at all is a worse failure than one
+  // that renders the pre-existing pair.
+  const payAction =
+    upload.pay_action !== undefined
+      ? upload.pay_action
+      : upload.status === "payment_pending" && upload.payment_path === "prepaid"
+        ? "prepaid"
+        : upload.receivable_is_payable === true
+          ? "invoice"
+          : null;
+
+  const isPaymentPending = payAction === "prepaid";
+  const isNetUnpaid = payAction === "invoice";
+
   // Default 0 rather than null: `is_payable` already guarantees a positive
   // balance server-side, and the two fields ship in the same serializer, so this
   // only removes a `null.toFixed()` crash path from the render below.
   const outstanding = upload.outstanding != null ? parseFloat(upload.outstanding) : 0;
-  const isNetUnpaid = upload.receivable_is_payable === true;
 
   // Settled = a NET invoice paid in full, or a prepaid upload that has cleared
   // payment (prepaid completes only after the charge succeeds).
