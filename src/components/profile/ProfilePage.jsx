@@ -4,17 +4,17 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import { Moon, Sun, Save, X, Loader, Building2, CheckCircle, Clock, XCircle, CreditCard, ArrowRight } from "lucide-react";
+import { Save, X, Loader, Building2, CheckCircle, Clock, XCircle, CreditCard, ArrowRight } from "lucide-react";
 import { authApi } from "../../api/AuthApi";
 import { useBusinessProfile } from "../../hooks/useBusinessProfile";
 import BusinessProfileOnboarding from "../business/BusinessProfileOnboarding";
 import PendingBookingsSection from "./PendingBookingsSection";
 
-// NAVIGATION & PROFILE UPGRADE: New /profile page with editable name fields and theme toggle
+// NAVIGATION & PROFILE UPGRADE: /profile page with editable name fields.
+// The theme toggle that used to live here was removed — see the comment below.
 export default function ProfilePage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [isDarkMode, setIsDarkMode] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
@@ -40,27 +40,18 @@ export default function ProfilePage() {
     }
   }, [user]);
 
-  // Initialize dark mode from localStorage
-  useEffect(() => {
-    const savedMode = localStorage.getItem("theme") === "light" ? false : true;
-    setIsDarkMode(savedMode);
-    applyTheme(savedMode);
-  }, []);
-
-  const applyTheme = (isDark) => {
-    if (isDark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-    localStorage.setItem("theme", isDark ? "dark" : "light");
-  };
-
-  const toggleTheme = () => {
-    const newMode = !isDarkMode;
-    setIsDarkMode(newMode);
-    applyTheme(newMode);
-  };
+  // THE THEME TOGGLE IS GONE. See utils/theme.js for the measurement behind it.
+  //
+  // Short version: this app has no light mode to switch to. `scripts/audit_theme.mjs`
+  // reports that NOT ONE file in src/ flips cleanly — every file carrying
+  // `dark:` pairs also carries unpaired dark-only utilities — and `body` is
+  // unconditionally `bg-black text-white`. Removing `.dark` therefore does not
+  // produce a light app; it produces whatever screen you happen to be on, half
+  // in one theme and half in the other.
+  //
+  // The button was harmless only while `dark:` resolved from the operating
+  // system and the class it wrote was read by nothing. Pinning `dark:` to that
+  // class made the button work, which is exactly what made it dangerous.
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -173,27 +164,9 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Theme Toggle */}
-              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700/30">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs text-gray-400 uppercase tracking-wider">Theme</p>
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={toggleTheme}
-                    className="p-2 rounded-lg hover:bg-gray-700/50 transition-all"
-                  >
-                    {isDarkMode ? (
-                      <Moon className="w-5 h-5 text-gray-400 hover:text-orange-400" />
-                    ) : (
-                      <Sun className="w-5 h-5 text-gray-400 hover:text-orange-400" />
-                    )}
-                  </motion.button>
-                </div>
-                <p className="text-sm text-gray-400">
-                  {isDarkMode ? "Dark Mode" : "Light Mode"}
-                </p>
-              </div>
+              {/* No theme card. Offering a switch to a theme that does not exist
+                  is worse than offering nothing: the button worked, and what it
+                  produced was half a screen in each theme. */}
             </div>
           </motion.div>
 

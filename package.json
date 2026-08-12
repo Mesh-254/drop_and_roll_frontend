@@ -8,7 +8,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "jest"
+    "test": "jest",
+    "audit:theme": "node scripts/audit_theme.mjs",
+    "audit:light": "node scripts/audit_unpaired_light.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
