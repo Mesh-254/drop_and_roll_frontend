@@ -313,8 +313,41 @@ const SELF_TRANSLUCENT_TOKENS = new Set([
   "bg-brand-surface",
 ]);
 
-/** Literal colours that must stay literal: third-party brand requirements. */
-export const ALLOW_LIST = ["bg-[#0070ba]", "bg-[#005ea6]", "text-[#0070ba]"];
+/**
+ * Colours that stay literal on purpose, and why. The audit reads this list too,
+ * so an exception has to be written down here rather than merely tolerated.
+ */
+export const ALLOW_LIST = [
+  // Third-party brand requirements: PayPal and Stripe own these values.
+  "bg-[#0070ba]",
+  "bg-[#005ea6]",
+  "text-[#0070ba]",
+  // A drop shadow is not a themed surface. Black at 40-50% reads correctly on a
+  // light ground and a dark one, and there is no "shadow" role to point at.
+  "shadow-black/40",
+  "shadow-black/50",
+  // Purple and pink carry a CATEGORY meaning that the token system has no role
+  // for — a service-type chip on the driver job cards, one Services card accent,
+  // one FAQ icon, one gradient tint. Each of these specifies its own foreground
+  // AND background on the same element (bg-purple-100 with text-purple-700), so
+  // the chip stays legible on either theme's surface without needing to flip.
+  // Promoting them to a token would invent a role nothing else shares; leaving
+  // them literal is the honest description of what they are.
+  "bg-purple-50",
+  "bg-purple-100",
+  "bg-purple-500",
+  "bg-purple-600",
+  "bg-purple-500/20",
+  "dark:bg-purple-900/10",
+  "border-purple-200",
+  "border-purple-300",
+  "dark:border-purple-700",
+  "text-purple-400",
+  "text-purple-700",
+  "from-purple-500",
+  "to-purple-500/5",
+  "to-pink-500",
+];
 
 /** Colour utilities we know about, for deciding what counts as "unmapped". */
 const COLOUR_CLASS_RE =
@@ -449,12 +482,45 @@ function collapseRedundantDarkVariants(value) {
   return kept.join("");
 }
 
-/** Does this string look like a class list rather than prose? */
+/**
+ * Tailwind utilities that carry no hyphen. Needed because "every token contains
+ * a hyphen" is what separates a class list from prose, and these are the honest
+ * exceptions.
+ */
+const HYPHENLESS_UTILITIES = new Set([
+  "flex", "grid", "block", "inline", "hidden", "table", "contents", "flow-root",
+  "relative", "absolute", "fixed", "sticky", "static", "isolate", "visible",
+  "invisible", "collapse", "italic", "underline", "overline", "truncate",
+  "uppercase", "lowercase", "capitalize", "normal", "rounded", "border",
+  "shadow", "transition", "transform", "container", "antialiased", "ring",
+  "outline", "resize", "appearance", "sr", "group", "peer", "blur", "grayscale",
+  "invert", "sepia", "opacity", "filter", "overflow", "cursor", "select",
+]);
+
+/**
+ * Does this string look like a class list rather than prose?
+ *
+ * This gate is what makes it safe to run the migration over EVERY string literal
+ * rather than only `className=` attributes. Class lists live in plenty of other
+ * places here — status maps like `{ paid: "bg-green-100 text-green-800" }`,
+ * helper functions returning a string, `clsx` arguments — and restricting to
+ * attributes left 535 raw colours behind.
+ *
+ * Requiring every token to be hyphenated (or a known hyphen-free utility) is
+ * what keeps prose out: "the text-white paint is bg-gray-900 in colour" fails on
+ * "the", and a doc comment's `body { @apply bg-black text-white }` fails on "{".
+ * Rewriting is in any case confined to classes the mapping table recognises, so
+ * a false positive here still cannot invent a change.
+ */
 function looksLikeClassList(text) {
   const trimmed = text.trim();
   if (trimmed === "") return false;
   const tokens = trimmed.split(/\s+/);
-  return tokens.every((t) => /^[\w[\]#().,%/:-]+$/.test(t)) && /-/.test(trimmed);
+  return tokens.every(
+    (t) =>
+      /^[\w[\]#().,%/:-]+$/.test(t) &&
+      (t.includes("-") || HYPHENLESS_UTILITIES.has(t.replace(/^.*:/, ""))),
+  );
 }
 
 /**
@@ -476,9 +542,11 @@ export function migrateSource(source) {
     return result.value;
   };
 
-  // 1. className="..." and class="..."
+  // 1. className="..." and class="...". Newlines are allowed inside the value:
+  //    long class lists in this codebase are routinely wrapped across lines, and
+  //    excluding \n silently skipped every one of them.
   let out = source.replace(
-    /((?:className|class)\s*=\s*)(["'])([^"'\n]*)\2/g,
+    /((?:className|class)\s*=\s*)(["'])([^"']*)\2/g,
     (_m, lead, quote, body) => `${lead}${quote}${apply(body)}${quote}`,
   );
 
@@ -504,6 +572,21 @@ export function migrateSource(source) {
       })
       .join("");
     return "`" + rebuilt + "`";
+  });
+
+  // 3. Any remaining quoted string that is ITSELF a plain class list. This is
+  //    where the status/variant maps live — `{ paid: "bg-green-100 text-green-800" }`,
+  //    `heading: "text-white"`, helpers that return a class string. Passes 1 and
+  //    2 alone left 535 raw colours behind, nearly all of them here.
+  //
+  //    Safe for two reasons: looksLikeClassList rejects prose, and only classes
+  //    the mapping table recognises are ever rewritten.
+  out = out.replace(/(["'])([^"'\n]*)\1/g, (whole, quote, body) => {
+    if (!/(?:bg|text|border|ring|from|via|to|divide|placeholder|shadow|accent|fill|stroke|outline)-/.test(body)) {
+      return whole;
+    }
+    if (!looksLikeClassList(body)) return whole;
+    return `${quote}${apply(body)}${quote}`;
   });
 
   return { source: out, changed, unmapped };

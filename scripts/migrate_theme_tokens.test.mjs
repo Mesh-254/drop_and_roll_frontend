@@ -246,3 +246,43 @@ describe("migrateSource", () => {
     expect(migrateSource(once).changed).toBe(0);
   });
 });
+
+describe("migrateSource: class lists outside className", () => {
+  // Where the last 535 raw colours were hiding.
+  it("rewrites a status/variant map", () => {
+    const src = `const STYLES = {
+      paid: "bg-green-100 text-green-800",
+      failed: "bg-red-50 dark:bg-red-900/20 text-red-600",
+      default: "bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white",
+    };`;
+    const out = migrateSource(src).source;
+    expect(out).toContain('paid: "bg-success-surface text-success"');
+    expect(out).toContain('failed: "bg-destructive-surface text-destructive"');
+    expect(out).toContain('default: "bg-muted dark:bg-surface text-foreground"');
+  });
+
+  it("rewrites a lone class string on an object key", () => {
+    const src = `const parts = { heading: "text-white", body: "text-gray-400" };`;
+    expect(migrateSource(src).source).toBe(
+      `const parts = { heading: "text-foreground", body: "text-muted-foreground" };`,
+    );
+  });
+
+  it("rewrites a className value wrapped across lines", () => {
+    const src = `<div className="rounded-lg bg-gray-900
+      text-white p-4" />`;
+    const out = migrateSource(src).source;
+    expect(out).toContain("bg-card");
+    expect(out).toContain("text-foreground");
+  });
+
+  it("still leaves prose alone", () => {
+    const src = `const msg = "the text-white paint is bg-gray-900 in colour";`;
+    expect(migrateSource(src).source).toBe(src);
+  });
+
+  it("leaves a doc comment's CSS snippet alone", () => {
+    const src = "// `body { @apply bg-black text-white }` is the old rule";
+    expect(migrateSource(src).source).toBe(src);
+  });
+});
