@@ -6,6 +6,16 @@ const dir = path.dirname(fileURLToPath(import.meta.url));
 export default {
   testEnvironment: "jsdom",
   setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
+  // Jest's default testMatch covers .js/.jsx but NOT .mjs, so the codemod's
+  // tests in scripts/ were silently collected as zero suites. The transform
+  // below already handles .mjs; this makes them discoverable. Note `.mjs` needs
+  // its own entry — a character class like `.[jm]s` matches "js" and "ms", not
+  // the three characters "mjs".
+  testMatch: [
+    "**/__tests__/**/*.[jt]s?(x)",
+    "**/?(*.)+(spec|test).[jt]s?(x)",
+    "**/?(*.)+(spec|test).mjs",
+  ],
   moduleNameMapper: {
     "\\.(css|scss)$": "identity-obj-proxy",
   },
