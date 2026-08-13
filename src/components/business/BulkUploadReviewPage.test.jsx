@@ -538,6 +538,6 @@ describe("layout under the fixed header", () => {
       <BulkUploadReviewPage uploadId="abc" embedded surface="dark" />
     );
     await screen.findByRole("heading", { name: /march week 2/i });
-    expect(container.firstChild.className).not.toMatch(/\bpt-24\b/);
+    expect(container.firstChild.className).toBe("space-y-6");
   });
 });
