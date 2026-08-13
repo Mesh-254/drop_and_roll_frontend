@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "jest",
     "audit:theme": "node scripts/audit_theme.mjs",
-    "migrate:theme": "node scripts/migrate_theme_tokens.mjs"
+    "migrate:theme": "node scripts/migrate_theme_tokens.mjs",
+    "eval:theme": "node evals/eval_theme_coverage.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
