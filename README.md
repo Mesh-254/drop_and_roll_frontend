@@ -43,6 +43,9 @@ The primary goal of the Drop 'N Roll platform is to deliver a fast, reliable, an
 - **Images**: High-quality photos of drivers, delivery vans, and satisfied customers.
 - **Videos**: Short promotional clips highlighting fast delivery, tracking, and eco-friendly options (to be produced).
 - **Visuals**: Clean UI with expressive icons, real-life delivery footage, and a responsive design for all devices.
+- **Theming**: The app ships a light and a dark theme, both driven by one token
+  file. Components name roles (`bg-card`), never colours (`bg-gray-900`) — see
+  [docs/theming.md](docs/theming.md) before adding UI.
 
 ## 5. Functional Requirements (MVP)
 
