@@ -24,6 +24,7 @@ import { useAuth } from "./contexts/AuthContext";
 import AuthModal from "./components/auth/AuthModal";
 import { QuoteProvider } from "./contexts/QuoteContext";
 import Header from "./components/common/Header";
+import ThemeToggle from "./components/common/ThemeToggle";
 import Hero from "./components/landingPage/Hero";
 import Services from "./components/landingPage/Services";
 import About from "./components/about/About";
@@ -101,11 +102,13 @@ function AdminRedirect() {
   }, []);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-8">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-8">
       <div className="text-center max-w-md mx-auto">
         <h1 className="text-2xl font-bold mb-4">Admin Dashboard</h1>
-        <p className="text-gray-400 mb-8">Redirecting to your dashboard...</p>
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
+        <p className="text-muted-foreground mb-8">
+          Redirecting to your dashboard...
+        </p>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
       </div>
     </div>
   );
@@ -165,7 +168,7 @@ function App() {
     <GoogleOAuthProvider clientId={googleClientId}>
     <AuthModalProvider>
       <AuthModal />
-      <div className="min-h-screen bg-black text-white">
+      <div className="min-h-screen bg-background text-foreground">
         {/*
           Single app-wide Toaster. Several components already call
           `toast.success/.error(...)` from "react-hot-toast" (driver
@@ -174,27 +177,46 @@ function App() {
           those calls were silently no-ops. Mounted once here so every
           toast in the app shows up, styled to match the brand accent.
         */}
+        {/*
+          Toast colours are inline styles, so no stylesheet can reach them —
+          they were hardcoded #1f2937/#fff and would have stayed dark in light
+          mode. Reading the tokens through var() makes them follow the theme
+          like everything else, including a live switch while a toast is up.
+        */}
         <Toaster
           position="top-right"
           toastOptions={{
             duration: 4500,
             style: {
-              background: "#1f2937",
-              color: "#fff",
-              border: "1px solid rgba(249,115,22,0.35)",
+              background: "var(--surface)",
+              color: "var(--foreground)",
+              border: "1px solid var(--border)",
               fontSize: "0.875rem",
             },
             success: {
-              iconTheme: { primary: "#f97316", secondary: "#fff" },
+              iconTheme: {
+                primary: "var(--primary)",
+                secondary: "var(--primary-foreground)",
+              },
             },
             error: {
-              iconTheme: { primary: "#ef4444", secondary: "#fff" },
+              iconTheme: {
+                primary: "var(--destructive)",
+                secondary: "var(--destructive-foreground)",
+              },
               style: {
-                border: "1px solid rgba(239,68,68,0.45)",
+                border: "1px solid var(--destructive)",
               },
             },
           }}
         />
+        {/*
+          Always-reachable theme toggle. Mounted OUTSIDE <Routes> so it is not
+          tied to any route: 14 of the 31 routes render no <Header>. It returns
+          null while a Header is on screen, so mounting it unconditionally is
+          safe. See contexts/ThemeContext.jsx.
+        */}
+        <ThemeToggle variant="floating" />
         <Routes>
           {/* ── Public ──────────────────────────────────────────────── */}
           <Route

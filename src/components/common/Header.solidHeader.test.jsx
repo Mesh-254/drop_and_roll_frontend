@@ -26,10 +26,18 @@ jest.mock("../profile/ProfileDropdown", () => () => null);
 jest.mock("lucide-react", () => new Proxy({}, { get: () => () => null }));
 
 import Header from "./Header";
+// Header now hosts the theme toggle and registers it with ThemeContext, so it
+// needs the real provider. Not mocked: the registration is a genuine part of
+// mounting a Header, and a stub would hide it breaking.
+import { ThemeProvider } from "../../contexts/ThemeContext";
 
 function renderAt(path) {
   mockLocation.pathname = path;
-  const { container } = render(<Header />);
+  const { container } = render(
+    <ThemeProvider>
+      <Header />
+    </ThemeProvider>,
+  );
   return container.querySelector("header");
 }
 

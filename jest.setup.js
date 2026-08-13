@@ -1,4 +1,16 @@
 import "@testing-library/jest-dom";
+import { TextEncoder, TextDecoder } from "node:util";
+
+// jsdom ships no TextEncoder/TextDecoder, and react-router-dom v7 reaches for
+// TextEncoder at import time — so merely importing <MemoryRouter> in a test threw
+// "TextEncoder is not defined" before the test body ran, which reads as a broken
+// test rather than a missing global. Node has both; hand them over.
+if (typeof globalThis.TextEncoder === "undefined") {
+  globalThis.TextEncoder = TextEncoder;
+}
+if (typeof globalThis.TextDecoder === "undefined") {
+  globalThis.TextDecoder = TextDecoder;
+}
 
 // jsdom implements neither of these, and a component that uses one throws on
 // mount rather than failing an assertion — which makes the real failure

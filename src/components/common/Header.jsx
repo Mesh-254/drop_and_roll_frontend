@@ -6,15 +6,23 @@ import { NavLink } from "react-router-dom";
 import TrackParcelModal from "../track/TrackParcelModal";
 import GetQuoteBook from "../quote/GetQuoteBook";
 import ProfileDropdown from "../profile/ProfileDropdown";
+import ThemeToggle from "./ThemeToggle";
 import { useAuth } from "../../contexts/AuthContext";
 import { useAuthModal } from "../../contexts/AuthModalContext";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, logout } = useAuth();
   const { openLogin, openRegister } = useAuthModal();
+  const { registerHeaderToggle } = useTheme();
   const [isScrolled, setIsScrolled] = useState(false);
+
+  // Tells the floating toggle in App.jsx to stand down while this header is on
+  // screen. Returning the unregister function from the effect is what makes a
+  // route change back to a headerless page restore it.
+  useEffect(() => registerHeaderToggle(), [registerHeaderToggle]);
 
   // The transparent header only works over the landing hero's dark gradient.
   // On every other route (bulk upload, invoices, history, ...) the page
@@ -165,6 +173,8 @@ export default function Header() {
                 </div>
               )}
 
+              <ThemeToggle variant="header" />
+
               {/* Divider */}
               <div className="w-px h-6 bg-white/20"></div>
 
@@ -214,6 +224,17 @@ export default function Header() {
                     {item.name}
                   </NavLink>
                 ))}
+
+                {/* Appearance — the toggle has to be reachable on a phone too,
+                    where the desktop nav is hidden. */}
+                <div className="px-3 py-2 border-t border-white/10 mt-2 pt-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground font-medium">
+                      Appearance
+                    </span>
+                    <ThemeToggle variant="header" />
+                  </div>
+                </div>
 
                 {/* Auth Section for Mobile */}
                 <div className="px-3 py-2 space-y-2 border-t border-white/10 mt-2 pt-4">
