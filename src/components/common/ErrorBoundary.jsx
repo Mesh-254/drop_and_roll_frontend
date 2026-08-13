@@ -61,18 +61,18 @@ function ErrorFallback({ error, onRetry }) {
   const isNetworkError = error?.message?.includes("network") || error?.message?.includes("fetch");
 
   return (
-    <div className="min-h-screen bg-red-50 dark:bg-red-900/10 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-destructive-surface dark:bg-destructive-surface/10 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
-          <div className="mb-4 inline-flex items-center justify-center w-12 h-12 bg-red-100 dark:bg-red-900/20 rounded-lg">
-            <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
+        <div className="bg-card dark:bg-surface rounded-lg shadow-lg p-8 text-center">
+          <div className="mb-4 inline-flex items-center justify-center w-12 h-12 bg-destructive-surface dark:bg-destructive-surface/20 rounded-lg">
+            <AlertTriangle className="h-6 w-6 text-destructive" />
           </div>
 
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+          <h1 className="text-xl font-bold text-foreground mb-2">
             Something went wrong
           </h1>
 
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 line-clamp-3">
+          <p className="text-sm text-muted-foreground mb-6 line-clamp-3">
             {isNetworkError
               ? "We couldn't reach the server. Please check your connection and try again."
               : errorMessage}
@@ -81,7 +81,7 @@ function ErrorFallback({ error, onRetry }) {
           <div className="space-y-3">
             <button
               onClick={onRetry}
-              className="w-full px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium flex items-center justify-center gap-2 transition-all"
+              className="w-full px-4 py-2.5 bg-destructive hover:bg-destructive text-destructive-foreground rounded-lg font-medium flex items-center justify-center gap-2 transition-all"
             >
               <RefreshCw className="h-4 w-4" />
               Try Again
@@ -89,7 +89,7 @@ function ErrorFallback({ error, onRetry }) {
 
             <button
               onClick={() => navigate("/")}
-              className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg font-medium flex items-center justify-center gap-2 transition-all"
+              className="w-full px-4 py-2.5 border border-border-strong text-muted-foreground hover:bg-muted dark:hover:bg-surface-hover/50 rounded-lg font-medium flex items-center justify-center gap-2 transition-all"
             >
               <Home className="h-4 w-4" />
               Go Home
@@ -97,8 +97,8 @@ function ErrorFallback({ error, onRetry }) {
           </div>
 
           {process.env.NODE_ENV === "development" && error?.message && (
-            <div className="mt-6 p-3 bg-gray-100 dark:bg-gray-900 rounded text-left">
-              <p className="text-xs font-mono text-gray-700 dark:text-gray-300 break-words">
+            <div className="mt-6 p-3 bg-muted dark:bg-card rounded text-left">
+              <p className="text-xs font-mono text-muted-foreground break-words">
                 {error.message}
               </p>
             </div>

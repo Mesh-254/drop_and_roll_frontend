@@ -94,7 +94,7 @@ export default function Header() {
       <header
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           solidHeader
-            ? "bg-black/95 backdrop-blur-md shadow-lg border-b border-orange-500/20 h-16"
+            ? "bg-background/95 backdrop-blur-md shadow-lg border-b border-primary/20 h-16"
             : "bg-transparent h-20"
         }`}
       >
@@ -107,12 +107,17 @@ export default function Header() {
             {/* Logo */}
             <div className="flex items-center">
               <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
-                  <div className="w-4 h-4 bg-white rounded-sm"></div>
+                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                  {/* The mark sits ON the brand orange, so it takes the on-brand
+                      foreground — the same near-black that button labels now use.
+                      The codemod mapped this from bg-white to bg-card, which would
+                      have made it a dark grey square in dark mode and a white
+                      square invisible against a white card in light mode. */}
+                  <div className="w-4 h-4 bg-primary-foreground rounded-sm"></div>
                 </div>
                 <span
                   className={`text-xl font-bold transition-colors duration-300 font-montserrat ${
-                    isScrolled ? "text-white" : "text-white"
+                    isScrolled ? "text-foreground" : "text-foreground"
                   }`}
                 >
                   Drop & Roll
@@ -130,21 +135,21 @@ export default function Header() {
                     className={({ isActive }) =>
                       `font-medium transition-all duration-300 relative flex items-center gap-2 ${
                         isActive && !item.onClick
-                          ? "text-orange-500 font-bold"
+                          ? "text-brand-text font-bold"
                           : isScrolled
-                          ? "text-white/90 hover:text-orange-500"
-                          : "text-white/90 hover:text-orange-500"
+                          ? "text-foreground/90 hover:text-brand-text"
+                          : "text-foreground/90 hover:text-brand-text"
                       }`
                     }
                   >
                     {item.name}
                     {item.badge && (
-                      <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded-full font-semibold ml-1">
+                      <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full font-semibold ml-1">
                         {item.badge}
                       </span>
                     )}
                   </NavLink>
-                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-orange-500 transition-all duration-300 group-hover:w-full"></span>
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all duration-300 group-hover:w-full"></span>
                 </div>
               ))}
             </nav>
@@ -158,15 +163,15 @@ export default function Header() {
                     onClick={handleLogin}
                     className={`font-medium px-4 py-2 rounded-lg transition-all duration-300 border ${
                       isScrolled
-                        ? "text-white/90 border-white/20 hover:border-orange-500 hover:text-orange-500 hover:bg-orange-500/10"
-                        : "text-white/90 border-white/20 hover:border-orange-500 hover:text-orange-500 hover:bg-orange-500/10"
+                        ? "text-foreground/90 border-border hover:border-primary hover:text-brand-text hover:bg-primary/10"
+                        : "text-foreground/90 border-border hover:border-primary hover:text-brand-text hover:bg-primary/10"
                     }`}
                   >
                     Login
                   </button>
                   <button
                     onClick={handleRegister}
-                    className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium px-4 py-2 rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-orange-500/25"
+                    className="bg-gradient-to-r from-primary to-primary-hover hover:from-primary-hover hover:to-primary-hover text-primary-foreground font-medium px-4 py-2 rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-primary/25"
                   >
                     Register
                   </button>
@@ -176,11 +181,11 @@ export default function Header() {
               <ThemeToggle variant="header" />
 
               {/* Divider */}
-              <div className="w-px h-6 bg-white/20"></div>
+              <div className="w-px h-6 bg-border"></div>
 
               {/* CTA Button */}
               <button
-                className="bg-orange-500 hover:bg-orange-600 text-white font-medium px-6 py-2 rounded-full transition-all duration-300 transform hover:scale-105 hover:shadow-orange-500/30"
+                className="bg-primary hover:bg-primary-hover text-primary-foreground font-medium px-6 py-2 rounded-full transition-all duration-300 transform hover:scale-105 hover:shadow-primary/30"
                 onClick={handleBookDelivery}
               >
                 Send an Item
@@ -192,8 +197,8 @@ export default function Header() {
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className={`md:hidden p-2 rounded-lg transition-all duration-300 transform hover:scale-105 ${
                 isScrolled
-                  ? "text-white hover:text-orange-500"
-                  : "text-white hover:text-orange-500"
+                  ? "text-foreground hover:text-brand-text"
+                  : "text-foreground hover:text-brand-text"
               }`}
             >
               {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -201,7 +206,7 @@ export default function Header() {
           </div>
 
           {isMobileMenuOpen && (
-            <div className="md:hidden bg-black/95 backdrop-blur-md border-t border-orange-500/20 transition-all duration-300">
+            <div className="md:hidden bg-black/95 backdrop-blur-md border-t border-primary/20 transition-all duration-300">
               <div className="px-2 pt-2 pb-3 space-y-1">
                 {navItems.map((item) => (
                   <NavLink
@@ -214,10 +219,10 @@ export default function Header() {
                       setIsMobileMenuOpen(false);
                     }}
                     className={({ isActive }) =>
-                      `block px-3 py-2 font-medium transition-all duration-300 hover:text-orange-500 hover:bg-orange-500/10 rounded-md ${
+                      `block px-3 py-2 font-medium transition-all duration-300 hover:text-brand-text hover:bg-primary/10 rounded-md ${
                         isActive && !item.onClick
-                          ? "text-orange-500 font-bold"
-                          : "text-white/90"
+                          ? "text-brand-text font-bold"
+                          : "text-primary-foreground/90"
                       }`
                     }
                   >
@@ -227,7 +232,7 @@ export default function Header() {
 
                 {/* Appearance — the toggle has to be reachable on a phone too,
                     where the desktop nav is hidden. */}
-                <div className="px-3 py-2 border-t border-white/10 mt-2 pt-4">
+                <div className="px-3 py-2 border-t border-border mt-2 pt-4">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground font-medium">
                       Appearance
@@ -237,10 +242,10 @@ export default function Header() {
                 </div>
 
                 {/* Auth Section for Mobile */}
-                <div className="px-3 py-2 space-y-2 border-t border-white/10 mt-2 pt-4">
+                <div className="px-3 py-2 space-y-2 border-t border-border mt-2 pt-4">
                   {isAuthenticated ? (
                     <div className="space-y-2">
-                      <div className="text-white/90 font-medium mb-2">
+                      <div className="text-foreground/90 font-medium mb-2">
                         Profile
                       </div>
                       <button
@@ -248,7 +253,7 @@ export default function Header() {
                           navigate("/profile-settings");
                           setIsMobileMenuOpen(false);
                         }}
-                        className="w-full text-left text-white/90 hover:text-orange-500 hover:bg-orange-500/10 font-medium px-4 py-2 rounded-lg transition-all duration-300"
+                        className="w-full text-left text-primary-foreground/90 hover:text-brand-text hover:bg-primary/10 font-medium px-4 py-2 rounded-lg transition-all duration-300"
                       >
                         Profile Settings
                       </button>
@@ -257,7 +262,7 @@ export default function Header() {
                           navigate("/history");
                           setIsMobileMenuOpen(false);
                         }}
-                        className="w-full text-left text-white/90 hover:text-orange-500 hover:bg-orange-500/10 font-medium px-4 py-2 rounded-lg transition-all duration-300"
+                        className="w-full text-left text-primary-foreground/90 hover:text-brand-text hover:bg-primary/10 font-medium px-4 py-2 rounded-lg transition-all duration-300"
                       >
                         Booking History
                       </button>
@@ -268,7 +273,7 @@ export default function Header() {
                             navigate("/billing");
                             setIsMobileMenuOpen(false);
                           }}
-                          className="w-full text-left text-white/90 hover:text-blue-400 hover:bg-blue-500/10 font-medium px-4 py-2 rounded-lg transition-all duration-300"
+                          className="w-full text-left text-info-foreground/90 hover:text-info hover:bg-info/10 font-medium px-4 py-2 rounded-lg transition-all duration-300"
                         >
                           Billing &amp; Invoices
                         </button>
@@ -280,7 +285,7 @@ export default function Header() {
                           setIsMobileMenuOpen(false);
                           navigate("/"); // Redirect to home after logout
                         }}
-                        className="w-full text-left text-red-400 hover:text-red-300 hover:bg-red-500/10 font-medium px-4 py-2 rounded-lg transition-all duration-300"
+                        className="w-full text-left text-destructive hover:text-destructive hover:bg-destructive/10 font-medium px-4 py-2 rounded-lg transition-all duration-300"
                       >
                         Logout
                       </button>
@@ -293,7 +298,7 @@ export default function Header() {
                           handleLogin();
                           setIsMobileMenuOpen(false);
                         }}
-                        className="w-full text-white/90 border border-white/20 hover:border-orange-500 hover:text-orange-500 hover:bg-orange-500/10 font-medium px-4 py-2 rounded-lg transition-all duration-300"
+                        className="w-full text-primary-foreground/90 border border-border hover:border-primary hover:text-brand-text hover:bg-primary/10 font-medium px-4 py-2 rounded-lg transition-all duration-300"
                       >
                         Login
                       </button>
@@ -302,7 +307,7 @@ export default function Header() {
                           handleRegister();
                           setIsMobileMenuOpen(false);
                         }}
-                        className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium px-4 py-2 rounded-lg transition-all duration-300"
+                        className="w-full bg-gradient-to-r from-primary to-primary-hover hover:from-primary-hover hover:to-primary-hover text-primary-foreground font-medium px-4 py-2 rounded-lg transition-all duration-300"
                       >
                         Register
                       </button>
@@ -312,7 +317,7 @@ export default function Header() {
 
                 <div className="px-3 py-2">
                   <button
-                    className="w-full bg-orange-500 hover:bg-orange-600 text-white font-medium px-6 py-2 rounded-full transition-all duration-300 transform hover:scale-105"
+                    className="w-full bg-primary hover:bg-primary-hover text-primary-foreground font-medium px-6 py-2 rounded-full transition-all duration-300 transform hover:scale-105"
                     onClick={() => {
                       handleBookDelivery();
                       setIsMobileMenuOpen(false);

@@ -126,6 +126,11 @@ export const MAPPING = {
   "bg-red-100": "bg-destructive-surface",
   "border-red-500": "border-destructive",
   "border-red-600": "border-destructive",
+  "bg-red-700": "bg-destructive",
+  "bg-red-900": "bg-destructive-surface",
+  "text-red-300": "text-destructive",
+  "shadow-orange-500": "shadow-primary",
+  "shadow-orange-600": "shadow-primary",
   "text-green-400": "text-success",
   "text-green-500": "text-success",
   "text-green-600": "text-success",
@@ -279,7 +284,40 @@ export function migrateClassString(value, context = {}) {
     return piece;
   });
 
-  return { value: out.join(""), changed, unmapped };
+  return { value: collapseRedundantDarkVariants(out.join("")), changed, unmapped };
+}
+
+/**
+ * Drop `dark:x` where a bare `x` is already present in the same class string.
+ *
+ * The codebase carries 1160 `dark:` utilities, written as pairs like
+ * `bg-red-50 dark:bg-red-900/20` — one colour for each theme, chosen by hand.
+ * Both halves of such a pair map to the SAME token, because the token already
+ * knows what to be in each theme, and the result reads
+ * `bg-destructive-surface dark:bg-destructive-surface`. That is harmless to
+ * render and terrible to read, and it leaves behind the impression that a
+ * component still needs to think about themes.
+ *
+ * Only exact duplicates are removed, so a genuine override — `bg-card
+ * dark:bg-surface`, where the author wants different ROLES per theme — survives
+ * untouched and stays visible in review.
+ */
+function collapseRedundantDarkVariants(value) {
+  const pieces = value.split(/(\s+)/);
+  const bare = new Set(
+    pieces.filter((p) => p && !/^\s+$/.test(p) && !p.startsWith("dark:")),
+  );
+  const kept = [];
+  for (let i = 0; i < pieces.length; i += 1) {
+    const piece = pieces[i];
+    if (piece.startsWith("dark:") && bare.has(piece.slice(5))) {
+      // Drop this class and the whitespace that preceded it, so spacing stays sane.
+      if (kept.length && /^\s+$/.test(kept[kept.length - 1])) kept.pop();
+      continue;
+    }
+    kept.push(piece);
+  }
+  return kept.join("");
 }
 
 /** Does this string look like a class list rather than prose? */

@@ -41,19 +41,25 @@ function renderAt(path) {
   return container.querySelector("header");
 }
 
-test("landing route ('/') starts transparent (over the dark hero)", () => {
+// These assert SOLID vs TRANSPARENT, not a particular colour. They used to look
+// for `bg-black`, which was the same claim while the app had one theme; the
+// background is now `bg-background/95` so that the bar follows the theme.
+// Matching the token keeps the test about visibility rather than about a shade.
+const SOLID = /bg-background/;
+
+test("landing route ('/') starts transparent (over the hero)", () => {
   const header = renderAt("/");
   expect(header.className).toMatch(/bg-transparent/);
-  expect(header.className).not.toMatch(/bg-black/);
+  expect(header.className).not.toMatch(SOLID);
 });
 
 test("interior route renders a solid, visible header from first paint", () => {
   const header = renderAt("/bulk-upload/abc123");
-  expect(header.className).toMatch(/bg-black/);
+  expect(header.className).toMatch(SOLID);
   expect(header.className).not.toMatch(/bg-transparent/);
 });
 
 test("another interior route (invoice) is solid too", () => {
   const header = renderAt("/invoices/xyz");
-  expect(header.className).toMatch(/bg-black/);
+  expect(header.className).toMatch(SOLID);
 });

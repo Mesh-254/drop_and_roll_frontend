@@ -136,6 +136,34 @@ describe("migrateClassString", () => {
     expect(migrateClassString(once).value).toBe(once);
   });
 
+  // A hand-written light/dark pair collapses to ONE token, because the token
+  // already knows what to be in each theme.
+  it("collapses a dark: variant that duplicates its own token", () => {
+    expect(migrateClassString("bg-red-50 dark:bg-red-900").value).toBe(
+      "bg-destructive-surface",
+    );
+  });
+
+  it("collapses a duplicated text pair", () => {
+    expect(migrateClassString("text-gray-900 dark:text-white").value).toBe(
+      "text-foreground",
+    );
+  });
+
+  it("keeps a dark: variant that means a genuinely different role", () => {
+    // gray-900 -> card and gray-800 -> surface are different tokens, so the
+    // author wanted different roles per theme. That must survive review.
+    expect(migrateClassString("bg-gray-900 dark:bg-gray-800").value).toBe(
+      "bg-card dark:bg-surface",
+    );
+  });
+
+  it("leaves spacing sane after collapsing", () => {
+    expect(
+      migrateClassString("rounded bg-red-50 dark:bg-red-900 p-2").value,
+    ).toBe("rounded bg-destructive-surface p-2");
+  });
+
   it("preserves whitespace shape, so diffs stay readable", () => {
     expect(migrateClassString("bg-gray-900   text-white").value).toBe(
       "bg-card   text-foreground",

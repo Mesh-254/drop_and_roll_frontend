@@ -22,7 +22,7 @@ export function TableSkeleton({ rows = 5, columns = 4 }) {
               key={colIdx}
               animate={{ opacity: [0.5, 1, 0.5] }}
               transition={{ duration: 1.5, repeat: Infinity }}
-              className="h-4 bg-gray-200 dark:bg-gray-700 rounded"
+              className="h-4 bg-surface-hover rounded"
             />
           ))}
         </div>
@@ -42,7 +42,7 @@ export function StatCardSkeleton({ count = 4 }) {
           key={idx}
           animate={{ opacity: [0.5, 1, 0.5] }}
           transition={{ duration: 1.5, repeat: Infinity }}
-          className="p-6 bg-gray-200 dark:bg-gray-700 rounded-2xl h-24"
+          className="p-6 bg-surface-hover rounded-2xl h-24"
         />
       ))}
     </div>
@@ -60,7 +60,7 @@ export function UploadRowSkeleton({ count = 5 }) {
           key={idx}
           animate={{ opacity: [0.5, 1, 0.5] }}
           transition={{ duration: 1.5, repeat: Infinity }}
-          className="grid grid-cols-1 sm:grid-cols-12 gap-4 p-4 bg-gray-200 dark:bg-gray-700 rounded-lg h-20"
+          className="grid grid-cols-1 sm:grid-cols-12 gap-4 p-4 bg-surface-hover rounded-lg h-20"
         />
       ))}
     </div>
@@ -74,14 +74,14 @@ export function DetailPageSkeleton() {
   return (
     <div className="space-y-8 animate-pulse">
       {/* Header */}
-      <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded-lg w-1/3" />
+      <div className="h-12 bg-surface-hover rounded-lg w-1/3" />
       
       {/* Stepper */}
       <div className="flex gap-4">
         {Array.from({ length: 4 }).map((_, idx) => (
           <div key={idx} className="flex flex-col items-center gap-2">
-            <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-full" />
-            <div className="h-2 w-16 bg-gray-200 dark:bg-gray-700 rounded" />
+            <div className="h-8 w-8 bg-surface-hover rounded-full" />
+            <div className="h-2 w-16 bg-surface-hover rounded" />
           </div>
         ))}
       </div>
@@ -90,9 +90,9 @@ export function DetailPageSkeleton() {
       <StatCardSkeleton count={4} />
 
       {/* Tabs */}
-      <div className="flex gap-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex gap-4 border-b border-border">
         {Array.from({ length: 3 }).map((_, idx) => (
-          <div key={idx} className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded" />
+          <div key={idx} className="h-4 w-20 bg-surface-hover rounded" />
         ))}
       </div>
 
@@ -108,10 +108,10 @@ export function DetailPageSkeleton() {
 export function PaginationSkeleton() {
   return (
     <div className="flex items-center justify-between p-4">
-      <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded" />
+      <div className="h-4 w-48 bg-surface-hover rounded" />
       <div className="flex gap-2">
         {Array.from({ length: 5 }).map((_, idx) => (
-          <div key={idx} className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded" />
+          <div key={idx} className="h-8 w-8 bg-surface-hover rounded" />
         ))}
       </div>
     </div>
@@ -126,8 +126,8 @@ export function FormSkeleton({ fieldCount = 4 }) {
     <div className="space-y-4">
       {Array.from({ length: fieldCount }).map((_, idx) => (
         <div key={idx} className="space-y-2">
-          <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
-          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded" />
+          <div className="h-4 w-24 bg-surface-hover rounded" />
+          <div className="h-10 bg-surface-hover rounded" />
         </div>
       ))}
     </div>
@@ -142,7 +142,7 @@ export function BannerSkeleton() {
     <motion.div
       animate={{ opacity: [0.5, 1, 0.5] }}
       transition={{ duration: 1.5, repeat: Infinity }}
-      className="p-6 bg-gray-200 dark:bg-gray-700 rounded-lg h-20"
+      className="p-6 bg-surface-hover rounded-lg h-20"
     />
   );
 }
@@ -153,8 +153,8 @@ export function BannerSkeleton() {
 export function ProgressBarSkeleton() {
   return (
     <div className="space-y-2">
-      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full" />
-      <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+      <div className="h-3 bg-surface-hover rounded-full" />
+      <div className="h-4 w-32 bg-surface-hover rounded" />
     </div>
   );
 }
