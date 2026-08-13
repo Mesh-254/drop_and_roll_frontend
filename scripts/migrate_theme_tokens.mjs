@@ -41,122 +41,210 @@ import {
 } from "node:fs";
 import { join, relative } from "node:path";
 
-/** Bare class (no variant, no opacity) -> token class. */
-export const MAPPING = {
-  // ── Surfaces ──────────────────────────────────────────────────────────────
-  "bg-black": "bg-background",
-  "bg-white": "bg-card",
-  "bg-gray-50": "bg-muted",
-  "bg-gray-100": "bg-muted",
-  "bg-slate-50": "bg-muted",
-  "bg-slate-100": "bg-muted",
-  "bg-gray-200": "bg-surface-hover",
-  "bg-gray-700": "bg-surface-hover",
-  "bg-gray-800": "bg-surface",
-  "bg-slate-700": "bg-surface",
-  "bg-gray-900": "bg-card",
-  "bg-slate-800": "bg-card",
-  "bg-slate-900": "bg-card",
-  "bg-gray-950": "bg-background",
+/**
+ * THE MAPPING IS GENERATED FROM RULES, NOT TYPED OUT.
+ * ───────────────────────────────────────────────────────────────────────────
+ * A first pass at this was a hand-written table. It reached about 100 entries
+ * covering `common/`, and the remaining streams then reported 650 unmapped
+ * classes needing roughly 180 more — the same handful of decisions repeated
+ * across nine colour families, twelve shades and fourteen property prefixes.
+ * Typing that out invites exactly the kind of silent transposition
+ * (`text-blue-700` -> success) that no test would catch.
+ *
+ * So the decisions live in RULES, and the table is derived. Two ideas only:
+ *
+ *   FAMILY -> ROLE   gray/slate/zinc/... are neutral surfaces and text;
+ *                    red/rose mean destructive; green/emerald/teal success;
+ *                    amber/yellow warning; blue/sky/indigo/cyan info;
+ *                    orange is the brand.
+ *
+ *   SHADE -> TIER    within a role, how light or dark the shade is says which
+ *                    token it wanted: gray-900 is a card, gray-800 a panel,
+ *                    gray-500 tertiary text, red-50 an error surface, red-600
+ *                    the error colour itself.
+ *
+ * OVERRIDES holds the judgement calls that the rules get wrong, each with its
+ * reason. Everything the tests pin is reproduced exactly by this construction —
+ * that is what the test suite is for.
+ */
 
-  // ── Text ──────────────────────────────────────────────────────────────────
-  "text-white": "text-foreground", // may become text-primary-foreground; see the on-colour rule
-  "text-black": "text-foreground",
-  "text-gray-900": "text-foreground",
-  "text-slate-900": "text-foreground",
-  "text-gray-800": "text-foreground",
-  "text-gray-700": "text-muted-foreground",
-  "text-gray-600": "text-muted-foreground",
-  "text-slate-600": "text-muted-foreground",
-  "text-gray-300": "text-muted-foreground",
-  "text-slate-300": "text-muted-foreground",
-  "text-gray-400": "text-muted-foreground",
-  "text-slate-400": "text-muted-foreground",
-  "text-gray-500": "text-subtle-foreground",
-  "text-slate-500": "text-subtle-foreground",
+const NEUTRAL_FAMILIES = ["gray", "slate", "zinc", "neutral", "stone"];
 
-  // ── Lines ─────────────────────────────────────────────────────────────────
-  "border-white": "border-border",
-  "border-gray-200": "border-border",
-  "border-gray-300": "border-border-strong",
-  "border-slate-200": "border-border",
-  "border-slate-300": "border-border-strong",
-  "border-gray-600": "border-border-strong",
-  "border-slate-600": "border-border",
-  "border-gray-700": "border-border",
-  "border-gray-800": "border-border",
-  "border-slate-700": "border-border",
-  "border-slate-800": "border-border",
-  "divide-gray-200": "divide-border",
-  "divide-gray-700": "divide-border",
-  "divide-gray-800": "divide-border",
-  "placeholder-gray-400": "placeholder-subtle-foreground",
-  "placeholder-gray-500": "placeholder-subtle-foreground",
-  "placeholder-slate-400": "placeholder-subtle-foreground",
-  "placeholder-slate-500": "placeholder-subtle-foreground",
-
-  // ── Brand ─────────────────────────────────────────────────────────────────
-  "bg-orange-500": "bg-primary",
-  "bg-orange-600": "bg-primary-hover",
-  "bg-orange-700": "bg-primary-hover",
-  "bg-orange-50": "bg-brand-surface",
-  "bg-orange-100": "bg-brand-surface",
-  "text-orange-400": "text-brand-text",
-  "text-orange-500": "text-brand-text",
-  "text-orange-600": "text-brand-text",
-  "text-orange-700": "text-brand-text",
-  "border-orange-500": "border-primary",
-  "border-orange-600": "border-primary",
-  "ring-orange-500": "ring-ring",
-  "ring-orange-600": "ring-ring",
-  "from-orange-500": "from-primary",
-  "from-orange-600": "from-primary-hover",
-  "to-orange-500": "to-primary",
-  "to-orange-600": "to-primary-hover",
-  "to-orange-700": "to-primary-hover",
-
-  // ── States ────────────────────────────────────────────────────────────────
-  "text-red-400": "text-destructive",
-  "text-red-500": "text-destructive",
-  "text-red-600": "text-destructive",
-  "text-red-700": "text-destructive",
-  "bg-red-500": "bg-destructive",
-  "bg-red-600": "bg-destructive",
-  "bg-red-50": "bg-destructive-surface",
-  "bg-red-100": "bg-destructive-surface",
-  "border-red-500": "border-destructive",
-  "border-red-600": "border-destructive",
-  "bg-red-700": "bg-destructive",
-  "bg-red-900": "bg-destructive-surface",
-  "text-red-300": "text-destructive",
-  "shadow-orange-500": "shadow-primary",
-  "shadow-orange-600": "shadow-primary",
-  "text-green-400": "text-success",
-  "text-green-500": "text-success",
-  "text-green-600": "text-success",
-  "text-green-700": "text-success",
-  "bg-green-500": "bg-success",
-  "bg-green-600": "bg-success",
-  "bg-green-50": "bg-success-surface",
-  "bg-green-100": "bg-success-surface",
-  "border-green-500": "border-success",
-  "text-amber-400": "text-warning",
-  "text-amber-500": "text-warning",
-  "text-amber-600": "text-warning",
-  "text-yellow-400": "text-warning",
-  "text-yellow-500": "text-warning",
-  "bg-amber-50": "bg-warning-surface",
-  "bg-amber-100": "bg-warning-surface",
-  "bg-yellow-50": "bg-warning-surface",
-  "text-blue-400": "text-info",
-  "text-blue-500": "text-info",
-  "text-blue-600": "text-info",
-  "bg-blue-500": "bg-info",
-  "bg-blue-600": "bg-info",
-  "bg-blue-50": "bg-info-surface",
-  "bg-blue-100": "bg-info-surface",
-  "border-blue-500": "border-info",
+/** family -> role token stem. Orange is handled separately: it has three stems. */
+const STATE_FAMILIES = {
+  red: "destructive",
+  rose: "destructive",
+  green: "success",
+  emerald: "success",
+  teal: "success",
+  amber: "warning",
+  yellow: "warning",
+  blue: "info",
+  sky: "info",
+  indigo: "info",
+  cyan: "info",
 };
+
+const SHADES = [
+  "50", "100", "200", "300", "400", "500", "600", "700", "800", "900", "950",
+];
+
+/** Neutral shade -> token, per property group. */
+const NEUTRAL = {
+  bg: {
+    50: "muted", 100: "muted", 200: "surface-hover", 300: "surface-hover",
+    400: "surface-hover", 500: "surface-hover", 600: "surface-hover",
+    700: "surface-hover", 800: "surface", 900: "card", 950: "background",
+    white: "card", black: "background",
+  },
+  text: {
+    50: "foreground", 100: "foreground", 200: "foreground",
+    300: "muted-foreground", 400: "muted-foreground", 500: "subtle-foreground",
+    600: "muted-foreground", 700: "muted-foreground", 800: "foreground",
+    900: "foreground", 950: "foreground", white: "foreground",
+    black: "foreground",
+  },
+  border: {
+    50: "border", 100: "border", 200: "border", 300: "border-strong",
+    400: "border-strong", 500: "border-strong", 600: "border-strong",
+    700: "border", 800: "border", 900: "border", 950: "border",
+    white: "border", black: "border",
+  },
+  ring: {
+    50: "border-strong", 100: "border-strong", 200: "border-strong",
+    300: "border-strong", 400: "border-strong", 500: "border-strong",
+    600: "border-strong", 700: "border-strong", 800: "border-strong",
+    900: "border-strong", 950: "border-strong", white: "border-strong",
+    black: "border-strong",
+  },
+  placeholder: {
+    300: "subtle-foreground", 400: "subtle-foreground", 500: "subtle-foreground",
+    600: "subtle-foreground",
+  },
+  divide: {
+    50: "border", 100: "border", 200: "border", 300: "border", 400: "border",
+    500: "border", 600: "border", 700: "border", 800: "border", 900: "border",
+  },
+};
+// Gradient stops follow surfaces.
+NEUTRAL.from = NEUTRAL.bg;
+NEUTRAL.via = NEUTRAL.bg;
+NEUTRAL.to = NEUTRAL.bg;
+
+/** Which shades of a state family mean "the tinted surface" rather than "the colour". */
+const SURFACE_SHADES = new Set(["50", "100", "200", "900", "950"]);
+/** Which shades of a state family want a subtle tinted BORDER rather than a solid one. */
+const SUBTLE_BORDER_SHADES = new Set(["50", "100", "200", "300", "700", "800", "900", "950"]);
+
+/** Brand (orange) needs three stems, so it gets its own shade tables. */
+const BRAND = {
+  bg: {
+    50: "brand-surface", 100: "brand-surface", 200: "brand-surface",
+    300: "primary", 400: "primary", 500: "primary", 600: "primary-hover",
+    700: "primary-hover", 800: "primary-hover", 900: "brand-surface",
+    950: "brand-surface",
+  },
+  text: Object.fromEntries(SHADES.map((s) => [s, "brand-text"])),
+  ring: Object.fromEntries(SHADES.map((s) => [s, "ring"])),
+  accent: Object.fromEntries(SHADES.map((s) => [s, "primary"])),
+  shadow: Object.fromEntries(SHADES.map((s) => [s, "primary"])),
+  fill: Object.fromEntries(SHADES.map((s) => [s, "brand-text"])),
+  stroke: Object.fromEntries(SHADES.map((s) => [s, "brand-text"])),
+};
+BRAND.border = Object.fromEntries(
+  SHADES.map((s) => [s, SUBTLE_BORDER_SHADES.has(s) ? "primary/30" : "primary"]),
+);
+BRAND.from = BRAND.bg;
+BRAND.via = BRAND.bg;
+BRAND.to = BRAND.bg;
+
+function stateTokenFor(prefix, stem, shade) {
+  switch (prefix) {
+    case "bg":
+    case "from":
+    case "via":
+    case "to":
+      return SURFACE_SHADES.has(shade) ? `${stem}-surface` : stem;
+    case "border":
+      return SUBTLE_BORDER_SHADES.has(shade) ? `${stem}/30` : stem;
+    case "text":
+    case "ring":
+    case "fill":
+    case "stroke":
+    case "shadow":
+    case "accent":
+    case "outline":
+      return stem;
+    case "divide":
+      return "border";
+    default:
+      return null;
+  }
+}
+
+/**
+ * Judgement calls the rules get wrong. Each one is a place where the shade does
+ * not tell the truth about the role.
+ */
+const OVERRIDES = {
+  // These two are the dominant DARK PANEL in this codebase (127 + 51 uses),
+  // used as a raised surface rather than the hover state the 700/800 rule
+  // would infer.
+  "bg-slate-700": "bg-surface",
+  "bg-gray-800": "bg-surface",
+  // slate-600 borders are the standard resting border on dark cards here, not
+  // the emphasis border that shade 600 normally implies.
+  "border-slate-600": "border-border",
+  // Read as an input surface rather than a page background.
+  "bg-gray-700": "bg-surface-hover",
+  // The brand gradient's two stops: keep them distinct so the gradient stays a
+  // gradient rather than collapsing to a flat fill.
+  "from-orange-500": "from-primary",
+  "to-orange-600": "to-primary-hover",
+};
+
+/** Bare class (no variant, no opacity) -> token class. Generated; see above. */
+export const MAPPING = (() => {
+  const table = {};
+  const add = (cls, token) => {
+    if (token) table[cls] = token;
+  };
+
+  for (const family of NEUTRAL_FAMILIES) {
+    for (const [prefix, shades] of Object.entries(NEUTRAL)) {
+      for (const shade of SHADES) {
+        add(`${prefix}-${family}-${shade}`, shades[shade] && `${prefix}-${shades[shade]}`);
+      }
+    }
+  }
+
+  // white and black are neutrals without a shade number.
+  for (const [prefix, shades] of Object.entries(NEUTRAL)) {
+    for (const bare of ["white", "black"]) {
+      add(`${prefix}-${bare}`, shades[bare] && `${prefix}-${shades[bare]}`);
+    }
+  }
+
+  for (const [family, stem] of Object.entries(STATE_FAMILIES)) {
+    for (const prefix of [
+      "bg", "text", "border", "ring", "from", "via", "to", "divide", "fill",
+      "stroke", "shadow", "accent", "outline",
+    ]) {
+      for (const shade of SHADES) {
+        const token = stateTokenFor(prefix, stem, shade);
+        add(`${prefix}-${family}-${shade}`, token && `${prefix}-${token}`);
+      }
+    }
+  }
+
+  for (const [prefix, shades] of Object.entries(BRAND)) {
+    for (const shade of SHADES) {
+      add(`${prefix}-orange-${shade}`, shades[shade] && `${prefix}-${shades[shade]}`);
+    }
+  }
+
+  return { ...table, ...OVERRIDES };
+})();
 
 /**
  * A background in the SAME class string that makes white text on-colour rather
@@ -195,6 +283,34 @@ const OPACITY_SENSITIVE = new Set([
   "bg-black",
   "border-white",
   "border-black",
+]);
+
+/**
+ * A full-bleed translucent black is a modal scrim, and every one in this
+ * codebase is written `fixed inset-0 bg-black/50` (or /40, /60, /80). The
+ * `--overlay` token already encodes the translucency, so the opacity modifier
+ * is dropped rather than compounded. Scrims stay dark in BOTH themes, which is
+ * what a scrim is for — `--overlay` is a dark mix in the light theme too.
+ *
+ * Requiring `inset-0` is what keeps this honest: the mobile menu's `bg-black/95`
+ * is a glass bar rather than a scrim, has no inset-0, and is still reported for
+ * a human to place.
+ */
+const SCRIM_CONTEXT_RE = /(?:^|\s)inset-0(?:\s|$)/;
+
+/**
+ * Tokens that already carry their own translucency, so an incoming opacity
+ * modifier must be discarded instead of multiplied. The dark halves of state
+ * pairs are written `dark:bg-green-900/20`; the token is a 15% mix already, and
+ * `bg-success-surface/20` would fade that to almost nothing. Dropping the
+ * modifier also lets the pair collapse against its light half.
+ */
+const SELF_TRANSLUCENT_TOKENS = new Set([
+  "bg-destructive-surface",
+  "bg-success-surface",
+  "bg-warning-surface",
+  "bg-info-surface",
+  "bg-brand-surface",
 ]);
 
 /** Literal colours that must stay literal: third-party brand requirements. */
@@ -253,8 +369,13 @@ export function migrateClassString(value, context = {}) {
     const { variants, base, opacity } = parseClass(piece);
 
     // Rule 2: a translucent neutral surface or line is a scrim/divider, and its
-    // intent is not readable from the class. Report rather than guess.
+    // intent is not readable from the class alone — with one exception that IS
+    // readable, a full-bleed translucent black, which is always a modal scrim.
     if (opacity && OPACITY_SENSITIVE.has(base)) {
+      if (base === "bg-black" && SCRIM_CONTEXT_RE.test(value)) {
+        changed += 1;
+        return rebuild({ variants, base: "bg-overlay", opacity: "" });
+      }
       unmapped.push(piece);
       return piece;
     }
@@ -276,7 +397,15 @@ export function migrateClassString(value, context = {}) {
 
     if (mapped) {
       changed += 1;
-      return rebuild({ variants, base: mapped, opacity });
+      // A token that is already translucent must not have an incoming opacity
+      // multiplied onto it, and a mapping that carries its own opacity (the
+      // subtle state borders) keeps the source's modifier when there is one.
+      const keepOpacity = SELF_TRANSLUCENT_TOKENS.has(mapped)
+        ? ""
+        : mapped.includes("/") && opacity
+          ? ""
+          : opacity;
+      return rebuild({ variants, base: mapped, opacity: keepOpacity });
     }
 
     // Unknown colour utility: leave it, report it. Never guess.

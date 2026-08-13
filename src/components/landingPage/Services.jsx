@@ -104,11 +104,11 @@ const ServiceCard = ({ service, onGetQuote, index }) => {
       <div
         className={`relative h-full rounded-2xl border-2 p-6 transition-all duration-300 backdrop-blur-sm
           ${service.bgColor} ${service.borderColor}
-          ${isHovered ? "border-orange-500/50 shadow-2xl" : "shadow-lg"}`}
+          ${isHovered ? "border-primary/50 shadow-2xl" : "shadow-lg"}`}
       >
         {/* Tier Badge */}
         <div className="mb-4 flex items-center justify-between">
-          <span className="inline-block px-3 py-1 rounded-full text-xs font-bold tracking-wider text-orange-500 bg-orange-100 dark:bg-orange-900/40 uppercase">
+          <span className="inline-block px-3 py-1 rounded-full text-xs font-bold tracking-wider text-brand-text bg-brand-surface uppercase">
             {service.tier}
           </span>
         </div>
@@ -121,18 +121,18 @@ const ServiceCard = ({ service, onGetQuote, index }) => {
           transition={{ duration: 0.3 }}
           className="mb-6 flex items-center justify-center"
         >
-          <div className={`relative w-20 h-20 rounded-full bg-orange-500/10 flex items-center justify-center border-2 border-orange-500/30
-            ${isHovered ? "bg-orange-500/20 border-orange-500/60 shadow-lg shadow-orange-500/30" : ""}`}
+          <div className={`relative w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center border-2 border-primary/30
+            ${isHovered ? "bg-primary/20 border-primary/60 shadow-lg shadow-primary/30" : ""}`}
           >
-            <Icon className="w-10 h-10 text-orange-500" />
+            <Icon className="w-10 h-10 text-brand-text" />
           </div>
         </motion.div>
 
         {/* Title and Subtitle */}
-        <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 font-montserrat">
+        <h3 className="text-2xl font-bold text-foreground mb-2 font-montserrat">
           {service.name}
         </h3>
-        <p className="text-gray-600 dark:text-gray-400 text-sm mb-6">
+        <p className="text-muted-foreground text-sm mb-6">
           {service.subtitle}
         </p>
 
@@ -145,20 +145,20 @@ const ServiceCard = ({ service, onGetQuote, index }) => {
               whileInView={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.1 + idx * 0.05 }}
               viewport={{ once: true }}
-              className="flex items-center text-sm text-gray-700 dark:text-gray-300"
+              className="flex items-center text-sm text-muted-foreground"
             >
-              <Check className="w-5 h-5 text-orange-500 mr-3 flex-shrink-0" />
+              <Check className="w-5 h-5 text-brand-text mr-3 flex-shrink-0" />
               {feature}
             </motion.li>
           ))}
         </ul>
 
         {/* Price Section */}
-        <div className="mb-6 pb-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="text-3xl font-bold text-orange-500 font-montserrat">
+        <div className="mb-6 pb-6 border-b border-border">
+          <div className="text-3xl font-bold text-brand-text font-montserrat">
             {service.price}
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-xs text-subtle-foreground dark:text-muted-foreground mt-1">
             excl. VAT
           </p>
         </div>
@@ -169,11 +169,11 @@ const ServiceCard = ({ service, onGetQuote, index }) => {
           whileTap={{ scale: 0.95 }}
           onClick={() => onGetQuote(service)}
           className={`w-full py-3 px-4 rounded-lg font-bold transition-all duration-300
-            bg-gradient-to-r from-orange-500 to-orange-600 
-            hover:from-orange-600 hover:to-orange-700
-            text-white shadow-lg hover:shadow-orange-500/30
+            bg-gradient-to-r from-primary to-primary-hover 
+            hover:from-primary-hover hover:to-primary-hover
+            text-primary-foreground shadow-lg hover:shadow-primary/30
             transform hover:scale-105 active:scale-95
-            focus:outline-none focus:ring-2 focus:ring-orange-500/50`}
+            focus:outline-none focus:ring-2 focus:ring-ring/50`}
         >
           Get Quote
         </motion.button>
@@ -192,7 +192,7 @@ export default function Services() {
   };
 
   return (
-    <section id="services" className="py-20 px-4 sm:px-6 lg:px-8 bg-white dark:bg-black">
+    <section id="services" className="py-20 px-4 sm:px-6 lg:px-8 bg-card dark:bg-background">
       <div className="max-w-7xl mx-auto">
         {/* Section Header */}
         <motion.div
@@ -202,15 +202,15 @@ export default function Services() {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <h2 className="text-5xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6 font-montserrat text-balance">
+          <h2 className="text-5xl md:text-6xl font-bold text-foreground mb-6 font-montserrat text-balance">
             Our Services
           </h2>
           <div className="flex items-center justify-center gap-4 mb-6">
-            <div className="h-1 w-12 bg-gray-200 dark:bg-gray-800"></div>
-            <div className="h-1 w-20 bg-orange-500 rounded-full"></div>
-            <div className="h-1 w-12 bg-gray-200 dark:bg-gray-800"></div>
+            <div className="h-1 w-12 bg-surface-hover dark:bg-surface"></div>
+            <div className="h-1 w-20 bg-primary rounded-full"></div>
+            <div className="h-1 w-12 bg-surface-hover dark:bg-surface"></div>
           </div>
-          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Choose the perfect delivery service for your needs. Fast, reliable,
             and transparent pricing.
           </p>
@@ -236,14 +236,14 @@ export default function Services() {
           viewport={{ once: true }}
           className="mt-16 text-center"
         >
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
+          <p className="text-muted-foreground mb-6">
             Not sure which service is right for you?
           </p>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => handleGetQuote(null)}
-            className="px-8 py-4 rounded-full bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-lg hover:shadow-orange-500/30 transition-all duration-300 transform hover:scale-105"
+            className="px-8 py-4 rounded-full bg-primary hover:bg-primary-hover text-primary-foreground font-bold shadow-lg hover:shadow-primary/30 transition-all duration-300 transform hover:scale-105"
           >
             Get a Custom Quote
           </motion.button>
@@ -254,7 +254,7 @@ export default function Services() {
       {showQuoteModal && (
         <Suspense
           fallback={
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
+            <div className="fixed inset-0 bg-overlay flex items-center justify-center">
               Loading...
             </div>
           }

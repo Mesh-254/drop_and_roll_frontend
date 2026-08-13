@@ -111,10 +111,42 @@ describe("migrateClassString", () => {
     expect(result.unmapped).toContain("bg-white/20");
   });
 
-  it("refuses to guess at a black scrim", () => {
-    const result = migrateClassString("fixed inset-0 bg-black/50");
-    expect(result.value).toBe("fixed inset-0 bg-black/50");
-    expect(result.unmapped).toContain("bg-black/50");
+  // A full-bleed translucent black IS readable: it is always a modal scrim.
+  // --overlay already encodes the translucency, so the modifier is dropped
+  // rather than compounded.
+  it("maps a full-bleed translucent black to the overlay token", () => {
+    expect(migrateClassString("fixed inset-0 bg-black/50").value).toBe(
+      "fixed inset-0 bg-overlay",
+    );
+    expect(migrateClassString("fixed inset-0 z-50 bg-black/60").value).toBe(
+      "fixed inset-0 z-50 bg-overlay",
+    );
+  });
+
+  it("still refuses to guess at a translucent black that is not full-bleed", () => {
+    // The mobile menu's glass bar, not a scrim.
+    const result = migrateClassString("md:hidden bg-black/95 backdrop-blur-md");
+    expect(result.value).toContain("bg-black/95");
+    expect(result.unmapped).toContain("bg-black/95");
+  });
+
+  it("does not compound opacity onto an already-translucent token", () => {
+    // --*-surface is a 15% mix in dark; bg-success-surface/20 would fade it away.
+    expect(migrateClassString("dark:bg-green-900/20").value).toBe(
+      "dark:bg-success-surface",
+    );
+  });
+
+  it("collapses a state pair once the dark half drops its opacity", () => {
+    expect(migrateClassString("bg-green-50 dark:bg-green-900/20").value).toBe(
+      "bg-success-surface",
+    );
+  });
+
+  it("maps subtle state borders to a tinted border, collapsing the pair", () => {
+    expect(migrateClassString("border-red-200 dark:border-red-800").value).toBe(
+      "border-destructive/30",
+    );
   });
 
   it("still maps an opaque neutral background", () => {

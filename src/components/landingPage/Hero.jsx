@@ -198,18 +198,18 @@ export default function Hero() {
   };
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-black via-gray-900 to-black pt-20 overflow-hidden">
+    <section className="relative min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-background via-card to-background pt-20 overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         <motion.div
           animate={{ x: [0, 100, 0], y: [0, 50, 0] }}
           transition={{ duration: 20, repeat: Infinity }}
-          className="absolute top-20 right-20 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl"
+          className="absolute top-20 right-20 w-96 h-96 bg-primary/10 rounded-full blur-3xl"
         />
         <motion.div
           animate={{ x: [0, -100, 0], y: [0, -50, 0] }}
           transition={{ duration: 25, repeat: Infinity }}
-          className="absolute bottom-20 left-20 w-96 h-96 bg-orange-500/5 rounded-full blur-3xl"
+          className="absolute bottom-20 left-20 w-96 h-96 bg-primary/5 rounded-full blur-3xl"
         />
       </div>
 
@@ -223,14 +223,14 @@ export default function Hero() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-16">
           {/* Left Side - Text Content */}
           <motion.div variants={itemVariants} className="space-y-8">
-            <h1 className="text-6xl md:text-7xl font-bold text-white leading-tight font-montserrat text-balance">
+            <h1 className="text-6xl md:text-7xl font-bold text-foreground leading-tight font-montserrat text-balance">
               Delivery{" "}
-              <span className="bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-primary to-primary-hover bg-clip-text text-transparent">
                 Perfected
               </span>
             </h1>
 
-            <p className="text-xl text-gray-400 leading-relaxed max-w-lg">
+            <p className="text-xl text-muted-foreground leading-relaxed max-w-lg">
               Fast, reliable same-day and next-day delivery across Milton
               Keynes, Oxford, and surrounding areas. Get your items where they
               need to be, on time, every time.
@@ -239,16 +239,16 @@ export default function Hero() {
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <div className="text-3xl font-bold text-orange-500 font-montserrat">500+</div>
-                <p className="text-sm text-gray-400">Daily Deliveries</p>
+                <div className="text-3xl font-bold text-brand-text font-montserrat">500+</div>
+                <p className="text-sm text-muted-foreground">Daily Deliveries</p>
               </div>
               <div className="space-y-2">
-                <div className="text-3xl font-bold text-orange-500 font-montserrat">99.8%</div>
-                <p className="text-sm text-gray-400">On-Time Rate</p>
+                <div className="text-3xl font-bold text-brand-text font-montserrat">99.8%</div>
+                <p className="text-sm text-muted-foreground">On-Time Rate</p>
               </div>
               <div className="space-y-2">
-                <div className="text-3xl font-bold text-orange-500 font-montserrat">24/7</div>
-                <p className="text-sm text-gray-400">Support</p>
+                <div className="text-3xl font-bold text-brand-text font-montserrat">24/7</div>
+                <p className="text-sm text-muted-foreground">Support</p>
               </div>
             </div>
 
@@ -258,7 +258,7 @@ export default function Hero() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={openBlankModal}
-                className="px-8 py-4 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold shadow-lg hover:shadow-orange-500/40 transition-all duration-300"
+                className="px-8 py-4 rounded-full bg-gradient-to-r from-primary to-primary-hover hover:from-primary-hover hover:to-primary-hover text-primary-foreground font-bold shadow-lg hover:shadow-primary/40 transition-all duration-300"
               >
                 Get Quote & Book
               </motion.button>
@@ -266,7 +266,7 @@ export default function Hero() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setShowTrackModal(true)}
-                className="px-8 py-4 rounded-full border-2 border-orange-500/50 text-orange-400 hover:text-orange-300 hover:border-orange-400 font-bold transition-all duration-300 flex items-center justify-center gap-2"
+                className="px-8 py-4 rounded-full border-2 border-primary/50 text-brand-text hover:text-brand-text hover:border-primary font-bold transition-all duration-300 flex items-center justify-center gap-2"
               >
                 <Zap size={20} />
                 Track Delivery
@@ -284,10 +284,10 @@ export default function Hero() {
               transition={{ duration: 4, repeat: Infinity }}
               className="relative w-full h-96 flex items-center justify-center"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-orange-500/10 to-transparent rounded-3xl blur-2xl" />
+              <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent rounded-3xl blur-2xl" />
               <div className="relative flex items-center justify-center">
-                <div className="w-48 h-48 bg-gradient-to-br from-orange-500/20 to-transparent rounded-3xl border-2 border-orange-500/30 flex items-center justify-center">
-                  <Zap className="w-24 h-24 text-orange-500/40" />
+                <div className="w-48 h-48 bg-gradient-to-br from-primary/20 to-transparent rounded-3xl border-2 border-primary/30 flex items-center justify-center">
+                  <Zap className="w-24 h-24 text-brand-text/40" />
                 </div>
               </div>
             </motion.div>
@@ -296,21 +296,21 @@ export default function Hero() {
 
         {/* Quick Quote Card - Floating Glass Effect */}
         <motion.div variants={itemVariants} whileHover={{ y: -5 }} className="relative mt-12">
-          <div className="rounded-3xl border-2 border-orange-500/30 bg-gradient-to-br from-gray-900/50 via-black/50 to-gray-900/50 backdrop-blur-xl p-8 shadow-2xl hover:border-orange-500/50 transition-all duration-300">
+          <div className="rounded-3xl border-2 border-primary/30 bg-gradient-to-br from-card/50 via-background/50 to-card/50 backdrop-blur-xl p-8 shadow-2xl hover:border-primary/50 transition-all duration-300">
             {/* Glow Effect */}
             <motion.div
               animate={{ opacity: [0.5, 0.8, 0.5] }}
               transition={{ duration: 3, repeat: Infinity }}
-              className="absolute inset-0 bg-gradient-to-r from-orange-500/10 to-transparent rounded-3xl blur-xl"
+              className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent rounded-3xl blur-xl"
             />
 
             {/* Card Content */}
             <div className="relative z-10">
-              <h3 className="text-2xl font-bold text-white mb-2 font-montserrat flex items-center gap-2">
-                <Zap className="w-6 h-6 text-orange-500" />
+              <h3 className="text-2xl font-bold text-foreground mb-2 font-montserrat flex items-center gap-2">
+                <Zap className="w-6 h-6 text-brand-text" />
                 Get an instant quote in 10 seconds
               </h3>
-              <p className="text-gray-400 text-sm mb-6">
+              <p className="text-muted-foreground text-sm mb-6">
                 We deliver across Milton Keynes, Oxford &amp; surrounding areas
               </p>
 
@@ -319,8 +319,8 @@ export default function Hero() {
                 {/* Postcodes */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="relative">
-                    <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
-                      <MapPin size={16} className="text-green-400" />
+                    <label className="block text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                      <MapPin size={16} className="text-success" />
                       Collection Postcode
                     </label>
                     <input
@@ -329,15 +329,15 @@ export default function Hero() {
                       value={quickQuoteData.pickupPostcode}
                       onChange={(e) => handlePostcodeChange("pickupPostcode", e.target.value)}
                       placeholder="MK9 1AA"
-                      className={`w-full px-4 py-3 rounded-lg bg-gray-800/50 border text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors ${
-                        errorField === "pickup" ? "border-red-500" : "border-gray-700"
+                      className={`w-full px-4 py-3 rounded-lg bg-surface/50 border text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors ${
+                        errorField === "pickup" ? "border-destructive" : "border-border"
                       }`}
                     />
                   </div>
 
                   <div className="relative">
-                    <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
-                      <MapPin size={16} className="text-red-400" />
+                    <label className="block text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                      <MapPin size={16} className="text-destructive" />
                       Delivery Postcode
                     </label>
                     <input
@@ -346,8 +346,8 @@ export default function Hero() {
                       value={quickQuoteData.dropoffPostcode}
                       onChange={(e) => handlePostcodeChange("dropoffPostcode", e.target.value)}
                       placeholder="OX1 1AA"
-                      className={`w-full px-4 py-3 rounded-lg bg-gray-800/50 border text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors ${
-                        errorField === "dropoff" ? "border-red-500" : "border-gray-700"
+                      className={`w-full px-4 py-3 rounded-lg bg-surface/50 border text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors ${
+                        errorField === "dropoff" ? "border-destructive" : "border-border"
                       }`}
                     />
                   </div>
@@ -357,27 +357,27 @@ export default function Hero() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Parcel count stepper */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
-                      <Package size={16} className="text-orange-400" />
+                    <label className="block text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                      <Package size={16} className="text-brand-text" />
                       Parcels
                     </label>
-                    <div className="flex items-center rounded-lg bg-gray-800/50 border border-gray-700 overflow-hidden">
+                    <div className="flex items-center rounded-lg bg-surface/50 border border-border overflow-hidden">
                       <button
                         type="button"
                         aria-label="Decrease parcels"
                         onClick={() => adjustParcels(-1)}
-                        className="px-3 py-3 text-gray-300 hover:text-white hover:bg-gray-700/50 transition-colors"
+                        className="px-3 py-3 text-muted-foreground hover:text-foreground hover:bg-surface-hover/50 transition-colors"
                       >
                         <Minus size={16} />
                       </button>
-                      <span className="flex-1 text-center text-white font-semibold" aria-live="polite">
+                      <span className="flex-1 text-center text-foreground font-semibold" aria-live="polite">
                         {quickQuoteData.parcelCount}
                       </span>
                       <button
                         type="button"
                         aria-label="Increase parcels"
                         onClick={() => adjustParcels(1)}
-                        className="px-3 py-3 text-gray-300 hover:text-white hover:bg-gray-700/50 transition-colors"
+                        className="px-3 py-3 text-muted-foreground hover:text-foreground hover:bg-surface-hover/50 transition-colors"
                       >
                         <Plus size={16} />
                       </button>
@@ -386,8 +386,8 @@ export default function Hero() {
 
                   {/* Weight */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
-                      <Weight size={16} className="text-orange-400" />
+                    <label className="block text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                      <Weight size={16} className="text-brand-text" />
                       Total weight (kg)
                     </label>
                     <input
@@ -398,20 +398,20 @@ export default function Hero() {
                       value={quickQuoteData.weightKg}
                       onChange={(e) => handleField("weightKg", e.target.value)}
                       placeholder="5"
-                      className="w-full px-4 py-3 rounded-lg bg-gray-800/50 border border-gray-700 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                      className="w-full px-4 py-3 rounded-lg bg-surface/50 border border-border text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors"
                     />
                   </div>
 
                   {/* Service type */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
-                      <Zap size={16} className="text-orange-400" />
+                    <label className="block text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                      <Zap size={16} className="text-brand-text" />
                       Service
                     </label>
                     <select
                       value={quickQuoteData.serviceTypeId}
                       onChange={(e) => handleField("serviceTypeId", e.target.value)}
-                      className="w-full px-4 py-3 rounded-lg bg-gray-800/50 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                      className="w-full px-4 py-3 rounded-lg bg-surface/50 border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors"
                     >
                       {serviceTypes.length === 0 && <option value="">Standard</option>}
                       {serviceTypes.map((s) => (
@@ -428,7 +428,7 @@ export default function Hero() {
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400"
+                    className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive"
                   >
                     <AlertCircle size={18} className="flex-shrink-0" />
                     <span className="text-sm">{quickQuoteError}</span>
@@ -441,14 +441,14 @@ export default function Hero() {
                   whileTap={{ scale: 0.98 }}
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-4 px-6 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold shadow-lg hover:shadow-orange-500/30 transition-all duration-300 flex items-center justify-center gap-2"
+                  className="w-full py-4 px-6 rounded-lg bg-gradient-to-r from-primary to-primary-hover hover:from-primary-hover hover:to-primary-hover disabled:from-surface-hover disabled:to-surface-hover disabled:cursor-not-allowed text-primary-foreground font-bold shadow-lg hover:shadow-primary/30 transition-all duration-300 flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? (
                     <>
                       <motion.div
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                        className="w-5 h-5 border-2 border-border border-t-transparent rounded-full"
                       />
                       Calculating...
                     </>
@@ -466,15 +466,15 @@ export default function Hero() {
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mt-6 rounded-2xl border border-orange-500/40 bg-black/40 p-6"
+                  className="mt-6 rounded-2xl border border-primary/40 bg-card/40 p-6"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
                     <div>
-                      <p className="text-sm text-gray-400 mb-1">Estimated price</p>
-                      <div className="text-4xl font-bold text-white font-montserrat">
+                      <p className="text-sm text-muted-foreground mb-1">Estimated price</p>
+                      <div className="text-4xl font-bold text-foreground font-montserrat">
                         {quoteResult.currency} {Number(quoteResult.price).toFixed(2)}
                       </div>
-                      <p className="text-xs text-gray-500 mt-2">
+                      <p className="text-xs text-subtle-foreground mt-2">
                         ~{Number(quoteResult.distance_km).toFixed(1)} km ·{" "}
                         {quickQuoteData.parcelCount} parcel
                         {quickQuoteData.parcelCount > 1 ? "s" : ""} ·{" "}
@@ -486,13 +486,13 @@ export default function Hero() {
                       whileTap={{ scale: 0.97 }}
                       type="button"
                       onClick={handleContinueToBooking}
-                      className="px-6 py-3 rounded-lg bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold shadow-lg transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap"
+                      className="px-6 py-3 rounded-lg bg-gradient-to-r from-primary to-primary-hover hover:from-primary-hover hover:to-primary-hover text-primary-foreground font-bold shadow-lg transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap"
                     >
                       Continue to Booking
                       <ArrowRight size={18} />
                     </motion.button>
                   </div>
-                  <p className="text-[11px] text-gray-500 mt-3">
+                  <p className="text-[11px] text-subtle-foreground mt-3">
                     Final price is confirmed at checkout. Logged-in business
                     accounts may see account-specific rates.
                   </p>
@@ -503,16 +503,16 @@ export default function Hero() {
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mt-6 flex items-start gap-3 rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-5 text-yellow-200"
+                  className="mt-6 flex items-start gap-3 rounded-2xl border border-warning/30 bg-warning/10 p-5 text-warning"
                 >
                   <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="font-semibold">Not currently serviceable</p>
-                    <p className="text-sm text-yellow-200/80 mt-1">{quoteResult.message}</p>
-                    <p className="text-sm text-yellow-200/80 mt-2">
+                    <p className="text-sm text-warning/80 mt-1">{quoteResult.message}</p>
+                    <p className="text-sm text-warning/80 mt-2">
                       We currently cover Milton Keynes, Oxford &amp; surrounding
                       areas. Need somewhere else?{" "}
-                      <a href="/#contact" className="underline hover:text-yellow-100">
+                      <a href="/#contact" className="underline hover:text-warning">
                         Contact us
                       </a>
                       .
@@ -529,7 +529,7 @@ export default function Hero() {
       {showQuoteModal && (
         <Suspense
           fallback={
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
+            <div className="fixed inset-0 bg-overlay flex items-center justify-center">
               Loading...
             </div>
           }
@@ -551,7 +551,7 @@ export default function Hero() {
       {showTrackModal && (
         <Suspense
           fallback={
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
+            <div className="fixed inset-0 bg-overlay flex items-center justify-center">
               Loading...
             </div>
           }
