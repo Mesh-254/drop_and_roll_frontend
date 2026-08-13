@@ -2,51 +2,47 @@
 /**
  * scripts/audit_theme.mjs
  * ═══════════════════════════════════════════════════════════════════════════
- * Is "light mode" a thing this app can actually render?
+ * Can every screen render in both themes?
  *
- * WHY THIS EXISTS. `dark:` used to resolve from the visitor's OS, so the
- * Profile page's light/dark toggle wrote a `.dark` class that nothing read and
- * the button did nothing. Pinning `dark:` to that class (index.css) made the
- * toggle work — which is only an improvement if the light side of every pair
- * exists. This counts whether it does, rather than leaving it to whoever
- * happens to press the button.
+ * WHAT THIS USED TO ASK. Before the token migration this counted whether any
+ * file flipped cleanly, and the answer was zero of 73 — which is why the toggle
+ * was removed in 9e8d481. That question is settled, so the measurement moved.
  *
- * WHAT IT COUNTS. Two independent facts per file:
+ * WHAT IT ASKS NOW. Does any file still name a COLOUR (bg-gray-900) instead of
+ * a ROLE (bg-card)? A raw colour cannot flip: it renders the same in both
+ * themes, so one unpaired `text-white` is enough to make a card illegible once
+ * the page goes light. Zero is the only passing answer.
  *
- *   dark-only    a dark-surface utility (bg-slate-800, text-white, …) with NO
- *                `dark:`-prefixed sibling anywhere in the file. In light mode
- *                these keep their dark styling while their neighbours flip, so
- *                a file with many of them renders as a mixture of both themes.
+ * HOW IT KNOWS. It runs the codemod's own analysis rather than re-implementing
+ * the rules. Three outcomes per file:
  *
- *   paired       a `dark:` utility. A file made of these flips cleanly.
+ *   mappable  the codemod WOULD rewrite it, so a token exists and the file
+ *             simply has not been migrated. Always a failure.
+ *   unmapped  a colour with no rule and no exemption. A human has to decide.
+ *             Also a failure.
+ *   exempt    deliberately literal, by the allow-list (PayPal's blue, decorative
+ *             shadows, the purple category chips) or by a structural rule
+ *             (multi-hue decorative gradients). Reported, never a failure.
  *
- * A file that is 100% dark-only is not a bug — it is a deliberately dark
- * component, and it is fine as long as the app is dark. The damage is the
- * MIXTURE: a file with both is a file that half-flips.
+ * Reusing the codemod is the point: the audit and the migration cannot disagree
+ * about what counts as themed, because there is only one implementation.
  *
- * Deterministic on purpose: same tree, same answer, no judgement calls. Run it
- * before changing how `dark:` resolves, and after.
- *
- *   node scripts/audit_theme.mjs          # summary
- *   node scripts/audit_theme.mjs --files  # per-file table
+ *   node scripts/audit_theme.mjs
+ *   node scripts/audit_theme.mjs --files
  */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { migrateSource } from "./migrate_theme_tokens.mjs";
 
 const ROOT = new URL("../src", import.meta.url).pathname;
 
-// Utilities that only make sense on a dark ground. Deliberately narrow: these
-// are the ones that become invisible or garish on white, not every colour.
-const DARK_ONLY = [
-  /\bbg-(?:slate|gray|zinc|neutral|stone)-(?:700|800|900|950)\b/g,
-  /\bbg-black\b/g,
-  /\btext-white\b/g,
-  /\btext-(?:slate|gray|zinc)-(?:200|300|400)\b/g,
-  /\bborder-(?:slate|gray|zinc)-(?:700|800)\b/g,
-];
-
-const PAIRED = /\bdark:/g;
+/**
+ * tokens.js holds the palette itself — it IS where colour values live, and its
+ * comments name the literals each token replaced. Auditing it would be asking
+ * the dictionary to stop containing words.
+ */
+const NOT_AUDITED = /styles[/\\]tokens\.js$/;
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -58,90 +54,61 @@ function walk(dir, out = []) {
 }
 
 const rows = [];
+let totalMappable = 0;
+let totalUnmapped = 0;
+let totalExempt = 0;
+
 for (const file of walk(ROOT)) {
-  const src = readFileSync(file, "utf8");
-  const paired = (src.match(PAIRED) || []).length;
-  let darkOnly = 0;
-  for (const re of DARK_ONLY) darkOnly += (src.match(re) || []).length;
-  if (darkOnly || paired) {
-    rows.push({ file: relative(ROOT, file), darkOnly, paired });
+  if (NOT_AUDITED.test(file)) continue;
+  const source = readFileSync(file, "utf8");
+  const { changed, unmapped, exempt } = migrateSource(source);
+  totalExempt += exempt.length;
+  if (changed > 0 || unmapped.length > 0) {
+    rows.push({
+      file: relative(ROOT, file),
+      mappable: changed,
+      unmapped: unmapped.length,
+      classes: [...new Set(unmapped)],
+    });
+    totalMappable += changed;
+    totalUnmapped += unmapped.length;
   }
 }
 
-const mixed = rows.filter((r) => r.darkOnly > 0 && r.paired > 0);
-const darkOnlyFiles = rows.filter((r) => r.darkOnly > 0 && r.paired === 0);
-const pairedFiles = rows.filter((r) => r.paired > 0 && r.darkOnly === 0);
-
-const totalDarkOnly = rows.reduce((n, r) => n + r.darkOnly, 0);
-const totalPaired = rows.reduce((n, r) => n + r.paired, 0);
-
 if (process.argv.includes("--files")) {
-  console.log("dark-only  paired  file");
-  for (const r of [...mixed, ...darkOnlyFiles].sort(
-    (a, b) => b.darkOnly - a.darkOnly,
+  console.log("mappable  unmapped  file");
+  for (const r of rows.sort(
+    (a, b) => b.mappable + b.unmapped - (a.mappable + a.unmapped),
   )) {
     console.log(
-      String(r.darkOnly).padStart(9),
-      String(r.paired).padStart(7),
+      String(r.mappable).padStart(8),
+      String(r.unmapped).padStart(9),
       " ",
       r.file,
+      r.classes.length ? `  [${r.classes.join(" ")}]` : "",
     );
   }
   console.log("");
 }
 
 console.log("THEME AUDIT");
-console.log(
-  "  files with dark-only styling and NO dark: pair :",
-  darkOnlyFiles.length,
-);
-console.log(
-  "  files that flip cleanly (dark: only)           :",
-  pairedFiles.length,
-);
-console.log("  MIXED files (half-flip in light mode)          :", mixed.length);
-console.log(
-  "  dark-only utility occurrences (total)          :",
-  totalDarkOnly,
-);
-console.log("  dark: utility occurrences (total)              :", totalPaired);
+console.log("  files still naming a colour        :", rows.length);
+console.log("  occurrences a token already exists for:", totalMappable);
+console.log("  occurrences with no rule (need a human):", totalUnmapped);
+console.log("  deliberately literal (exempt)      :", totalExempt);
 console.log("");
-// THE DECISIVE SIGNAL IS `pairedFiles`, NOT THE RATIO.
-//
-// A first pass at this compared totals (dark-only vs dark:) and called 1700 vs
-// 1153 "plausible". That was the wrong question. What decides whether a theme
-// can flip is not how many utilities are paired — it is whether any FILE is
-// fully paired. One unpaired `text-white` is enough to make a card illegible on
-// white, so a file is only safe if it has zero of them.
-//
-// Zero clean files means every screen half-flips, and no amount of favourable
-// ratio changes that.
-const cleanlyFlippable = pairedFiles.length;
-if (cleanlyFlippable === 0) {
-  console.log(
-    "VERDICT: light mode cannot render. NOT ONE file in src/ flips cleanly —",
-  );
-  console.log(
-    "         every file carrying dark: pairs also carries unpaired dark-only",
-  );
-  console.log(
-    "         utilities, and `body` is unconditionally bg-black text-white.",
-  );
-  console.log(
-    "         Implementing it means re-theming " +
-      rows.length +
-      " files. Until then the app is",
-  );
-  console.log(
-    "         dark-only and must not offer a toggle that half-flips a screen.",
-  );
+
+if (totalMappable > 0 || totalUnmapped > 0) {
+  console.log("VERDICT: not themeable yet. A raw colour renders identically in both");
+  console.log("         themes, so each of these is a spot that stays put when the page");
+  console.log("         flips. For the mappable ones run:");
+  console.log("");
+  console.log("           npm run migrate:theme -- --write <path>");
+  console.log("");
+  console.log("         then read the diff. The unmapped ones need a decision — see");
+  console.log("         /tmp/theme-migration/unmapped.tsv after a dry run. `--files`");
+  console.log("         lists the worst offenders first.");
   process.exitCode = 1;
 } else {
-  console.log(
-    "VERDICT: " +
-      cleanlyFlippable +
-      " file(s) flip cleanly; " +
-      mixed.length +
-      " mixed files need auditing.",
-  );
+  console.log("VERDICT: every file names roles, not colours. Both themes render.");
 }
