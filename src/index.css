@@ -1,86 +1,94 @@
-@import "tailwindcss";
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 /*
- * `dark:` follows OUR theme class, not the visitor's operating system.
- * ─────────────────────────────────────────────────────────────────────────────
- * Tailwind v4 resolves `dark:` from `prefers-color-scheme` unless told
- * otherwise, and this project never told it otherwise. Every `dark:bg-gray-800`
- * / `text-gray-900 dark:text-white` pair in the codebase — 42 of them in the
- * bulk-upload wizard alone — was therefore being decided by a setting the app
- * does not control and cannot see, while `body` was unconditionally
- * `bg-black text-white` and ProfilePage was writing a `.dark` class on <html>
- * that nothing read.
+ * src/index.css — the app's single Tailwind entry point.
  *
- * The visible cost: on a light-mode machine the bulk-upload wizard rendered as
- * a WHITE card inside a black app, and every element styled for the dark half
- * of the pair (the review step's `text-white`, `text-slate-300`,
- * `text-slate-400`) came out white-on-white or light-grey-on-white. The step
- * that lists which rows failed was, for those users, blank.
+ * Theme colours live in styles/tokens.css. Nothing here may name a colour.
  *
- * Class-based restores the authors' intent and makes ProfilePage's existing
- * light/dark toggle do what it always looked like it did. `<html class="dark">`
- * in index.html sets the default before first paint, so there is no flash and
- * no dependence on JS having run.
+ * `dark:` follows OUR class, not the operating system: the app owns the
+ * preference, stores it, and must be able to render either theme on any
+ * machine. Declared here ONCE — globals.css used to declare a second,
+ * different variant (`&:is(.dark *)`), and which one won depended on import
+ * order rather than intent.
  */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./styles/tokens.css";
+
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Base styles */
 @layer base {
   html {
     font-family: "Inter", system-ui, sans-serif;
   }
 
   body {
-    @apply bg-black text-white antialiased;
+    @apply bg-background text-foreground antialiased;
+  }
+
+  /*
+   * Absorbed from globals.css, which is gone. Vite compiles each CSS entry
+   * independently, so a file using `@apply` has to import Tailwind itself —
+   * which is precisely how this project ended up with two theme configs and a
+   * `dark:` variant whose meaning depended on import order. One entry point
+   * makes that class of bug unreachable rather than merely fixed.
+   */
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  @media (max-width: 768px) {
+    .mobile-optimized {
+      @apply text-base leading-relaxed;
+    }
+
+    .mobile-card {
+      @apply p-4 shadow-sm;
+    }
+
+    .mobile-header {
+      @apply text-lg font-semibold;
+    }
+
+    .mobile-nav {
+      @apply text-base font-medium;
+    }
   }
 }
 
-/* Component styles */
 @layer components {
   .btn-primary {
-    @apply bg-orange-500 hover:bg-orange-600 text-white font-medium px-6 py-3 rounded-lg transition-all duration-300 transform hover:scale-105;
+    @apply bg-primary hover:bg-primary-hover text-primary-foreground font-medium px-6 py-3 rounded-lg transition-colors duration-300;
   }
 
   .btn-secondary {
-    @apply border border-gray-600 hover:border-orange-500 text-gray-300 hover:text-orange-500 px-6 py-3 rounded-lg font-medium transition-colors;
+    @apply border border-border-strong hover:border-primary text-muted-foreground hover:text-brand-text px-6 py-3 rounded-lg font-medium transition-colors;
   }
 
   .input-field {
-    @apply w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:border-orange-500 focus:outline-none;
+    @apply w-full px-4 py-3 bg-input border border-border rounded-lg text-foreground placeholder-subtle-foreground focus:border-primary focus:outline-none;
   }
 
   .card {
-    @apply bg-gray-900 rounded-lg border border-gray-800 hover:border-orange-500/30 transition-colors;
+    @apply bg-card rounded-lg border border-border hover:border-primary/30 transition-colors;
   }
 
   .modal {
-    @apply fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4;
+    @apply fixed inset-0 bg-overlay backdrop-blur-sm z-50 flex items-center justify-center p-4;
   }
 
   .modal-content {
-    @apply bg-black border border-orange-500/20 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto;
+    @apply bg-popover border border-primary/20 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto;
   }
 }
 
-/* Utility styles */
 @layer utilities {
   .text-gradient {
-    @apply bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-primary to-primary-hover bg-clip-text text-transparent;
   }
 
   .shadow-orange {
-    box-shadow: 0 10px 25px rgba(249, 115, 22, 0.1);
+    box-shadow: 0 10px 25px color-mix(in oklab, var(--primary) 10%, transparent);
   }
 
-  .border-gradient {
-    border-image: linear-gradient(135deg, #f97316, #ea580c) 1;
-  }
-}
-
-@layer utilities {
   @keyframes float {
     0%,
     100% {
@@ -90,6 +98,7 @@
       transform: translateY(-10px) rotate(5deg);
     }
   }
+
   .animate-float {
     animation: float 6s ease-in-out infinite;
   }

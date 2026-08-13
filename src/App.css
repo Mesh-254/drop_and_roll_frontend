@@ -6,25 +6,41 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #1f2937;
+  background: var(--surface);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #f97316;
+  background: var(--primary);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #ea580c;
+  background: var(--primary-hover);
 }
 
-/* Smooth transitions */
-* {
-  transition-property:
-    color, background-color, border-color, text-decoration-color, fill, stroke,
-    opacity, box-shadow, transform, filter, backdrop-filter;
+/*
+ * Theme switching only. A `*` rule used to apply this transition permanently,
+ * so every hover and focus animated too; that made ordinary interaction feel
+ * laggy and was never the intent. utils/theme.js adds `.theme-transition` to
+ * <html> for 200ms around a switch and removes it again.
+ */
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition-property: color, background-color, border-color, fill, stroke,
+    text-decoration-color, outline-color;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
+  transition-duration: 200ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-transition,
+  .theme-transition *,
+  .theme-transition *::before,
+  .theme-transition *::after {
+    transition-duration: 0ms;
+  }
 }
 
 /* Focus styles */
@@ -32,7 +48,7 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid #f97316;
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
 

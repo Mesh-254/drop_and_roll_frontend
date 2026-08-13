@@ -1,0 +1,133 @@
+/*
+ * src/styles/tokens.css
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE ONLY PLACE COLOURS ARE DEFINED. Two themes, one set of names.
+ *
+ * Components must name a ROLE (`bg-card`), never a colour (`bg-gray-900`).
+ * That is what makes a new component impossible to half-theme: there is no
+ * second place to forget.
+ *
+ * Values are literal oklch copied from Tailwind v4's palette, NOT
+ * `var(--color-gray-900)`. Tailwind v4 only emits a palette variable when some
+ * utility uses it, so a var() reference here resolves to nothing once the last
+ * `gray-900` utility is migrated away.
+ *
+ * Mirrored as data in tokens.js for the tests; tokensParity.test.js fails if
+ * the two drift. Edit both or neither.
+ *
+ * Contrast is enforced by themeContrast.test.js over 26 pairs in both themes.
+ * Do not change a value here without running `npx jest src/styles/`.
+ */
+
+:root {
+  --background: oklch(98.5% 0.002 247.839);
+  --foreground: oklch(21% 0.034 264.665);
+  --card: oklch(100% 0 0);
+  --card-foreground: oklch(21% 0.034 264.665);
+  --popover: oklch(100% 0 0);
+  --popover-foreground: oklch(21% 0.034 264.665);
+  --surface: oklch(96.7% 0.003 264.542);
+  --surface-hover: oklch(92.8% 0.006 264.531);
+  --muted: oklch(96.7% 0.003 264.542);
+  --muted-foreground: oklch(44.6% 0.03 256.802);
+  --subtle-foreground: oklch(44.6% 0.03 256.802);
+  --border: oklch(92.8% 0.006 264.531);
+  --border-strong: oklch(87.2% 0.01 258.338);
+  --input: oklch(100% 0 0);
+  --ring: oklch(64.6% 0.222 41.116);
+  --overlay: color-mix(in oklab, oklch(21% 0.034 264.665) 50%, transparent);
+  --primary: oklch(70.5% 0.213 47.604);
+  --primary-hover: oklch(64.6% 0.222 41.116);
+  --primary-foreground: oklch(21% 0.034 264.665);
+  --brand-text: oklch(55.3% 0.195 38.402);
+  --brand-surface: oklch(98% 0.016 73.684);
+  --destructive: oklch(57.7% 0.245 27.325);
+  --destructive-foreground: oklch(100% 0 0);
+  --destructive-surface: oklch(97.1% 0.013 17.38);
+  --success: oklch(52.7% 0.154 150.069);
+  --success-foreground: oklch(100% 0 0);
+  --success-surface: oklch(98.2% 0.018 155.826);
+  --warning: oklch(55.5% 0.163 48.998);
+  --warning-foreground: oklch(100% 0 0);
+  --warning-surface: oklch(98.7% 0.022 95.277);
+  --info: oklch(54.6% 0.245 262.881);
+  --info-foreground: oklch(100% 0 0);
+  --info-surface: oklch(97% 0.014 254.604);
+}
+
+.dark {
+  --background: oklch(0% 0 0);
+  --foreground: oklch(100% 0 0);
+  --card: oklch(21% 0.034 264.665);
+  --card-foreground: oklch(100% 0 0);
+  --popover: oklch(21% 0.034 264.665);
+  --popover-foreground: oklch(100% 0 0);
+  --surface: oklch(27.8% 0.033 256.848);
+  --surface-hover: oklch(37.3% 0.034 259.733);
+  --muted: oklch(27.8% 0.033 256.848);
+  --muted-foreground: oklch(70.7% 0.022 261.325);
+  --subtle-foreground: oklch(70.7% 0.022 261.325);
+  --border: oklch(37.3% 0.034 259.733);
+  --border-strong: oklch(44.6% 0.03 256.802);
+  --input: oklch(27.8% 0.033 256.848);
+  --ring: oklch(70.5% 0.213 47.604);
+  --overlay: color-mix(in oklab, oklch(0% 0 0) 50%, transparent);
+  --primary: oklch(70.5% 0.213 47.604);
+  --primary-hover: oklch(64.6% 0.222 41.116);
+  --primary-foreground: oklch(21% 0.034 264.665);
+  --brand-text: oklch(70.5% 0.213 47.604);
+  --brand-surface: color-mix(in oklab, oklch(70.5% 0.213 47.604) 15%, transparent);
+  --destructive: oklch(70.4% 0.191 22.216);
+  --destructive-foreground: oklch(21% 0.034 264.665);
+  --destructive-surface: color-mix(in oklab, oklch(70.4% 0.191 22.216) 15%, transparent);
+  --success: oklch(79.2% 0.209 151.711);
+  --success-foreground: oklch(21% 0.034 264.665);
+  --success-surface: color-mix(in oklab, oklch(79.2% 0.209 151.711) 15%, transparent);
+  --warning: oklch(82.8% 0.189 84.429);
+  --warning-foreground: oklch(21% 0.034 264.665);
+  --warning-surface: color-mix(in oklab, oklch(82.8% 0.189 84.429) 15%, transparent);
+  --info: oklch(70.7% 0.165 254.624);
+  --info-foreground: oklch(21% 0.034 264.665);
+  --info-surface: color-mix(in oklab, oklch(70.7% 0.165 254.624) 15%, transparent);
+}
+
+/*
+ * `inline` is load-bearing: it makes `bg-card` compile to
+ * `background-color: var(--card)` rather than baking in the light value, which
+ * is what lets `.dark` redefining `--card` flip the whole app.
+ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-subtle-foreground: var(--subtle-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-overlay: var(--overlay);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-brand-text: var(--brand-text);
+  --color-brand-surface: var(--brand-surface);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-surface: var(--destructive-surface);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-surface: var(--success-surface);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-surface: var(--warning-surface);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-surface: var(--info-surface);
+}

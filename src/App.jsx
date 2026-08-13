@@ -32,7 +32,6 @@ import Footer from "./components/common/Footer";
 import AdminLiveTrackingDashboard from "./components/admin/admin-live-tracking-dashboard";
 import FAQ from "./components/contact/faq";
 import "./App.css";
-import "./globals.css";
 import ForgotPassword from "./components/auth/forgot-password";
 import ResetPassword from "./components/auth/reset-password";
 
