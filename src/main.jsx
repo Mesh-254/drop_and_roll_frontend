@@ -5,12 +5,10 @@ import App from "./App.jsx";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { fetchParcelLimits } from "./utils/parcelValidation";
-import { applyAppTheme } from "./utils/theme";
+import { initTheme } from "./utils/theme";
 
-// The app has exactly one theme. This clears any stale "light" preference left
-// by the toggle that used to exist, so a user who pressed it is not stranded on
-// a half-flipped screen. See utils/theme.js for the measurement.
-applyAppTheme();
+// Before render, so React's first paint agrees with the class index.html set.
+initTheme();
 
 // Warm the parcel limits cache so Zod schemas use live backend values.
 fetchParcelLimits();

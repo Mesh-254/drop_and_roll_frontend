@@ -1,13 +1,29 @@
 <!doctype html>
-<!-- class="dark" is the app's default theme, set before first paint so the
-     bulk-upload wizard and every other `dark:`-styled surface cannot render in
-     its light variant on a black page. ProfilePage's toggle removes it. -->
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
     <title>Drop 'N Roll</title>
+    <!--
+      Set the theme BEFORE first paint. If this ran in the bundle instead, a
+      visitor whose preference is dark would see a white page flash first.
+      Deliberately tiny and dependency-free, and it must stay in sync with
+      STORAGE_KEY and DEFAULT_THEME in src/utils/theme.js.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("theme");
+          var theme = stored === "light" || stored === "dark" ? stored : "light";
+          if (theme === "dark") document.documentElement.classList.add("dark");
+          document.documentElement.style.colorScheme = theme;
+        } catch (e) {
+          document.documentElement.style.colorScheme = "light";
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
