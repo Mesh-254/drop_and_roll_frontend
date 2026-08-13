@@ -9,7 +9,7 @@ const ProgressTracker = ({
 }) => {
   const getStepIcon = (step, index) => {
     if (index < currentStep) {
-      return <Check className="h-5 w-5 text-white" />;
+      return <Check className="h-5 w-5 text-foreground" />;
     }
     if (index === currentStep) {
       return (
@@ -17,11 +17,11 @@ const ProgressTracker = ({
           animate={{ rotate: 360 }}
           transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
         >
-          <Clock className="h-5 w-5 text-white" />
+          <Clock className="h-5 w-5 text-foreground" />
         </motion.div>
       );
     }
-    return <div className="h-2 w-2 bg-gray-400 rounded-full" />;
+    return <div className="h-2 w-2 bg-surface-hover rounded-full" />;
   };
 
   const getStepStatus = (index) => {
@@ -50,15 +50,15 @@ const ProgressTracker = ({
               <div
                 className={`h-10 w-10 rounded-full flex items-center justify-center mb-2 transition-all ${
                   getStepStatus(index) === 'completed'
-                    ? 'bg-green-500'
+                    ? 'bg-success'
                     : getStepStatus(index) === 'active'
-                    ? 'bg-orange-500 shadow-lg shadow-orange-500/50'
-                    : 'bg-gray-300 dark:bg-gray-600'
+                    ? 'bg-primary shadow-lg shadow-primary/50'
+                    : 'bg-surface-hover'
                 }`}
               >
                 {getStepIcon(step, index)}
               </div>
-              <p className="text-xs sm:text-sm font-medium text-gray-900 dark:text-gray-100 text-center">
+              <p className="text-xs sm:text-sm font-medium text-foreground text-center">
                 {step.label}
               </p>
             </motion.div>
@@ -71,8 +71,8 @@ const ProgressTracker = ({
                 transition={{ delay: index * 0.1 + 0.1, duration: 0.4 }}
                 className={`h-1 flex-1 mx-2 rounded-full origin-left ${
                   index < currentStep
-                    ? 'bg-green-500'
-                    : 'bg-gray-300 dark:bg-gray-600'
+                    ? 'bg-success'
+                    : 'bg-surface-hover'
                 }`}
               />
             )}
@@ -88,10 +88,10 @@ const ProgressTracker = ({
           transition={{ delay: 0.3 }}
           className={`flex items-center gap-2 text-sm font-medium ${
             status === 'completed'
-              ? 'text-green-600 dark:text-green-400'
+              ? 'text-success'
               : status === 'error'
-              ? 'text-red-600 dark:text-red-400'
-              : 'text-orange-600 dark:text-orange-400'
+              ? 'text-destructive'
+              : 'text-brand-text'
           }`}
         >
           {status === 'completed' ? (

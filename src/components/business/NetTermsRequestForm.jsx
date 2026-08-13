@@ -97,47 +97,47 @@ export default function NetTermsRequestForm({ onClose, onSuccess, existingReques
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
+        className="fixed inset-0 bg-overlay flex items-center justify-center p-4 z-50"
       >
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="bg-gray-900 border border-orange-500/30 rounded-2xl max-w-lg w-full p-8 relative"
+          className="bg-card border border-primary/30 rounded-2xl max-w-lg w-full p-8 relative"
         >
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 hover:bg-gray-800 rounded-lg transition-colors"
+            className="absolute top-4 right-4 p-2 hover:bg-surface rounded-lg transition-colors"
           >
-            <X className="h-5 w-5 text-gray-400" />
+            <X className="h-5 w-5 text-muted-foreground" />
           </button>
 
           <div className="text-center space-y-4">
             <div className="flex justify-center">
-              <div className="p-3 bg-yellow-900/20 border border-yellow-500/30 rounded-full">
-                <Clock className="h-8 w-8 text-yellow-400" />
+              <div className="p-3 bg-warning-surface border border-warning/30 rounded-full">
+                <Clock className="h-8 w-8 text-warning" />
               </div>
             </div>
-            <h2 className="text-xl font-bold text-white">Request Under Review</h2>
-            <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 space-y-2 text-left">
+            <h2 className="text-xl font-bold text-foreground">Request Under Review</h2>
+            <div className="bg-surface/50 border border-border rounded-lg p-4 space-y-2 text-left">
               {pkg && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Package</span>
-                  <span className="text-white font-medium">{pkg.name}</span>
+                  <span className="text-muted-foreground">Package</span>
+                  <span className="text-foreground font-medium">{pkg.name}</span>
                 </div>
               )}
               <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Submitted</span>
-                <span className="text-white">
+                <span className="text-muted-foreground">Submitted</span>
+                <span className="text-foreground">
                   {new Date(existingRequest.created_at).toLocaleDateString()}
                 </span>
               </div>
             </div>
-            <p className="text-gray-400 text-sm">
+            <p className="text-muted-foreground text-sm">
               Under review — you'll receive an email within 1–2 business days.
             </p>
             <button
               onClick={onClose}
-              className="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
+              className="w-full py-2 bg-primary hover:bg-primary-hover text-primary-foreground rounded-lg font-medium transition-colors"
             >
               Close
             </button>
@@ -169,57 +169,57 @@ export default function NetTermsRequestForm({ onClose, onSuccess, existingReques
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
+        className="fixed inset-0 bg-overlay flex items-center justify-center p-4 z-50"
       >
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="bg-gray-900 border border-green-500/30 rounded-2xl max-w-lg w-full p-8 relative"
+          className="bg-card border border-success/30 rounded-2xl max-w-lg w-full p-8 relative"
         >
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 hover:bg-gray-800 rounded-lg transition-colors"
+            className="absolute top-4 right-4 p-2 hover:bg-surface rounded-lg transition-colors"
           >
-            <X className="h-5 w-5 text-gray-400" />
+            <X className="h-5 w-5 text-muted-foreground" />
           </button>
 
           <div className="text-center space-y-4">
             <div className="flex justify-center">
-              <div className="p-3 bg-green-900/20 border border-green-500/30 rounded-full">
-                <CheckCircle2 className="h-8 w-8 text-green-500" />
+              <div className="p-3 bg-success-surface border border-success/30 rounded-full">
+                <CheckCircle2 className="h-8 w-8 text-success" />
               </div>
             </div>
-            <h2 className="text-xl font-bold text-white">NET Terms Approved!</h2>
-            <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 space-y-3 text-left">
+            <h2 className="text-xl font-bold text-foreground">NET Terms Approved!</h2>
+            <div className="bg-surface/50 border border-border rounded-lg p-4 space-y-3 text-left">
               {pkg && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Package</span>
-                  <span className="font-semibold text-white">{pkg.name}</span>
+                  <span className="text-muted-foreground">Package</span>
+                  <span className="font-semibold text-foreground">{pkg.name}</span>
                 </div>
               )}
               <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Credit Limit</span>
-                <span className="font-semibold text-green-400">{approvedLimit}</span>
+                <span className="text-muted-foreground">Credit Limit</span>
+                <span className="font-semibold text-success">{approvedLimit}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Payment Terms</span>
-                <span className="font-semibold text-white">{approvedTerms}</span>
+                <span className="text-muted-foreground">Payment Terms</span>
+                <span className="font-semibold text-foreground">{approvedTerms}</span>
               </div>
               {existingRequest.reviewed_at && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Approved On</span>
-                  <span className="text-white">
+                  <span className="text-muted-foreground">Approved On</span>
+                  <span className="text-foreground">
                     {new Date(existingRequest.reviewed_at).toLocaleDateString()}
                   </span>
                 </div>
               )}
             </div>
-            <p className="text-gray-400 text-sm">
+            <p className="text-muted-foreground text-sm">
               Your account now has NET payment terms enabled.
             </p>
             <button
               onClick={onClose}
-              className="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
+              className="w-full py-2 bg-primary hover:bg-primary-hover text-primary-foreground rounded-lg font-medium transition-colors"
             >
               Close
             </button>
@@ -237,41 +237,41 @@ export default function NetTermsRequestForm({ onClose, onSuccess, existingReques
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
+        className="fixed inset-0 bg-overlay flex items-center justify-center p-4 z-50"
       >
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="bg-gray-900 border border-red-500/30 rounded-2xl max-w-lg w-full p-8 relative"
+          className="bg-card border border-destructive/30 rounded-2xl max-w-lg w-full p-8 relative"
         >
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 hover:bg-gray-800 rounded-lg transition-colors"
+            className="absolute top-4 right-4 p-2 hover:bg-surface rounded-lg transition-colors"
           >
-            <X className="h-5 w-5 text-gray-400" />
+            <X className="h-5 w-5 text-muted-foreground" />
           </button>
 
           <div className="text-center space-y-4">
             <div className="flex justify-center">
-              <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-full">
-                <AlertCircle className="h-8 w-8 text-red-500" />
+              <div className="p-3 bg-destructive-surface border border-destructive/30 rounded-full">
+                <AlertCircle className="h-8 w-8 text-destructive" />
               </div>
             </div>
-            <h2 className="text-xl font-bold text-white">Application Rejected</h2>
+            <h2 className="text-xl font-bold text-foreground">Application Rejected</h2>
             {existingRequest.rejection_reason && (
-              <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 text-left">
-                <p className="text-sm text-gray-300">
+              <div className="bg-surface/50 border border-border rounded-lg p-4 text-left">
+                <p className="text-sm text-muted-foreground">
                   <strong>Reason:</strong> {existingRequest.rejection_reason}
                 </p>
               </div>
             )}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-subtle-foreground">
               You may re-apply after 30 days or contact support for assistance.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={onClose}
-                className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
+                className="flex-1 py-2 bg-surface-hover hover:bg-surface-hover text-foreground rounded-lg font-medium transition-colors"
               >
                 Close
               </button>
@@ -288,7 +288,7 @@ export default function NetTermsRequestForm({ onClose, onSuccess, existingReques
                   setJustificationLength(0);
                   setError(null);
                 }}
-                className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
+                className="flex-1 py-2 bg-primary hover:bg-primary-hover text-primary-foreground rounded-lg font-medium transition-colors"
               >
                 Re-apply
               </button>
@@ -337,23 +337,23 @@ export default function NetTermsRequestForm({ onClose, onSuccess, existingReques
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
+      className="fixed inset-0 bg-overlay flex items-center justify-center p-4 z-50"
     >
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="bg-gray-900 border border-orange-500/30 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8 relative"
+        className="bg-card border border-primary/30 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8 relative"
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 hover:bg-gray-800 rounded-lg transition-colors"
+          className="absolute top-4 right-4 p-2 hover:bg-surface rounded-lg transition-colors"
         >
-          <X className="h-5 w-5 text-gray-400" />
+          <X className="h-5 w-5 text-muted-foreground" />
         </button>
 
-        <h2 className="text-2xl font-bold text-white mb-2">Apply for NET Payment Terms</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-2">Apply for NET Payment Terms</h2>
         {isReapplying && (
-          <p className="text-sm text-orange-400 mb-4">
+          <p className="text-sm text-brand-text mb-4">
             Re-applying after previous rejection.
           </p>
         )}
@@ -362,17 +362,17 @@ export default function NetTermsRequestForm({ onClose, onSuccess, existingReques
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-6 p-4 bg-red-900/20 border border-red-500/30 rounded-lg flex gap-3"
+            className="mb-6 p-4 bg-destructive-surface border border-destructive/30 rounded-lg flex gap-3"
           >
-            <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-400">{error}</p>
+            <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-destructive">{error}</p>
           </motion.div>
         )}
 
         <form onSubmit={handleSubmitForm} className="space-y-8 mt-6">
           {/* Package Selector */}
           <div>
-            <label className="block text-sm font-semibold text-white mb-4">
+            <label className="block text-sm font-semibold text-foreground mb-4">
               Select Package *
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -385,17 +385,17 @@ export default function NetTermsRequestForm({ onClose, onSuccess, existingReques
                   }
                   className={`relative p-6 rounded-xl border-2 transition-all text-left ${
                     formData.requested_package === pkg.id
-                      ? 'border-orange-500 bg-orange-500/10 shadow-lg shadow-orange-500/20'
-                      : 'border-gray-700 bg-gray-800/60 hover:border-orange-400'
+                      ? 'border-primary bg-primary/10 shadow-lg shadow-primary/20'
+                      : 'border-border bg-surface/60 hover:border-primary'
                   }`}
                 >
                   {pkg.popular && (
-                    <div className="absolute top-2 right-2 px-2 py-1 bg-orange-500 text-white text-xs font-bold rounded">
+                    <div className="absolute top-2 right-2 px-2 py-1 bg-primary text-primary-foreground text-xs font-bold rounded">
                       Most Popular
                     </div>
                   )}
-                  <h3 className="font-bold text-white mb-3">{pkg.name}</h3>
-                  <div className="space-y-2 text-xs text-gray-300">
+                  <h3 className="font-bold text-foreground mb-3">{pkg.name}</h3>
+                  <div className="space-y-2 text-xs text-muted-foreground">
                     <p>
                       <strong>Limit:</strong> {pkg.limit}
                     </p>
@@ -410,7 +410,7 @@ export default function NetTermsRequestForm({ onClose, onSuccess, existingReques
 
           {/* Justification */}
           <div>
-            <label className="block text-sm font-semibold text-white mb-2">
+            <label className="block text-sm font-semibold text-foreground mb-2">
               Business Justification *
             </label>
             <textarea
@@ -423,29 +423,29 @@ export default function NetTermsRequestForm({ onClose, onSuccess, existingReques
               placeholder="Explain your business need for NET payment terms (minimum 50 characters)..."
               minLength={50}
               rows={4}
-              className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none transition-all"
+              className="w-full px-4 py-3 bg-surface border border-border rounded-lg text-foreground placeholder-subtle-foreground focus:ring-2 focus:ring-ring focus:border-transparent resize-none transition-all"
             />
             <div className="flex items-end justify-between mt-2">
               <p
                 className={`text-xs ${
-                  justificationLength < 50 ? 'text-red-400' : 'text-green-400'
+                  justificationLength < 50 ? 'text-destructive' : 'text-success'
                 }`}
               >
                 {justificationLength < 50
                   ? `${50 - justificationLength} more characters required`
                   : '✓ Valid'}
               </p>
-              <span className="text-xs text-gray-500">{justificationLength}/1000</span>
+              <span className="text-xs text-subtle-foreground">{justificationLength}/1000</span>
             </div>
           </div>
 
           {/* Monthly Volume */}
           <div>
-            <label className="block text-sm font-semibold text-white mb-2">
+            <label className="block text-sm font-semibold text-foreground mb-2">
               Estimated Monthly Volume (Optional)
             </label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-subtle-foreground">
                 £
               </span>
               <input
@@ -458,7 +458,7 @@ export default function NetTermsRequestForm({ onClose, onSuccess, existingReques
                   })
                 }
                 placeholder="e.g. 5000"
-                className="w-full pl-8 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                className="w-full pl-8 pr-4 py-3 bg-surface border border-border rounded-lg text-foreground placeholder-subtle-foreground focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
               />
             </div>
           </div>
@@ -468,7 +468,7 @@ export default function NetTermsRequestForm({ onClose, onSuccess, existingReques
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors"
+              className="flex-1 py-3 bg-surface-hover hover:bg-surface-hover text-foreground rounded-lg font-medium transition-colors"
             >
               Cancel
             </button>
@@ -479,7 +479,7 @@ export default function NetTermsRequestForm({ onClose, onSuccess, existingReques
                 !formData.requested_package ||
                 formData.justification.length < 50
               }
-              className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+              className="flex-1 py-3 bg-primary hover:bg-primary-hover disabled:bg-surface-hover text-primary-foreground rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
             >
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               {loading ? 'Submitting...' : 'Submit Request'}

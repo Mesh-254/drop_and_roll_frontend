@@ -44,9 +44,9 @@ export default function BulkUploadProgressBar({
   const isCompleted = status === "completed" || upload?.status === "completed";
   const isFailed = status === "failed" || upload?.status === "failed";
 
-  let barColor = highlight === "blue" ? "from-blue-500 to-blue-600" : "from-orange-500 to-orange-600";
-  if (isCompleted) barColor = "from-green-500 to-green-600";
-  if (isFailed) barColor = "from-red-500 to-red-600";
+  let barColor = highlight === "blue" ? "from-info to-info" : "from-primary to-primary-hover";
+  if (isCompleted) barColor = "from-success to-success";
+  if (isFailed) barColor = "from-destructive to-destructive";
 
   const countLabel = `${processed} of ${total} rows processed`;
 
@@ -58,7 +58,7 @@ export default function BulkUploadProgressBar({
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuetext={`${countLabel}, ${failed} failed`}
-        className="relative h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden"
+        className="relative h-3 bg-surface-hover rounded-full overflow-hidden"
       >
         <motion.div
           className={`absolute inset-y-0 left-0 bg-gradient-to-r ${barColor} rounded-full`}
@@ -69,17 +69,17 @@ export default function BulkUploadProgressBar({
       </div>
 
       <div className="flex items-center justify-between text-sm">
-        <span className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-          {isCompleted && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+        <span className="flex items-center gap-2 text-muted-foreground">
+          {isCompleted && <CheckCircle2 className="h-4 w-4 text-success" />}
           {countLabel}
         </span>
         <span
           className={`text-xs font-semibold ${
             isCompleted
-              ? "text-green-600 dark:text-green-400"
+              ? "text-success"
               : isFailed
-                ? "text-red-600 dark:text-red-400"
-                : "text-gray-600 dark:text-gray-400"
+                ? "text-destructive"
+                : "text-muted-foreground"
           }`}
         >
           {pct}%
@@ -92,33 +92,33 @@ export default function BulkUploadProgressBar({
           icon={<CheckCircle2 className="h-3.5 w-3.5" />}
           label="Booked"
           value={successful}
-          tone="text-green-600 dark:text-green-400"
+          tone="text-success"
         />
         <Tile
           testId="count-failed"
           icon={<AlertCircle className="h-3.5 w-3.5" />}
           label="Failed"
           value={failed}
-          tone="text-red-600 dark:text-red-400"
+          tone="text-destructive"
         />
         <Tile
           testId="count-skipped"
           icon={<SkipForward className="h-3.5 w-3.5" />}
           label="Skipped"
           value={skipped}
-          tone="text-slate-500 dark:text-slate-400"
+          tone="text-subtle-foreground dark:text-muted-foreground"
         />
         <Tile
           testId="count-remaining"
           icon={<Clock className="h-3.5 w-3.5" />}
           label="Remaining"
           value={remaining}
-          tone="text-slate-500 dark:text-slate-400"
+          tone="text-subtle-foreground dark:text-muted-foreground"
         />
       </div>
 
       {!isCompleted && !isFailed && (
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-subtle-foreground dark:text-muted-foreground">
           You can close this page — processing continues, and we will email you
           when it is ready to review.
         </p>
@@ -130,9 +130,9 @@ export default function BulkUploadProgressBar({
 /** One count. Icon AND text, so colour is never the only signal. */
 function Tile({ testId, icon, label, value, tone }) {
   return (
-    <div className="flex items-center gap-1.5 rounded-md border border-gray-200 dark:border-gray-700 px-2 py-1.5">
+    <div className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5">
       <span className={tone}>{icon}</span>
-      <span className="text-gray-500 dark:text-gray-400">{label}</span>
+      <span className="text-subtle-foreground dark:text-muted-foreground">{label}</span>
       <span data-testid={testId} className={`ml-auto font-semibold ${tone}`}>
         {value}
       </span>

@@ -505,23 +505,23 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-      <div className="bg-gray-900 w-full max-w-md mx-4 rounded-xl shadow-2xl">
-        <div className="flex justify-between items-center p-4 border-b border-gray-800">
-          <h2 className="text-xl font-bold text-white">Proof of Delivery</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
+    <div className="fixed inset-0 bg-overlay flex items-center justify-center z-50">
+      <div className="bg-card w-full max-w-md mx-4 rounded-xl shadow-2xl">
+        <div className="flex justify-between items-center p-4 border-b border-border">
+          <h2 className="text-xl font-bold text-foreground">Proof of Delivery</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="h-6 w-6" />
           </button>
         </div>
 
         <div className="p-4 space-y-6 max-h-[90vh] overflow-y-auto">
           <div className="space-y-4">
-            <label className="text-base font-medium text-white">
+            <label className="text-base font-medium text-foreground">
               Delivery Photo (Required)
             </label>
-            <div className="border border-dashed border-gray-700 rounded-lg p-6 text-center">
+            <div className="border border-dashed border-border rounded-lg p-6 text-center">
               {cameraError && (
-                <p className="text-red-500 text-sm mb-4">{cameraError}</p>
+                <p className="text-destructive text-sm mb-4">{cameraError}</p>
               )}
               {photoPreview ? (
                 <div className="space-y-2">
@@ -533,14 +533,14 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
                     />
                     <button
                       onClick={retakePhoto}
-                      className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
+                      className="absolute top-2 right-2 bg-destructive text-destructive-foreground p-1 rounded-full hover:bg-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                   <button
                     onClick={retakePhoto}
-                    className="bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg text-sm"
+                    className="bg-primary hover:bg-primary-hover text-primary-foreground py-2 px-4 rounded-lg text-sm"
                     disabled={loading}
                   >
                     Retake Photo
@@ -552,11 +552,11 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
                     ref={videoRef}
                     autoPlay
                     playsInline
-                    className="w-full min-h-[200px] max-h-48 rounded-lg object-contain bg-black"
+                    className="w-full min-h-[200px] max-h-48 rounded-lg object-contain bg-background"
                   />
                   <button
                     onClick={capturePhoto}
-                    className="bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg disabled:opacity-50"
+                    className="bg-primary hover:bg-primary-hover text-primary-foreground py-2 px-4 rounded-lg disabled:opacity-50"
                     disabled={loading || !hasActiveStream}
                   >
                     Capture Photo
@@ -564,21 +564,21 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <FileImage className="h-12 w-12 mx-auto text-gray-500" />
-                  <p className="text-sm text-gray-400">
+                  <FileImage className="h-12 w-12 mx-auto text-subtle-foreground" />
+                  <p className="text-sm text-muted-foreground">
                     Capture or upload a clear photo of the delivery
                   </p>
                   <div className="flex gap-2 justify-center">
                     <button
                       onClick={startCamera}
-                      className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg"
+                      className="flex items-center gap-2 bg-primary hover:bg-primary-hover text-primary-foreground py-2 px-4 rounded-lg"
                       disabled={loading}
                     >
                       <Camera className="h-4 w-4" /> Camera
                     </button>
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex items-center gap-2 border border-gray-600 text-gray-300 py-2 px-4 rounded-lg hover:bg-gray-800"
+                      className="flex items-center gap-2 border border-border-strong text-muted-foreground py-2 px-4 rounded-lg hover:bg-surface"
                       disabled={loading}
                     >
                       <Upload className="h-4 w-4" /> Upload
@@ -596,7 +596,7 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
             />
           </div>
           <div className="space-y-2">
-            <label htmlFor="notes" className="text-base font-medium text-white">
+            <label htmlFor="notes" className="text-base font-medium text-foreground">
               Delivery Notes (Optional)
             </label>
             <textarea
@@ -604,19 +604,19 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg p-3 focus:outline-none focus:border-orange-500"
+              className="w-full bg-surface border border-border text-foreground rounded-lg p-3 focus:outline-none focus:border-primary"
               disabled={loading}
             />
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-base font-medium text-white">
+              <label className="text-base font-medium text-foreground">
                 Delivery Location (Required)
               </label>
               <button
                 onClick={() => getCurrentLocation()}
                 disabled={loading}
-                className="flex items-center gap-2 border border-gray-600 text-gray-300 py-2 px-3 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+                className="flex items-center gap-2 border border-border-strong text-muted-foreground py-2 px-3 rounded-lg hover:bg-surface disabled:opacity-50"
               >
                 <MapPin className="h-4 w-4" />
                 {location
@@ -636,8 +636,8 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
                 className={`text-sm ${
                   location.accuracy != null &&
                   location.accuracy <= ACCURACY_GOOD_M
-                    ? "text-green-400"
-                    : "text-amber-400"
+                    ? "text-success"
+                    : "text-warning"
                 }`}
               >
                 ✓ Lat: {location.lat.toFixed(6)}, Lng: {location.lng.toFixed(6)}
@@ -648,18 +648,18 @@ export function ProofOfDelivery({ jobId, onClose, onSubmit }) {
               </p>
             )}
           </div>
-          <div className="flex gap-2 pt-4 border-t border-gray-800">
+          <div className="flex gap-2 pt-4 border-t border-border">
             <button
               onClick={handleSubmit}
               disabled={loading || !photo || !location}
-              className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg disabled:opacity-50"
+              className="flex-1 bg-primary hover:bg-primary-hover text-primary-foreground py-2 px-4 rounded-lg disabled:opacity-50"
             >
               {loading ? "Submitting..." : "Submit Proof"}
             </button>
             <button
               onClick={onClose}
               disabled={loading}
-              className="border border-gray-600 text-gray-300 py-2 px-4 rounded-lg hover:bg-gray-800"
+              className="border border-border-strong text-muted-foreground py-2 px-4 rounded-lg hover:bg-surface"
             >
               Cancel
             </button>

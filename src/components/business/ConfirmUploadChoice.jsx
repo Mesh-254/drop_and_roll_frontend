@@ -51,8 +51,8 @@ export function ConfirmUploadChoice({
     });
 
   return (
-    <fieldset className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-      <legend className="px-1 text-sm font-semibold text-gray-900 dark:text-white">
+    <fieldset className="rounded-lg border border-border p-4">
+      <legend className="px-1 text-sm font-semibold text-foreground">
         What is this upload?
       </legend>
 
@@ -77,10 +77,10 @@ export function ConfirmUploadChoice({
           className="mt-1"
         />
         <span>
-          <span className="flex items-center gap-1.5 font-medium text-gray-900 dark:text-white">
+          <span className="flex items-center gap-1.5 font-medium text-foreground">
             <FilePlus2 className="h-4 w-4" /> A new batch
           </span>
-          <span className="block text-xs text-gray-500 dark:text-gray-400">
+          <span className="block text-xs text-subtle-foreground dark:text-muted-foreground">
             {duplicateCount > 0
               ? `Books every row, including the ${duplicateCount} already booked. You are charged for all of them.`
               : "Books every row in this file."}
@@ -98,10 +98,10 @@ export function ConfirmUploadChoice({
           className="mt-1"
         />
         <span>
-          <span className="flex items-center gap-1.5 font-medium text-gray-900 dark:text-white">
+          <span className="flex items-center gap-1.5 font-medium text-foreground">
             <Wrench className="h-4 w-4" /> Corrections to an earlier upload
           </span>
-          <span className="block text-xs text-gray-500 dark:text-gray-400">
+          <span className="block text-xs text-subtle-foreground dark:text-muted-foreground">
             Skips anything you have already booked, so nothing is booked or
             charged twice. You can paste the whole original file back in.
           </span>
@@ -111,13 +111,13 @@ export function ConfirmUploadChoice({
       {resolved === "corrections" &&
         (hasCorrectable ? (
           <label className="mt-3 block text-sm">
-            <span className="block text-gray-700 dark:text-gray-300">
+            <span className="block text-muted-foreground">
               Which batch are you correcting?
             </span>
             <select
               value={correctsUpload || ""}
               onChange={(e) => onChange({ kind: "corrections", correctsUpload: e.target.value })}
-              className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-gray-900 dark:text-white"
+              className="mt-1 w-full rounded-lg border border-border-strong bg-card dark:bg-surface p-2 text-foreground"
             >
               <option value="">Choose a batch</option>
               {correctable.map((b) => (
@@ -131,13 +131,13 @@ export function ConfirmUploadChoice({
           // Says why rather than presenting an empty dropdown. The list is
           // narrowed to finished batches inside the dedupe window, so "empty" is
           // a real answer, not a loading state.
-          <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
+          <p className="mt-3 text-sm text-subtle-foreground dark:text-muted-foreground">
             You have no earlier uploads to correct.
           </p>
         ))}
 
       {resolved === null && (
-        <p className="mt-3 text-sm font-semibold text-amber-700 dark:text-amber-300">
+        <p className="mt-3 text-sm font-semibold text-warning">
           Choose one to continue.
         </p>
       )}
@@ -155,11 +155,11 @@ function DuplicateWarning({ count, rows, matchedUpload, expanded, onToggle, idPr
   const batch = matchedUpload?.batch_name;
 
   return (
-    <div className="mt-1 rounded-lg border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-900/20 p-3">
+    <div className="mt-1 rounded-lg border border-warning/30 bg-warning-surface p-3">
       <div className="flex gap-2">
-        <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+        <AlertCircle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
         <div className="flex-1">
-          <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+          <p className="text-sm font-semibold text-warning">
             {count} row{count === 1 ? "" : "s"} already booked
             {batch ? (
               <>
@@ -175,7 +175,7 @@ function DuplicateWarning({ count, rows, matchedUpload, expanded, onToggle, idPr
                 onClick={onToggle}
                 aria-expanded={expanded}
                 aria-controls={panelId}
-                className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300 hover:underline"
+                className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-warning hover:underline"
               >
                 {expanded ? (
                   <ChevronDown className="h-3.5 w-3.5" />
@@ -189,7 +189,7 @@ function DuplicateWarning({ count, rows, matchedUpload, expanded, onToggle, idPr
                   {rows.map((r) => (
                     <li
                       key={r.row_number}
-                      className="text-xs font-mono text-amber-700 dark:text-amber-300/90"
+                      className="text-xs font-mono text-warning dark:text-warning/90"
                     >
                       {/* Each row identifies itself the way it was actually
                           matched: a blank reference column is matched on content,
@@ -204,7 +204,7 @@ function DuplicateWarning({ count, rows, matchedUpload, expanded, onToggle, idPr
               )}
             </>
           )}
-          <p className="mt-2 text-xs text-amber-600 dark:text-amber-400/70">
+          <p className="mt-2 text-xs text-warning dark:text-warning/70">
             A row repeated inside this one file is always skipped, whichever you
             pick.
           </p>

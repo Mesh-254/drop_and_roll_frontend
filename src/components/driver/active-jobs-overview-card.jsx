@@ -16,44 +16,44 @@ export function ActiveJobsOverviewCard({
   const getStyle = (num) => {
     if (num === 0) {
       return {
-        bg: "bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950",
-        border: "border-slate-200/70 dark:border-slate-800/60",
-        text: "text-slate-700 dark:text-slate-300",
-        accent: "text-slate-500 dark:text-slate-400",
-        iconBg: "bg-slate-200/70 dark:bg-slate-800/50",
-        iconColor: "text-slate-500 dark:text-slate-400",
+        bg: "bg-gradient-to-br from-muted to-muted dark:from-card dark:to-background",
+        border: "border-border/70 dark:border-border/60",
+        text: "text-muted-foreground",
+        accent: "text-subtle-foreground dark:text-muted-foreground",
+        iconBg: "bg-surface-hover/70 dark:bg-surface/50",
+        iconColor: "text-subtle-foreground dark:text-muted-foreground",
         label: "All clear",
       };
     }
     if (num <= 3) {
       return {
-        bg: "bg-gradient-to-br from-emerald-50/80 to-emerald-100/60 dark:from-emerald-950/40 dark:to-emerald-900/30",
-        border: "border-emerald-200/60 dark:border-emerald-800/40",
-        text: "text-emerald-800 dark:text-emerald-200",
-        accent: "text-emerald-600 dark:text-emerald-400",
-        iconBg: "bg-emerald-100 dark:bg-emerald-900/40",
-        iconColor: "text-emerald-600 dark:text-emerald-400",
+        bg: "bg-gradient-to-br from-success-surface/80 to-success-surface/60 dark:from-success-surface/40 dark:to-success-surface/30",
+        border: "border-success/30",
+        text: "text-success",
+        accent: "text-success",
+        iconBg: "bg-success-surface",
+        iconColor: "text-success",
         label: "Smooth sailing",
       };
     }
     if (num <= 8) {
       return {
-        bg: "bg-gradient-to-br from-amber-50/80 to-amber-100/60 dark:from-amber-950/40 dark:to-amber-900/30",
-        border: "border-amber-200/60 dark:border-amber-800/40",
-        text: "text-amber-800 dark:text-amber-200",
-        accent: "text-amber-600 dark:text-amber-400",
-        iconBg: "bg-amber-100 dark:bg-amber-900/40",
-        iconColor: "text-amber-600 dark:text-amber-400",
+        bg: "bg-gradient-to-br from-warning-surface/80 to-warning-surface/60 dark:from-warning-surface/40 dark:to-warning-surface/30",
+        border: "border-warning/30",
+        text: "text-warning",
+        accent: "text-warning",
+        iconBg: "bg-warning-surface",
+        iconColor: "text-warning",
         label: "Busy but manageable",
       };
     }
     return {
-      bg: "bg-gradient-to-br from-rose-50/80 to-rose-100/60 dark:from-rose-950/40 dark:to-rose-900/30",
-      border: "border-rose-200/60 dark:border-rose-800/40",
-      text: "text-rose-800 dark:text-rose-200",
-      accent: "text-rose-600 dark:text-rose-400",
-      iconBg: "bg-rose-100 dark:bg-rose-900/40",
-      iconColor: "text-rose-600 dark:text-rose-400",
+      bg: "bg-gradient-to-br from-destructive-surface/80 to-destructive-surface/60 dark:from-destructive-surface/40 dark:to-destructive-surface/30",
+      border: "border-destructive/30",
+      text: "text-destructive",
+      accent: "text-destructive",
+      iconBg: "bg-destructive-surface",
+      iconColor: "text-destructive",
       label: "High volume – check now",
       showAlert: true,
     };
@@ -77,7 +77,7 @@ export function ActiveJobsOverviewCard({
     >
       {/* Subtle animated gradient orb (modern touch) */}
       <div
-        className="absolute -right-20 -top-20 w-64 h-64 rounded-full bg-gradient-to-br from-white/10 to-transparent dark:from-black/10 opacity-70 blur-3xl group-hover:scale-110 transition-transform duration-700"
+        className="absolute -right-20 -top-20 w-64 h-64 rounded-full bg-gradient-to-br from-card/10 to-transparent dark:from-background/10 opacity-70 blur-3xl group-hover:scale-110 transition-transform duration-700"
       />
 
       <div className="relative flex flex-col items-center text-center gap-5 sm:gap-6">
@@ -88,7 +88,7 @@ export function ActiveJobsOverviewCard({
               w-20 h-20 sm:w-24 sm:h-24 rounded-2xl sm:rounded-3xl
               ${style.iconBg}
               flex items-center justify-center
-              shadow-inner ring-1 ring-inset ring-black/5 dark:ring-white/5
+              shadow-inner ring-1 ring-inset ring-border-strong/5
               transition-transform group-hover:scale-105
             `}
           >
@@ -96,7 +96,7 @@ export function ActiveJobsOverviewCard({
           </div>
 
           <div className="flex flex-col items-start">
-            <p className="text-base sm:text-lg font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            <p className="text-base sm:text-lg font-medium uppercase tracking-wider text-subtle-foreground dark:text-muted-foreground">
               Active Jobs
             </p>
             <p
@@ -127,20 +127,20 @@ export function ActiveJobsOverviewCard({
             onClick={onViewAll}
             className={`
               mt-3 sm:mt-5 px-7 sm:px-9 py-3.5 sm:py-4 rounded-full
-              bg-white/90 dark:bg-slate-900/80
+              bg-card/90
               backdrop-blur-sm
-              border border-slate-200/70 dark:border-slate-700/60
+              border border-border/70 dark:border-border/60
               text-base sm:text-lg font-semibold ${style.text}
               shadow-md hover:shadow-lg hover:scale-[1.03]
               transition-all duration-300 flex items-center gap-2.5
-              ring-1 ring-inset ring-black/5 dark:ring-white/5
+              ring-1 ring-inset ring-border-strong/5
             `}
           >
             View All Active Jobs
             <ArrowRight className="w-5 h-5" />
           </button>
         ) : (
-          <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-2 max-w-xs">
+          <p className="text-sm sm:text-base text-subtle-foreground dark:text-muted-foreground mt-2 max-w-xs">
             No deliveries in progress — new jobs will show here instantly
           </p>
         )}

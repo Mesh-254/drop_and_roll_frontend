@@ -72,11 +72,11 @@ const BACKGROUND_REFRESH_MS = 45000;
 const LIVE_REFRESH_DEBOUNCE_MS = 400;
 
 const STATUS_BADGE = {
-  assigned: "bg-blue-100 text-blue-700 border-blue-200",
-  picked_up: "bg-amber-100 text-amber-700 border-amber-200",
+  assigned: "bg-info-surface text-info border-info/30",
+  picked_up: "bg-warning-surface text-warning border-warning/30",
   at_hub: "bg-purple-100 text-purple-700 border-purple-200",
-  in_transit: "bg-indigo-100 text-indigo-700 border-indigo-200",
-  delivered: "bg-green-100 text-green-700 border-green-200",
+  in_transit: "bg-info-surface text-info border-info/30",
+  delivered: "bg-success-surface text-success border-success/30",
 };
 
 const ACTION_LABEL = {
@@ -525,23 +525,23 @@ export function DeliveryStatusUpdates({
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-muted dark:bg-background">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-slate-200 dark:border-slate-800">
+      <div className="sticky top-0 z-20 bg-card/95 backdrop-blur border-b border-border">
         <div className="max-w-3xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h1 className="text-xl font-bold text-slate-900 dark:text-white">
+              <h1 className="text-xl font-bold text-foreground">
                 My Jobs
               </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-xs text-subtle-foreground dark:text-muted-foreground mt-0.5">
                 {filteredJobs.length} of {totalCount} shown
               </p>
             </div>
             <button
               onClick={handleManualRefresh}
               disabled={isRefreshing}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-semibold disabled:opacity-60 active:scale-95 transition"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-card text-foreground text-sm font-semibold disabled:opacity-60 active:scale-95 transition"
             >
               <RefreshCw
                 className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
@@ -553,22 +553,22 @@ export function DeliveryStatusUpdates({
           {/* Search + filter */}
           <div className="flex gap-2 mt-3">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
                 type="text"
                 placeholder="Search postcode, name, phone..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-transparent focus:border-slate-300 dark:focus:border-slate-600 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
+                className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-muted dark:bg-surface border border-transparent focus:border-border-strong dark:focus:border-border text-sm text-foreground placeholder-subtle-foreground focus:outline-none"
               />
             </div>
             <div className="relative">
-              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 aria-label="Filter by status"
-                className="pl-9 pr-8 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-transparent text-sm font-medium text-slate-900 dark:text-white appearance-none focus:outline-none"
+                className="pl-9 pr-8 py-2.5 rounded-xl bg-muted dark:bg-surface border border-transparent text-sm font-medium text-foreground appearance-none focus:outline-none"
               >
                 <option value="all">All</option>
                 <option value="assigned">Assigned</option>
@@ -606,7 +606,7 @@ export function DeliveryStatusUpdates({
               return (
                 <div
                   key={jobKey(job)}
-                  className={`bg-white dark:bg-slate-900 rounded-2xl border-l-4 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm ${
+                  className={`bg-card rounded-2xl border-l-4 border border-border overflow-hidden shadow-sm ${
                     isDelivery ? "border-l-emerald-500" : "border-l-sky-500"
                   }`}
                 >
@@ -615,7 +615,7 @@ export function DeliveryStatusUpdates({
                   <button
                     type="button"
                     onClick={() => onJobClick && onJobClick(job)}
-                    className="w-full text-left p-4 active:bg-slate-50 dark:active:bg-slate-800/60 transition"
+                    className="w-full text-left p-4 active:bg-muted dark:active:bg-surface/60 transition"
                   >
                     {/* Job number: its own fixed column, OUTSIDE the tag row.
                         It used to be the last child of that row with `ml-auto`,
@@ -632,10 +632,10 @@ export function DeliveryStatusUpdates({
                       <div className="flex-shrink-0 w-14 text-center">
                         {job.job_number != null ? (
                           <>
-                            <div className="text-[10px] uppercase tracking-wide font-semibold text-slate-400 dark:text-slate-500 leading-none">
+                            <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground dark:text-subtle-foreground leading-none">
                               Job
                             </div>
-                            <div className="text-2xl font-extrabold tabular-nums leading-tight text-slate-900 dark:text-white">
+                            <div className="text-2xl font-extrabold tabular-nums leading-tight text-foreground">
                               {job.job_number}
                             </div>
                           </>
@@ -653,17 +653,17 @@ export function DeliveryStatusUpdates({
                           // this job HAS a position in the list, it just has no
                           // permanent label.
                           <>
-                            <div className="text-[10px] uppercase tracking-wide font-semibold text-slate-400 dark:text-slate-500 leading-none">
+                            <div className="text-[10px] uppercase tracking-wide font-semibold text-muted-foreground dark:text-subtle-foreground leading-none">
                               Job
                             </div>
-                            <div className="text-sm font-extrabold leading-tight tracking-tight text-orange-600 dark:text-orange-400 pt-1.5">
+                            <div className="text-sm font-extrabold leading-tight tracking-tight text-brand-text pt-1.5">
                               NEW
                             </div>
                           </>
                         ) : (
                           // Not on a route at all — a standalone job has no stop
                           // and therefore no route position to label.
-                          <div className="text-2xl font-extrabold tabular-nums leading-tight text-slate-300 dark:text-slate-700">
+                          <div className="text-2xl font-extrabold tabular-nums leading-tight text-muted-foreground">
                             –
                           </div>
                         )}
@@ -675,8 +675,8 @@ export function DeliveryStatusUpdates({
                         <span
                           className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide ${
                             isDelivery
-                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
-                              : "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200"
+                              ? "bg-success-surface text-success"
+                              : "bg-info-surface text-info"
                           }`}
                         >
                           {isDelivery ? "Delivery" : "Collection"}
@@ -684,7 +684,7 @@ export function DeliveryStatusUpdates({
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-bold uppercase tracking-wide ${
                             STATUS_BADGE[job.status] ||
-                            "bg-slate-100 text-slate-700 border-slate-200"
+                            "bg-muted text-muted-foreground border-border"
                           }`}
                         >
                           {(job.status || "unknown").replace("_", " ")}
@@ -695,13 +695,13 @@ export function DeliveryStatusUpdates({
                           hub, and the delivery card is where that gets decided
                           just as often as the collection card. */}
                         {job.is_same_day && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-brand-surface text-brand-text">
                             <Zap className="h-3 w-3" />
                             Same Day
                           </span>
                         )}
                         {urgent && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-destructive-surface text-destructive">
                             <AlertCircle className="h-3 w-3" />
                             Urgent
                           </span>
@@ -714,12 +714,12 @@ export function DeliveryStatusUpdates({
                         address sits under it for the last hundred metres. */}
                     <div className="mb-3">
                       <div className="flex items-baseline gap-2">
-                        <span className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+                        <span className="text-2xl font-extrabold tracking-tight text-foreground">
                           {postcode || "No postcode"}
                         </span>
-                        <ChevronRightIcon className="h-4 w-4 text-slate-300 dark:text-slate-600" />
+                        <ChevronRightIcon className="h-4 w-4 text-muted-foreground" />
                       </div>
-                      <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5 leading-snug">
+                      <p className="text-sm text-muted-foreground mt-0.5 leading-snug">
                         {formatAddress(address) || "Address unavailable"}
                       </p>
                     </div>
@@ -727,11 +727,11 @@ export function DeliveryStatusUpdates({
                     {/* Contact + parcels */}
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="text-[11px] uppercase tracking-wide font-semibold text-slate-400 dark:text-slate-500">
+                        <p className="text-[11px] uppercase tracking-wide font-semibold text-muted-foreground dark:text-subtle-foreground">
                           {isDelivery ? "Receiver" : "Sender"}
                         </p>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-1.5 truncate">
-                          <User className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+                        <p className="text-sm font-semibold text-foreground flex items-center gap-1.5 truncate">
+                          <User className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
                           {job.contact_name || "Not provided"}
                         </p>
                         {/* The NUMBER, not just a call icon.
@@ -741,19 +741,19 @@ export function DeliveryStatusUpdates({
                             about to ring the right person, read it out, or use
                             it at all without tapping through. Rendered as text
                             here and left tappable in the action row below. */}
-                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 mt-0.5 tabular-nums">
-                          <Phone className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+                        <p className="text-sm font-semibold text-muted-foreground dark:text-foreground flex items-center gap-1.5 mt-0.5 tabular-nums">
+                          <Phone className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
                           {job.contact_phone || (
-                            <span className="font-medium text-slate-400 dark:text-slate-500">
+                            <span className="font-medium text-muted-foreground dark:text-subtle-foreground">
                               No phone number
                             </span>
                           )}
                         </p>
                       </div>
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-sm font-bold text-slate-700 dark:text-slate-200 flex-shrink-0">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted dark:bg-surface text-sm font-bold text-muted-foreground dark:text-foreground flex-shrink-0">
                         <Package className="h-4 w-4" />
                         {parcels}
-                        <span className="font-medium text-slate-500 dark:text-slate-400">
+                        <span className="font-medium text-subtle-foreground dark:text-muted-foreground">
                           {parcels === 1 ? "parcel" : "parcels"}
                         </span>
                       </span>
@@ -770,13 +770,13 @@ export function DeliveryStatusUpdates({
                         an instruction, not a detail, and it has to survive being
                         read at arm's length in the rain. */}
                     {job.leave_safe_spot && (
-                      <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2">
-                        <ShieldCheck className="h-4 w-4 flex-shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                      <div className="mt-3 flex items-start gap-2 rounded-xl border border-warning/30 bg-warning-surface px-3 py-2">
+                        <ShieldCheck className="h-4 w-4 flex-shrink-0 mt-0.5 text-warning" />
                         <div className="min-w-0">
-                          <p className="text-[11px] uppercase tracking-wide font-bold text-amber-700 dark:text-amber-300 leading-none">
+                          <p className="text-[11px] uppercase tracking-wide font-bold text-warning leading-none">
                             Leave safe authorised
                           </p>
-                          <p className="text-sm font-semibold text-amber-900 dark:text-amber-100 mt-1 leading-snug">
+                          <p className="text-sm font-semibold text-warning mt-1 leading-snug">
                             {job.safe_spot_location?.trim()
                               ? job.safe_spot_location
                               : "No spot given — leave in a safe place and photograph it."}
@@ -795,7 +795,7 @@ export function DeliveryStatusUpdates({
                       <a
                         href={`tel:${job.contact_phone.replace(/[^\d+]/g, "")}`}
                         aria-label={`Call ${job.contact_name || "contact"}`}
-                        className="flex items-center justify-center w-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 transition flex-shrink-0"
+                        className="flex items-center justify-center w-12 rounded-xl bg-success hover:bg-success text-success-foreground active:scale-95 transition flex-shrink-0"
                       >
                         <Phone className="h-5 w-5" />
                       </a>
@@ -812,7 +812,7 @@ export function DeliveryStatusUpdates({
                             setSelectedJobForQR(job);
                             setShowQRScanner(true);
                           }}
-                          className="flex items-center justify-center w-12 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 active:scale-95 transition flex-shrink-0"
+                          className="flex items-center justify-center w-12 rounded-xl bg-card text-foreground active:scale-95 transition flex-shrink-0"
                           aria-label="Scan label"
                           title="Scan label"
                         >
@@ -825,22 +825,22 @@ export function DeliveryStatusUpdates({
                         onClick={() =>
                           handleSingleStatusUpdate(job.id, nextStatus)
                         }
-                        className="flex-1 px-4 py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm active:scale-95 transition"
+                        className="flex-1 px-4 py-3 rounded-xl bg-primary-hover hover:bg-primary-hover text-primary-foreground font-bold text-sm active:scale-95 transition"
                       >
                         {ACTION_LABEL[nextStatus] || "Update"}
                       </button>
                     ) : isImmutable ? (
-                      <div className="flex-1 px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold text-sm text-center flex items-center justify-center gap-2">
+                      <div className="flex-1 px-4 py-3 rounded-xl bg-muted dark:bg-surface text-subtle-foreground dark:text-muted-foreground font-bold text-sm text-center flex items-center justify-center gap-2">
                         <Lock className="h-4 w-4" />
                         Locked
                       </div>
                     ) : blockedReason ? (
-                      <div className="flex-1 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 font-semibold text-sm text-center flex items-center justify-center gap-2">
+                      <div className="flex-1 px-4 py-3 rounded-xl bg-warning-surface text-warning font-semibold text-sm text-center flex items-center justify-center gap-2">
                         <Lock className="h-4 w-4 flex-shrink-0" />
                         {blockedReason}
                       </div>
                     ) : (
-                      <div className="flex-1 px-4 py-3 rounded-xl bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 font-bold text-sm text-center">
+                      <div className="flex-1 px-4 py-3 rounded-xl bg-success-surface text-success font-bold text-sm text-center">
                         ✓ Completed
                       </div>
                     )}
@@ -857,7 +857,7 @@ export function DeliveryStatusUpdates({
                             isDelivery ? "delivery" : "pickup",
                           )
                         }
-                        className="flex items-center justify-center w-12 rounded-xl bg-amber-500 hover:bg-amber-600 text-white active:scale-95 transition flex-shrink-0"
+                        className="flex items-center justify-center w-12 rounded-xl bg-warning hover:bg-warning text-warning-foreground active:scale-95 transition flex-shrink-0"
                         aria-label={
                           isDelivery
                             ? "Report delivery issue"
@@ -875,11 +875,11 @@ export function DeliveryStatusUpdates({
           </div>
         ) : (
           <div className="text-center py-20">
-            <Package className="h-14 w-14 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
-            <p className="text-base font-bold text-slate-900 dark:text-white">
+            <Package className="h-14 w-14 text-muted-foreground mx-auto mb-3" />
+            <p className="text-base font-bold text-foreground">
               No jobs found
             </p>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-sm text-subtle-foreground dark:text-muted-foreground mt-1">
               {searchTerm
                 ? "Try a different search"
                 : "Nothing assigned right now"}
@@ -893,21 +893,21 @@ export function DeliveryStatusUpdates({
             <button
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 disabled:opacity-40 active:scale-95 transition"
+              className="p-2.5 rounded-xl bg-card border border-border disabled:opacity-40 active:scale-95 transition"
               aria-label="Previous page"
             >
-              <ChevronLeft className="h-5 w-5 text-slate-600 dark:text-slate-300" />
+              <ChevronLeft className="h-5 w-5 text-muted-foreground" />
             </button>
-            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+            <span className="text-sm font-semibold text-muted-foreground dark:text-foreground">
               Page {currentPage} of {totalPages}
             </span>
             <button
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 disabled:opacity-40 active:scale-95 transition"
+              className="p-2.5 rounded-xl bg-card border border-border disabled:opacity-40 active:scale-95 transition"
               aria-label="Next page"
             >
-              <ChevronRight className="h-5 w-5 text-slate-600 dark:text-slate-300" />
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </button>
           </div>
         )}
@@ -917,9 +917,9 @@ export function DeliveryStatusUpdates({
             the real count says the list is complete. */}
         {statusFilter === "all" && hasMoreJobs && (
           <div ref={observerTarget} className="mt-6 py-6 flex justify-center">
-            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+            <div className="flex items-center gap-2 text-sm text-subtle-foreground dark:text-muted-foreground">
               <Loader2
-                className={`h-4 w-4 text-orange-600 ${isLoadingMore ? "animate-spin" : "opacity-40"}`}
+                className={`h-4 w-4 text-brand-text ${isLoadingMore ? "animate-spin" : "opacity-40"}`}
               />
               {isLoadingMore
                 ? "Loading more..."
@@ -929,7 +929,7 @@ export function DeliveryStatusUpdates({
         )}
 
         {statusFilter === "all" && !hasMoreJobs && jobs.length > 0 && (
-          <p className="mt-6 py-4 text-center text-xs font-medium text-slate-400 dark:text-slate-600">
+          <p className="mt-6 py-4 text-center text-xs font-medium text-muted-foreground">
             All {totalCount} jobs loaded
           </p>
         )}

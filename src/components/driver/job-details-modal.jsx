@@ -74,17 +74,17 @@ export function JobDetailsModal({
   const getStatusBadgeClass = (status) => {
     switch (status) {
       case "assigned":
-        return "bg-blue-100 text-blue-700 border border-blue-200";
+        return "bg-info-surface text-info border border-info/30";
       case "picked_up":
-        return "bg-amber-100 text-amber-700 border border-amber-200";
+        return "bg-warning-surface text-warning border border-warning/30";
       case "at_hub":
         return "bg-purple-100 text-purple-700 border border-purple-200";
       case "in_transit":
-        return "bg-indigo-100 text-indigo-700 border border-indigo-200";
+        return "bg-info-surface text-info border border-info/30";
       case "delivered":
-        return "bg-green-100 text-green-700 border border-green-200";
+        return "bg-success-surface text-success border border-success/30";
       default:
-        return "bg-slate-100 text-slate-700 border border-slate-200";
+        return "bg-muted text-muted-foreground border border-border";
     }
   };
 
@@ -95,45 +95,45 @@ export function JobDetailsModal({
   const getActionButtonClass = (status) => {
     switch (status) {
       case "assigned":
-        return "bg-amber-500 hover:bg-amber-600 text-white";
+        return "bg-warning hover:bg-warning text-warning-foreground";
       case "picked_up":
-        return "bg-purple-500 hover:bg-purple-600 text-white";
+        return "bg-purple-500 hover:bg-purple-600 text-primary-foreground";
       case "at_hub":
-        return "bg-indigo-500 hover:bg-indigo-600 text-white";
+        return "bg-info hover:bg-info text-primary-foreground";
       case "in_transit":
-        return "bg-green-500 hover:bg-green-600 text-white";
+        return "bg-success hover:bg-success text-success-foreground";
       default:
-        return "bg-slate-300 text-slate-600 cursor-not-allowed";
+        return "bg-surface-hover text-muted-foreground cursor-not-allowed";
     }
   };
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay backdrop-blur-sm">
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ duration: 0.2 }}
-            className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+            className="bg-card rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white">
+            <div className="flex items-center justify-between p-6 border-b border-border bg-gradient-to-r from-muted to-card">
               <div>
-                <h2 className="text-2xl font-bold text-slate-900">
+                <h2 className="text-2xl font-bold text-foreground">
                   Job #{job.id?.slice(-8) || job.id}
                 </h2>
-                <p className="text-sm text-slate-600 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   {job.bookings?.length || 0} booking{job.bookings?.length !== 1 ? "s" : ""}
                 </p>
               </div>
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-slate-200 rounded-lg transition-colors"
+                className="p-2 hover:bg-surface-hover rounded-lg transition-colors"
                 aria-label="Close modal"
               >
-                <X className="h-6 w-6 text-slate-600" />
+                <X className="h-6 w-6 text-muted-foreground" />
               </button>
             </div>
 
@@ -141,21 +141,21 @@ export function JobDetailsModal({
             <div className="overflow-y-auto flex-1">
               <div className="p-6 space-y-6">
                 {/* Bulk Actions Section */}
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
+                <div className="bg-gradient-to-br from-info-surface to-info-surface border border-info/30 rounded-xl p-6">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
                     <div>
-                      <h3 className="font-bold text-slate-900 flex items-center gap-2">
-                        <AlertTriangle className="h-5 w-5 text-blue-600" />
+                      <h3 className="font-bold text-foreground flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5 text-info" />
                         Bulk Actions
                       </h3>
-                      <p className="text-sm text-slate-600 mt-1">
+                      <p className="text-sm text-muted-foreground mt-1">
                         Select bookings and upload a single photo for multiple deliveries
                       </p>
                     </div>
                     <button
                       onClick={() => setShowBulkDelivery(!showBulkDelivery)}
                       disabled={selectedBookings.length === 0}
-                      className="px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                      className="px-4 py-2.5 bg-info text-info-foreground text-sm font-semibold rounded-lg hover:bg-info transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                     >
                       Submit Bulk ({selectedBookings.length})
                     </button>
@@ -165,16 +165,16 @@ export function JobDetailsModal({
                   <div className="flex items-center gap-3 mb-4">
                     <button
                       onClick={handleSelectAll}
-                      className="p-1 hover:bg-blue-100 rounded transition-colors"
+                      className="p-1 hover:bg-info-surface rounded transition-colors"
                       aria-label="Select all bookings"
                     >
                       {selectedBookings.length === job.bookings?.length && job.bookings?.length > 0 ? (
-                        <CheckSquare className="h-5 w-5 text-blue-600" />
+                        <CheckSquare className="h-5 w-5 text-info" />
                       ) : (
-                        <Square className="h-5 w-5 text-slate-400" />
+                        <Square className="h-5 w-5 text-muted-foreground" />
                       )}
                     </button>
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-medium text-muted-foreground">
                       {selectedBookings.length > 0
                         ? `${selectedBookings.length} selected`
                         : "Select bookings to bulk deliver"}
@@ -187,15 +187,15 @@ export function JobDetailsModal({
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="mt-4 pt-4 border-t border-blue-200"
+                      className="mt-4 pt-4 border-t border-info/30"
                     >
                       <div className="space-y-4">
-                        <label className="block text-sm font-semibold text-slate-900">
+                        <label className="block text-sm font-semibold text-foreground">
                           Proof Photo (Required)
                         </label>
 
                         {bulkPhotoPreview ? (
-                          <div className="relative bg-white rounded-lg p-4 border-2 border-dashed border-slate-300">
+                          <div className="relative bg-card rounded-lg p-4 border-2 border-dashed border-border-strong">
                             <img
                               src={bulkPhotoPreview}
                               alt="Bulk delivery proof"
@@ -206,16 +206,16 @@ export function JobDetailsModal({
                                 setBulkPhoto(null);
                                 setBulkPhotoPreview(null);
                               }}
-                              className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                              className="absolute top-2 right-2 p-2 bg-destructive text-destructive-foreground rounded-full hover:bg-destructive transition-colors"
                               aria-label="Remove photo"
                             >
                               <X className="h-4 w-4" />
                             </button>
                           </div>
                         ) : (
-                          <label className="flex items-center justify-center gap-2 p-6 border-2 border-dashed border-slate-300 rounded-lg bg-white hover:bg-slate-50 cursor-pointer transition-colors">
-                            <Upload className="h-5 w-5 text-slate-400" />
-                            <span className="text-sm font-medium text-slate-700">
+                          <label className="flex items-center justify-center gap-2 p-6 border-2 border-dashed border-border-strong rounded-lg bg-card hover:bg-muted cursor-pointer transition-colors">
+                            <Upload className="h-5 w-5 text-muted-foreground" />
+                            <span className="text-sm font-medium text-muted-foreground">
                               Click to upload photo
                             </span>
                             <input
@@ -228,7 +228,7 @@ export function JobDetailsModal({
                         )}
 
                         <div>
-                          <label className="block text-sm font-semibold text-slate-900 mb-2">
+                          <label className="block text-sm font-semibold text-foreground mb-2">
                             Delivery Notes (Optional)
                           </label>
                           <textarea
@@ -236,14 +236,14 @@ export function JobDetailsModal({
                             onChange={(e) => setBulkNotes(e.target.value)}
                             placeholder="Add any notes about this delivery..."
                             rows={2}
-                            className="w-full px-4 py-2 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
+                            className="w-full px-4 py-2 border border-border rounded-lg text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 focus:ring-info focus:border-transparent text-sm resize-none"
                           />
                         </div>
 
                         <button
                           onClick={handleBulkDeliverySubmit}
                           disabled={!bulkPhoto || selectedBookings.length === 0}
-                          className="w-full px-4 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full px-4 py-3 bg-success text-success-foreground font-semibold rounded-lg hover:bg-success transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Complete Bulk Delivery
                         </button>
@@ -254,7 +254,7 @@ export function JobDetailsModal({
 
                 {/* Bookings List */}
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900 mb-4">
+                  <h3 className="text-lg font-bold text-foreground mb-4">
                     Bookings ({job.bookings?.length || 0})
                   </h3>
                   <div className="space-y-4">
@@ -262,23 +262,23 @@ export function JobDetailsModal({
                       job.bookings.map((booking) => (
                         <div
                           key={booking.id}
-                          className="border border-slate-200 rounded-lg p-5 hover:shadow-md transition-shadow"
+                          className="border border-border rounded-lg p-5 hover:shadow-md transition-shadow"
                         >
                           {/* Booking Header */}
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 pb-4 border-b border-slate-100">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 pb-4 border-b border-border">
                             <div className="flex items-center gap-3">
                               <button
                                 onClick={() => handleBookingSelect(booking.id)}
-                                className="p-1 hover:bg-slate-100 rounded transition-colors"
+                                className="p-1 hover:bg-muted rounded transition-colors"
                               >
                                 {selectedBookings.includes(booking.id) ? (
-                                  <CheckSquare className="h-5 w-5 text-blue-600" />
+                                  <CheckSquare className="h-5 w-5 text-info" />
                                 ) : (
-                                  <Square className="h-5 w-5 text-slate-300" />
+                                  <Square className="h-5 w-5 text-muted-foreground" />
                                 )}
                               </button>
                               <div>
-                                <h4 className="font-bold text-slate-900">
+                                <h4 className="font-bold text-foreground">
                                   Booking #{booking.id?.slice(-8) || booking.id}
                                 </h4>
                                 <span
@@ -310,7 +310,7 @@ export function JobDetailsModal({
                                       onClick={() =>
                                         onReportFailure(booking.id, "pickup", booking.id)
                                       }
-                                      className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-amber-500 hover:bg-amber-600 text-white transition-colors flex items-center gap-1"
+                                      className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-warning hover:bg-warning text-warning-foreground transition-colors flex items-center gap-1"
                                     >
                                       <AlertTriangle className="h-3.5 w-3.5" />
                                       Pickup Issue
@@ -347,7 +347,7 @@ export function JobDetailsModal({
                                       onClick={() =>
                                         onReportFailure(booking.id, "delivery", booking.id)
                                       }
-                                      className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-orange-500 hover:bg-orange-600 text-white transition-colors flex items-center gap-1"
+                                      className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground transition-colors flex items-center gap-1"
                                     >
                                       <AlertTriangle className="h-3.5 w-3.5" />
                                       Delivery Issue
@@ -356,7 +356,7 @@ export function JobDetailsModal({
                                 </>
                               )}
                               {booking.status === "delivered" && (
-                                <div className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-slate-100 text-slate-600">
+                                <div className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-muted text-muted-foreground">
                                   Completed
                                 </div>
                               )}
@@ -367,16 +367,16 @@ export function JobDetailsModal({
                           <div className="grid sm:grid-cols-2 gap-6">
                             {/* Pickup Section */}
                             <div className="space-y-3">
-                              <h5 className="font-semibold text-slate-900 flex items-center gap-2">
-                                <MapPin className="h-4 w-4 text-green-600" />
+                              <h5 className="font-semibold text-foreground flex items-center gap-2">
+                                <MapPin className="h-4 w-4 text-success" />
                                 Pickup Location
                               </h5>
                               <div className="space-y-2 text-sm ml-6">
                                 {booking.pickup_address && (
-                                  <div className="text-slate-700 font-medium">
+                                  <div className="text-muted-foreground font-medium">
                                     {booking.pickup_address}
                                     {booking.pickup_city && (
-                                      <p className="text-slate-500 text-xs mt-1">
+                                      <p className="text-subtle-foreground text-xs mt-1">
                                         {booking.pickup_city}
                                         {booking.pickup_state && `, ${booking.pickup_state}`}
                                       </p>
@@ -384,8 +384,8 @@ export function JobDetailsModal({
                                   </div>
                                 )}
                                 {booking.pickup_contact_name && (
-                                  <div className="flex items-center gap-2 text-slate-700">
-                                    <User className="h-3.5 w-3.5 text-slate-400" />
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <User className="h-3.5 w-3.5 text-muted-foreground" />
                                     {booking.pickup_contact_name}
                                   </div>
                                 )}
@@ -397,15 +397,15 @@ export function JobDetailsModal({
                                         ""
                                       )}`)
                                     }
-                                    className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
+                                    className="flex items-center gap-2 text-info hover:text-info font-medium"
                                   >
                                     <Phone className="h-3.5 w-3.5" />
                                     {booking.pickup_contact_phone}
                                   </button>
                                 )}
                                 {booking.pickup_time_window && (
-                                  <div className="flex items-center gap-2 text-slate-600">
-                                    <Clock className="h-3.5 w-3.5 text-slate-400" />
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                                     {booking.pickup_time_window}
                                   </div>
                                 )}
@@ -414,16 +414,16 @@ export function JobDetailsModal({
 
                             {/* Delivery Section */}
                             <div className="space-y-3">
-                              <h5 className="font-semibold text-slate-900 flex items-center gap-2">
-                                <MapPin className="h-4 w-4 text-blue-600" />
+                              <h5 className="font-semibold text-foreground flex items-center gap-2">
+                                <MapPin className="h-4 w-4 text-info" />
                                 Delivery Location
                               </h5>
                               <div className="space-y-2 text-sm ml-6">
                                 {booking.delivery_address && (
-                                  <div className="text-slate-700 font-medium">
+                                  <div className="text-muted-foreground font-medium">
                                     {booking.delivery_address}
                                     {booking.delivery_city && (
-                                      <p className="text-slate-500 text-xs mt-1">
+                                      <p className="text-subtle-foreground text-xs mt-1">
                                         {booking.delivery_city}
                                         {booking.delivery_state && `, ${booking.delivery_state}`}
                                       </p>
@@ -431,8 +431,8 @@ export function JobDetailsModal({
                                   </div>
                                 )}
                                 {booking.delivery_contact_name && (
-                                  <div className="flex items-center gap-2 text-slate-700">
-                                    <User className="h-3.5 w-3.5 text-slate-400" />
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <User className="h-3.5 w-3.5 text-muted-foreground" />
                                     {booking.delivery_contact_name}
                                   </div>
                                 )}
@@ -444,15 +444,15 @@ export function JobDetailsModal({
                                         ""
                                       )}`)
                                     }
-                                    className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
+                                    className="flex items-center gap-2 text-info hover:text-info font-medium"
                                   >
                                     <Phone className="h-3.5 w-3.5" />
                                     {booking.delivery_contact_phone}
                                   </button>
                                 )}
                                 {booking.delivery_time_window && (
-                                  <div className="flex items-center gap-2 text-slate-600">
-                                    <Clock className="h-3.5 w-3.5 text-slate-400" />
+                                  <div className="flex items-center gap-2 text-muted-foreground">
+                                    <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                                     {booking.delivery_time_window}
                                   </div>
                                 )}
@@ -462,23 +462,23 @@ export function JobDetailsModal({
 
                           {/* Package Details */}
                           {(booking.package_details || booking.special_instructions) && (
-                            <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                            <div className="mt-4 p-4 bg-muted rounded-lg border border-border">
                               {booking.package_details && (
                                 <div className="mb-3">
-                                  <h6 className="font-semibold text-slate-900 text-sm mb-1">
+                                  <h6 className="font-semibold text-foreground text-sm mb-1">
                                     Package
                                   </h6>
-                                  <p className="text-sm text-slate-600">
+                                  <p className="text-sm text-muted-foreground">
                                     {booking.package_details}
                                   </p>
                                 </div>
                               )}
                               {booking.special_instructions && (
                                 <div>
-                                  <h6 className="font-semibold text-slate-900 text-sm mb-1">
+                                  <h6 className="font-semibold text-foreground text-sm mb-1">
                                     Special Instructions
                                   </h6>
-                                  <p className="text-sm text-amber-700 bg-amber-50 px-3 py-2 rounded border border-amber-200">
+                                  <p className="text-sm text-warning bg-warning-surface px-3 py-2 rounded border border-warning/30">
                                     {booking.special_instructions}
                                   </p>
                                 </div>
@@ -488,7 +488,7 @@ export function JobDetailsModal({
                         </div>
                       ))
                     ) : (
-                      <p className="text-slate-600 text-center py-6">
+                      <p className="text-muted-foreground text-center py-6">
                         No bookings found for this job
                       </p>
                     )}
@@ -498,10 +498,10 @@ export function JobDetailsModal({
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+            <div className="px-6 py-4 border-t border-border bg-muted flex justify-end">
               <button
                 onClick={onClose}
-                className="px-4 py-2.5 bg-slate-200 text-slate-900 font-semibold rounded-lg hover:bg-slate-300 transition-colors"
+                className="px-4 py-2.5 bg-surface-hover text-foreground font-semibold rounded-lg hover:bg-surface-hover transition-colors"
               >
                 Close
               </button>

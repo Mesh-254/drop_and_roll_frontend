@@ -48,9 +48,9 @@ export default function BulkUploadComplete({ bulkUpload, onReset }) {
           className="flex justify-center mb-4"
         >
           {isFailed ? (
-            <AlertCircle className="w-16 h-16 text-red-400" />
+            <AlertCircle className="w-16 h-16 text-destructive" />
           ) : (
-            <CheckCircle className="w-16 h-16 text-green-400" />
+            <CheckCircle className="w-16 h-16 text-success" />
           )}
         </motion.div>
 
@@ -59,7 +59,7 @@ export default function BulkUploadComplete({ bulkUpload, onReset }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
           className={`text-3xl font-bold mb-2 ${
-            isFailed ? 'text-red-200' : 'text-green-200'
+            isFailed ? 'text-destructive' : 'text-success'
           }`}
         >
           {isSuccess
@@ -73,7 +73,7 @@ export default function BulkUploadComplete({ bulkUpload, onReset }) {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="text-slate-400"
+          className="text-muted-foreground"
         >
           {isSuccess
             ? `All ${successful} bookings have been created successfully.`
@@ -91,47 +91,47 @@ export default function BulkUploadComplete({ bulkUpload, onReset }) {
       >
         {/* Summary Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-slate-700/50 border border-slate-600 rounded-lg p-4 text-center">
-            <p className="text-slate-300 text-sm mb-1">Total Rows</p>
-            <p className="text-3xl font-bold text-white">{total}</p>
+          <div className="bg-surface/50 border border-border rounded-lg p-4 text-center">
+            <p className="text-muted-foreground text-sm mb-1">Total Rows</p>
+            <p className="text-3xl font-bold text-foreground">{total}</p>
           </div>
 
-          <div className="bg-green-900/20 border border-green-800 rounded-lg p-4 text-center">
-            <p className="text-green-300 text-sm mb-1">Successful</p>
-            <p className="text-3xl font-bold text-green-300">{successful}</p>
+          <div className="bg-success-surface border border-success/30 rounded-lg p-4 text-center">
+            <p className="text-success text-sm mb-1">Successful</p>
+            <p className="text-3xl font-bold text-success">{successful}</p>
           </div>
 
           {failed > 0 && (
-            <div className="bg-red-900/20 border border-red-800 rounded-lg p-4 text-center">
-              <p className="text-red-300 text-sm mb-1">Failed</p>
-              <p className="text-3xl font-bold text-red-300">{failed}</p>
+            <div className="bg-destructive-surface border border-destructive/30 rounded-lg p-4 text-center">
+              <p className="text-destructive text-sm mb-1">Failed</p>
+              <p className="text-3xl font-bold text-destructive">{failed}</p>
             </div>
           )}
         </div>
 
         {/* Batch Details */}
         {latestUpload && (
-          <div className="bg-slate-700/50 border border-slate-600 rounded-lg p-6">
-            <h3 className="font-semibold text-white mb-4">Batch Summary</h3>
+          <div className="bg-surface/50 border border-border rounded-lg p-6">
+            <h3 className="font-semibold text-foreground mb-4">Batch Summary</h3>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
-                <span className="text-slate-300">Batch ID:</span>
-                <span className="text-white font-mono">{latestUpload.id.slice(0, 8)}...</span>
+                <span className="text-muted-foreground">Batch ID:</span>
+                <span className="text-foreground font-mono">{latestUpload.id.slice(0, 8)}...</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-300">Batch Name:</span>
-                <span className="text-white">{latestUpload.batch_name || 'Untitled'}</span>
+                <span className="text-muted-foreground">Batch Name:</span>
+                <span className="text-foreground">{latestUpload.batch_name || 'Untitled'}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-300">Created:</span>
-                <span className="text-white">
+                <span className="text-muted-foreground">Created:</span>
+                <span className="text-foreground">
                   {new Date(latestUpload.created_at).toLocaleString()}
                 </span>
               </div>
               {latestUpload.processed_at && (
                 <div className="flex justify-between">
-                  <span className="text-slate-300">Completed:</span>
-                  <span className="text-white">
+                  <span className="text-muted-foreground">Completed:</span>
+                  <span className="text-foreground">
                     {new Date(latestUpload.processed_at).toLocaleString()}
                   </span>
                 </div>
@@ -146,17 +146,17 @@ export default function BulkUploadComplete({ bulkUpload, onReset }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
-            className="bg-yellow-900/20 border border-yellow-800 rounded-lg p-6"
+            className="bg-warning-surface border border-warning/30 rounded-lg p-6"
           >
-            <h3 className="font-semibold text-yellow-200 mb-3">Download Error Report</h3>
-            <p className="text-sm text-yellow-300 mb-4">
+            <h3 className="font-semibold text-warning mb-3">Download Error Report</h3>
+            <p className="text-sm text-warning mb-4">
               {failed} rows had errors. Download a detailed report with column-level information and suggested fixes.
             </p>
             <motion.button
               onClick={handleDownloadErrorReport}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-warning hover:bg-warning text-warning-foreground rounded-lg font-medium transition"
             >
               <Download className="w-4 h-4" />
               Download Error Report
@@ -172,12 +172,12 @@ export default function BulkUploadComplete({ bulkUpload, onReset }) {
             transition={{ delay: 0.5 }}
             className={`rounded-lg p-6 border-2 ${
               paymentPath === 'prepaid'
-                ? 'bg-orange-900/20 border-orange-500'
-                : 'bg-green-900/20 border-green-500'
+                ? 'bg-brand-surface border-primary'
+                : 'bg-success-surface border-success'
             }`}
           >
             <h3 className={`font-semibold text-lg mb-3 ${
-              paymentPath === 'prepaid' ? 'text-orange-200' : 'text-green-200'
+              paymentPath === 'prepaid' ? 'text-brand-text' : 'text-success'
             }`}>
               {paymentPath === 'prepaid' ? '💳 Next: Payment' : '📄 Your Invoice'}
             </h3>
@@ -185,7 +185,7 @@ export default function BulkUploadComplete({ bulkUpload, onReset }) {
             {paymentPath === 'prepaid' ? (
               <>
                 <p className={`text-sm mb-4 ${
-                  paymentPath === 'prepaid' ? 'text-orange-300' : 'text-green-300'
+                  paymentPath === 'prepaid' ? 'text-brand-text' : 'text-success'
                 }`}>
                   Total amount: <span className="font-bold">£{parseFloat(latestUpload?.effective_total || latestUpload?.computed_total || 0).toFixed(2)}</span>
                 </p>
@@ -194,7 +194,7 @@ export default function BulkUploadComplete({ bulkUpload, onReset }) {
                   disabled={isInitiatingPayment}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="w-full px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full px-6 py-3 bg-primary hover:bg-primary-hover text-primary-foreground rounded-lg font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isInitiatingPayment ? 'Starting payment...' : 'Proceed to Payment'}
                   <ArrowRight className="w-4 h-4" />
@@ -204,14 +204,14 @@ export default function BulkUploadComplete({ bulkUpload, onReset }) {
               <>
                 {latestUpload?.invoice_number && (
                   <div className="mb-4">
-                    <p className="text-sm text-green-400 mb-1">Invoice Number</p>
-                    <p className="text-lg font-bold text-green-200">{latestUpload.invoice_number}</p>
+                    <p className="text-sm text-success mb-1">Invoice Number</p>
+                    <p className="text-lg font-bold text-success">{latestUpload.invoice_number}</p>
                   </div>
                 )}
                 {latestUpload?.invoice_due_date && (
                   <div className="mb-4">
-                    <p className="text-sm text-green-400 mb-1">Due Date</p>
-                    <p className="text-lg font-bold text-green-200">
+                    <p className="text-sm text-success mb-1">Due Date</p>
+                    <p className="text-lg font-bold text-success">
                       {new Date(latestUpload.invoice_due_date).toLocaleDateString()}
                     </p>
                   </div>
@@ -220,7 +220,7 @@ export default function BulkUploadComplete({ bulkUpload, onReset }) {
                   onClick={handleViewInvoice}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="w-full px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2"
+                  className="w-full px-6 py-3 bg-success hover:bg-success text-success-foreground rounded-lg font-semibold transition flex items-center justify-center gap-2"
                 >
                   View Invoice
                   <ArrowRight className="w-4 h-4" />
@@ -236,7 +236,7 @@ export default function BulkUploadComplete({ bulkUpload, onReset }) {
             onClick={onReset}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition"
+            className="flex-1 px-6 py-3 bg-surface hover:bg-surface-hover text-foreground rounded-lg font-semibold transition"
           >
             Upload Another Batch
           </motion.button>
@@ -245,7 +245,7 @@ export default function BulkUploadComplete({ bulkUpload, onReset }) {
             onClick={() => navigate('/bulk-upload')}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition"
+            className="flex-1 px-6 py-3 bg-surface hover:bg-surface-hover text-foreground rounded-lg font-semibold transition"
           >
             View Dashboard
           </motion.button>

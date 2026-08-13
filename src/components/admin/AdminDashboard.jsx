@@ -119,7 +119,7 @@ const Sidebar = ({
       {/* Mobile Overlay */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-overlay z-40 lg:hidden"
           onClick={() => setIsMobileOpen(false)}
         />
       )}
@@ -129,17 +129,17 @@ const Sidebar = ({
         initial={{ x: -300 }}
         animate={{ x: isMobileOpen ? 0 : -300 }}
         transition={{ duration: 0.3 }}
-        className={`fixed left-0 top-0 h-full w-64 bg-gray-900 border-r border-gray-800 z-50 lg:relative lg:translate-x-0 lg:z-auto`}
+        className={`fixed left-0 top-0 h-full w-64 bg-card border-r border-border z-50 lg:relative lg:translate-x-0 lg:z-auto`}
       >
-        <div className="p-6 border-b border-gray-800">
+        <div className="p-6 border-b border-border">
           <div className="flex items-center space-x-3">
             <img
               src="/images/logo-clean.jpeg"
               alt="Logo"
               className="w-8 h-8 rounded"
             />
-            <div className="text-white font-bold">
-              DROP<span className="text-orange-500">'N</span>ROLL
+            <div className="text-foreground font-bold">
+              DROP<span className="text-brand-text">'N</span>ROLL
             </div>
           </div>
         </div>
@@ -156,8 +156,8 @@ const Sidebar = ({
                 }}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
                   activeSection === item.id
-                    ? "bg-orange-500 text-black"
-                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                    ? "bg-primary text-foreground"
+                    : "text-muted-foreground hover:bg-surface hover:text-foreground"
                 }`}
               >
                 <IconComponent size={20} />
@@ -174,32 +174,32 @@ const Sidebar = ({
 // Top Bar Component
 const TopBar = ({ isMobileOpen, setIsMobileOpen }) => {
   return (
-    <div className="bg-gray-900 border-b border-gray-800 px-6 py-4">
+    <div className="bg-card border-b border-border px-6 py-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <button
             onClick={() => setIsMobileOpen(!isMobileOpen)}
-            className="lg:hidden text-gray-400 hover:text-white"
+            className="lg:hidden text-muted-foreground hover:text-foreground"
           >
             {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
           <div className="relative">
             <Search
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
               size={20}
             />
             <input
               type="text"
               placeholder="Search orders, drivers, customers..."
-              className="pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 w-64"
+              className="pl-10 pr-4 py-2 bg-surface border border-border rounded-lg text-foreground placeholder-subtle-foreground focus:outline-none focus:border-primary w-64"
             />
           </div>
         </div>
 
         <div className="flex items-center space-x-4">
-          <button className="relative p-2 text-gray-400 hover:text-white">
+          <button className="relative p-2 text-muted-foreground hover:text-foreground">
             <Bell size={20} />
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full"></span>
+            <span className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full"></span>
           </button>
           <div className="flex items-center space-x-3">
             <img
@@ -208,8 +208,8 @@ const TopBar = ({ isMobileOpen, setIsMobileOpen }) => {
               className="w-8 h-8 rounded-full"
             />
             <div className="text-sm">
-              <div className="text-white font-medium">Admin User</div>
-              <div className="text-gray-400">admin@dropnroll.com</div>
+              <div className="text-foreground font-medium">Admin User</div>
+              <div className="text-muted-foreground">admin@dropnroll.com</div>
             </div>
           </div>
         </div>
@@ -224,16 +224,16 @@ const StatsCard = ({ title, value, change, color = "orange" }) => {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-gray-800 p-6 rounded-xl border border-gray-700 hover:border-gray-600 transition-colors"
+      className="bg-surface p-6 rounded-xl border border-border hover:border-border-strong transition-colors"
     >
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-gray-400 text-sm font-medium">{title}</p>
-          <p className="text-2xl font-bold text-white mt-1">{value}</p>
+          <p className="text-muted-foreground text-sm font-medium">{title}</p>
+          <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
           {change && (
             <p
               className={`text-sm mt-1 ${
-                change > 0 ? "text-green-500" : "text-red-500"
+                change > 0 ? "text-success" : "text-destructive"
               }`}
             >
               {change > 0 ? "+" : ""}
@@ -286,10 +286,10 @@ const DashboardSection = () => {
       {/* Charts and Tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Orders */}
-        <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">
+        <div className="bg-surface rounded-xl border border-border p-6">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-white">Recent Orders</h3>
-            <button className="text-orange-500 hover:text-orange-400 text-sm font-medium">
+            <h3 className="text-xl font-bold text-foreground">Recent Orders</h3>
+            <button className="text-brand-text hover:text-brand-text text-sm font-medium">
               View All
             </button>
           </div>
@@ -297,26 +297,26 @@ const DashboardSection = () => {
             {mockOrders.slice(0, 3).map((order) => (
               <div
                 key={order.id}
-                className="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg"
+                className="flex items-center justify-between p-4 bg-surface-hover/50 rounded-lg"
               >
                 <div className="flex items-center space-x-3">
                   <div
                     className={`w-3 h-3 rounded-full ${
                       order.status === "delivered"
-                        ? "bg-green-500"
+                        ? "bg-success"
                         : order.status === "in-transit"
-                          ? "bg-blue-500"
-                          : "bg-yellow-500"
+                          ? "bg-info"
+                          : "bg-warning"
                     }`}
                   />
                   <div>
-                    <p className="text-white font-medium">{order.id}</p>
-                    <p className="text-gray-400 text-sm">{order.customer}</p>
+                    <p className="text-foreground font-medium">{order.id}</p>
+                    <p className="text-muted-foreground text-sm">{order.customer}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-white font-medium">${order.value}</p>
-                  <p className="text-gray-400 text-sm">{order.time}</p>
+                  <p className="text-foreground font-medium">${order.value}</p>
+                  <p className="text-muted-foreground text-sm">{order.time}</p>
                 </div>
               </div>
             ))}
@@ -324,10 +324,10 @@ const DashboardSection = () => {
         </div>
 
         {/* Driver Performance */}
-        <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">
+        <div className="bg-surface rounded-xl border border-border p-6">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-white">Top Drivers</h3>
-            <button className="text-orange-500 hover:text-orange-400 text-sm font-medium">
+            <h3 className="text-xl font-bold text-foreground">Top Drivers</h3>
+            <button className="text-brand-text hover:text-brand-text text-sm font-medium">
               View All
             </button>
           </div>
@@ -335,11 +335,11 @@ const DashboardSection = () => {
             {mockDrivers.slice(0, 3).map((driver) => (
               <div
                 key={driver.id}
-                className="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg"
+                className="flex items-center justify-between p-4 bg-surface-hover/50 rounded-lg"
               >
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-orange-500/10 rounded-full flex items-center justify-center">
-                    <span className="text-orange-500 font-bold text-sm">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <span className="text-brand-text font-bold text-sm">
                       {driver.name
                         .split(" ")
                         .map((n) => n[0])
@@ -347,20 +347,20 @@ const DashboardSection = () => {
                     </span>
                   </div>
                   <div>
-                    <p className="text-white font-medium">{driver.name}</p>
+                    <p className="text-foreground font-medium">{driver.name}</p>
                     <div className="flex items-center space-x-1">
-                      <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                      <span className="text-gray-400 text-sm">
+                      <Star className="w-4 h-4 text-warning fill-current" />
+                      <span className="text-muted-foreground text-sm">
                         {driver.rating}
                       </span>
                     </div>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-white font-medium">
+                  <p className="text-foreground font-medium">
                     {driver.deliveries} deliveries
                   </p>
-                  <p className="text-gray-400 text-sm">${driver.earnings}</p>
+                  <p className="text-muted-foreground text-sm">${driver.earnings}</p>
                 </div>
               </div>
             ))}
@@ -376,21 +376,21 @@ const OrdersSection = () => {
   const [selectedStatus, setSelectedStatus] = useState("all");
 
   const statusColors = {
-    pending: "bg-yellow-500",
-    "in-transit": "bg-blue-500",
-    delivered: "bg-green-500",
-    cancelled: "bg-red-500",
+    pending: "bg-warning",
+    "in-transit": "bg-info",
+    delivered: "bg-success",
+    cancelled: "bg-destructive",
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Order Management</h2>
+        <h2 className="text-2xl font-bold text-foreground">Order Management</h2>
         <div className="flex items-center space-x-4">
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-orange-500"
+            className="bg-surface border border-border rounded-lg px-4 py-2 text-foreground focus:outline-none focus:border-primary"
           >
             <option value="all">All Status</option>
             <option value="pending">Pending</option>
@@ -398,37 +398,37 @@ const OrdersSection = () => {
             <option value="delivered">Delivered</option>
             <option value="cancelled">Cancelled</option>
           </select>
-          <button className="bg-orange-500 hover:bg-orange-600 text-black px-4 py-2 rounded-lg font-medium flex items-center space-x-2">
+          <button className="bg-primary hover:bg-primary-hover text-primary-foreground px-4 py-2 rounded-lg font-medium flex items-center space-x-2">
             <Plus size={20} />
             <span>New Order</span>
           </button>
         </div>
       </div>
 
-      <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+      <div className="bg-surface rounded-xl border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-700">
+            <thead className="bg-surface-hover">
               <tr>
-                <th className="text-left p-4 text-gray-300 font-medium">
+                <th className="text-left p-4 text-muted-foreground font-medium">
                   Order ID
                 </th>
-                <th className="text-left p-4 text-gray-300 font-medium">
+                <th className="text-left p-4 text-muted-foreground font-medium">
                   Customer
                 </th>
-                <th className="text-left p-4 text-gray-300 font-medium">
+                <th className="text-left p-4 text-muted-foreground font-medium">
                   Driver
                 </th>
-                <th className="text-left p-4 text-gray-300 font-medium">
+                <th className="text-left p-4 text-muted-foreground font-medium">
                   Status
                 </th>
-                <th className="text-left p-4 text-gray-300 font-medium">
+                <th className="text-left p-4 text-muted-foreground font-medium">
                   Value
                 </th>
-                <th className="text-left p-4 text-gray-300 font-medium">
+                <th className="text-left p-4 text-muted-foreground font-medium">
                   Time
                 </th>
-                <th className="text-left p-4 text-gray-300 font-medium">
+                <th className="text-left p-4 text-muted-foreground font-medium">
                   Actions
                 </th>
               </tr>
@@ -437,31 +437,31 @@ const OrdersSection = () => {
               {mockOrders.map((order) => (
                 <tr
                   key={order.id}
-                  className="border-t border-gray-700 hover:bg-gray-700/50"
+                  className="border-t border-border hover:bg-surface-hover/50"
                 >
-                  <td className="p-4 text-white font-medium">{order.id}</td>
-                  <td className="p-4 text-gray-300">{order.customer}</td>
-                  <td className="p-4 text-gray-300">{order.driver}</td>
+                  <td className="p-4 text-foreground font-medium">{order.id}</td>
+                  <td className="p-4 text-muted-foreground">{order.customer}</td>
+                  <td className="p-4 text-muted-foreground">{order.driver}</td>
                   <td className="p-4">
                     <span
-                      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-white ${
+                      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-foreground ${
                         statusColors[order.status]
                       }`}
                     >
                       {order.status.replace("-", " ")}
                     </span>
                   </td>
-                  <td className="p-4 text-white font-medium">${order.value}</td>
-                  <td className="p-4 text-gray-400">{order.time}</td>
+                  <td className="p-4 text-foreground font-medium">${order.value}</td>
+                  <td className="p-4 text-muted-foreground">{order.time}</td>
                   <td className="p-4">
                     <div className="flex items-center space-x-2">
-                      <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded">
+                      <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-surface-hover rounded">
                         <Eye size={16} />
                       </button>
-                      <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded">
+                      <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-surface-hover rounded">
                         <Edit size={16} />
                       </button>
-                      <button className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-700 rounded">
+                      <button className="p-2 text-muted-foreground hover:text-destructive hover:bg-surface-hover rounded">
                         <Trash2 size={16} />
                       </button>
                     </div>
@@ -490,11 +490,11 @@ export default function AdminDashboard() {
       case "drivers":
         return (
           <div className="text-center py-20">
-            <Truck className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-white mb-2">
+            <Truck className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-foreground mb-2">
               Driver Management
             </h3>
-            <p className="text-gray-400">
+            <p className="text-muted-foreground">
               Driver management features coming soon...
             </p>
           </div>
@@ -502,11 +502,11 @@ export default function AdminDashboard() {
       case "users":
         return (
           <div className="text-center py-20">
-            <Users className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-white mb-2">
+            <Users className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-foreground mb-2">
               User Management
             </h3>
-            <p className="text-gray-400">
+            <p className="text-muted-foreground">
               User management features coming soon...
             </p>
           </div>
@@ -514,29 +514,29 @@ export default function AdminDashboard() {
       case "analytics":
         return (
           <div className="text-center py-20">
-            <BarChart3 className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-white mb-2">Analytics</h3>
-            <p className="text-gray-400">Analytics dashboard coming soon...</p>
+            <BarChart3 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-foreground mb-2">Analytics</h3>
+            <p className="text-muted-foreground">Analytics dashboard coming soon...</p>
           </div>
         );
       case "financials":
         return (
           <div className="text-center py-20">
-            <DollarSign className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-white mb-2">
+            <DollarSign className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-foreground mb-2">
               Financial Management
             </h3>
-            <p className="text-gray-400">Financial reports coming soon...</p>
+            <p className="text-muted-foreground">Financial reports coming soon...</p>
           </div>
         );
       case "settings":
         return (
           <div className="text-center py-20">
-            <Settings className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-white mb-2">
+            <Settings className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-foreground mb-2">
               System Settings
             </h3>
-            <p className="text-gray-400">Settings panel coming soon...</p>
+            <p className="text-muted-foreground">Settings panel coming soon...</p>
           </div>
         );
       default:
@@ -545,7 +545,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-black flex">
+    <div className="min-h-screen bg-background flex">
       {/* Sidebar */}
       <Sidebar
         activeSection={activeSection}

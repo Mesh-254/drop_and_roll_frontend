@@ -206,9 +206,9 @@ const FileUploadZone = ({
 
   const getFileIcon = (filename) => {
     if (filename.toLowerCase().endsWith('.csv')) {
-      return <FileText className="h-8 w-8 text-orange-500" />;
+      return <FileText className="h-8 w-8 text-brand-text" />;
     }
-    return <FileSpreadsheet className="h-8 w-8 text-green-500" />;
+    return <FileSpreadsheet className="h-8 w-8 text-success" />;
   };
 
   // File preview card
@@ -220,16 +220,16 @@ const FileUploadZone = ({
         className="w-full space-y-3"
       >
         {/* File preview */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between">
+        <div className="bg-card dark:bg-surface rounded-lg border border-border p-4 flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg flex-shrink-0">
+            <div className="p-2 bg-muted dark:bg-surface-hover rounded-lg flex-shrink-0">
               {getFileIcon(selectedFile.name)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+              <p className="text-sm font-medium text-foreground truncate">
                 {selectedFile.name}
               </p>
-              <p className="text-xs text-gray-600 dark:text-gray-400">
+              <p className="text-xs text-muted-foreground">
                 {formatFileSize(selectedFile.size)}
               </p>
             </div>
@@ -240,7 +240,7 @@ const FileUploadZone = ({
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
               onClick={onRemoveFile}
-              className="p-2 hover:bg-red-100 dark:hover:bg-red-900/20 text-red-500 rounded-lg transition-all ml-2"
+              className="p-2 hover:bg-destructive-surface text-destructive rounded-lg transition-all ml-2"
               title="Remove file"
             >
               <X className="h-5 w-5" />
@@ -256,9 +256,9 @@ const FileUploadZone = ({
             className="space-y-2"
           >
             {/* Progress bar */}
-            <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div className="h-2 bg-surface-hover rounded-full overflow-hidden">
               <motion.div
-                className="h-full bg-gradient-to-r from-orange-500 to-orange-600"
+                className="h-full bg-gradient-to-r from-primary to-primary-hover"
                 initial={{ width: '0%' }}
                 animate={{ width: `${uploadProgress}%` }}
                 transition={{ duration: 0.6, ease: 'easeOut' }}
@@ -267,8 +267,8 @@ const FileUploadZone = ({
 
             {/* Loading text */}
             <div className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
-              <span className="text-sm text-gray-600 dark:text-gray-400">
+              <Loader2 className="h-4 w-4 animate-spin text-brand-text" />
+              <span className="text-sm text-muted-foreground">
                 Uploading file... {uploadProgress}%
               </span>
             </div>
@@ -294,10 +294,10 @@ const FileUploadZone = ({
         tabIndex={0}
         role="button"
         aria-label="Upload booking file"
-        className={`relative rounded-2xl border-2 border-dashed transition-all duration-300 overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
+        className={`relative rounded-2xl border-2 border-dashed transition-all duration-300 overflow-hidden group cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
           isDragActive
-            ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/10 shadow-lg shadow-orange-500/20'
-            : 'border-gray-300 dark:border-gray-600 hover:border-orange-400 dark:hover:border-orange-500 bg-white dark:bg-gray-800'
+            ? 'border-primary bg-brand-surface shadow-lg shadow-primary/20'
+            : 'border-border-strong hover:border-primary bg-card dark:bg-surface'
         }`}
       >
         {/* Hidden file input */}
@@ -318,15 +318,15 @@ const FileUploadZone = ({
             transition={{ duration: 0.3 }}
             className="mb-6"
           >
-            <div className="p-4 bg-orange-100 dark:bg-orange-900/20 rounded-2xl">
-              <Upload className="h-12 w-12 text-orange-500" />
+            <div className="p-4 bg-brand-surface rounded-2xl">
+              <Upload className="h-12 w-12 text-brand-text" />
             </div>
           </motion.div>
 
-          <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2 text-center">
+          <h3 className="text-xl sm:text-2xl font-bold text-foreground mb-2 text-center">
             Drop your file here
           </h3>
-          <p className="text-gray-600 dark:text-gray-400 text-center mb-6 max-w-sm text-sm">
+          <p className="text-muted-foreground text-center mb-6 max-w-sm text-sm">
             Drag and drop your CSV or Excel file, or click to browse from your computer
           </p>
 
@@ -336,14 +336,14 @@ const FileUploadZone = ({
               {ALLOWED_FORMATS.map((format) => (
                 <span
                   key={format}
-                  className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 text-xs font-medium"
+                  className="px-3 py-1.5 bg-muted dark:bg-surface-hover border border-border dark:border-border-strong rounded-lg text-muted-foreground text-xs font-medium"
                 >
                   {format.toUpperCase()}
                 </span>
               ))}
             </div>
 
-            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            <p className="text-xs text-subtle-foreground dark:text-muted-foreground text-center">
               Max 10 MB · Max 1,000 rows per file
             </p>
           </div>
@@ -355,14 +355,14 @@ const FileUploadZone = ({
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-lg"
+          className="flex items-start gap-3 p-4 bg-destructive-surface border border-destructive/30 rounded-lg"
         >
-          <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="text-sm font-semibold text-red-700 dark:text-red-400 mb-1">
+            <p className="text-sm font-semibold text-destructive mb-1">
               {validationError?.title || error?.title || 'Error'}
             </p>
-            <p className="text-sm text-red-600 dark:text-red-400/80">
+            <p className="text-sm text-destructive dark:text-destructive/80">
               {validationError?.message || error?.message}
             </p>
           </div>

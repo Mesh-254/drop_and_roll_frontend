@@ -51,7 +51,7 @@ export default function BusinessProfilePage() {
       return {
         icon: CheckCircle,
         text: 'Approved',
-        className: 'bg-green-500/20 text-green-400 border-green-500/30',
+        className: 'bg-success/20 text-success border-success/30',
         description: 'Your business profile has been approved. You can now access all business features.',
       };
     }
@@ -59,14 +59,14 @@ export default function BusinessProfilePage() {
       return {
         icon: XCircle,
         text: 'Rejected',
-        className: 'bg-red-500/20 text-red-400 border-red-500/30',
+        className: 'bg-destructive/20 text-destructive border-destructive/30',
         description: 'Your profile was not approved. Please contact support for more information.',
       };
     }
     return {
       icon: Clock,
       text: 'Pending Review',
-      className: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+      className: 'bg-warning/20 text-warning border-warning/30',
       description: 'Your profile is being reviewed by our team. This usually takes 1-2 business days.',
     };
   };
@@ -77,10 +77,10 @@ export default function BusinessProfilePage() {
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black pt-24 pb-12">
+      <div className="min-h-screen bg-gradient-to-br from-background via-card to-background pt-24 pb-12">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         </div>
       </div>
@@ -90,14 +90,14 @@ export default function BusinessProfilePage() {
   // No profile - show create prompt
   if (!hasProfile) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black pt-24 pb-12">
+      <div className="min-h-screen bg-gradient-to-br from-background via-card to-background pt-24 pb-12">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Back Button */}
           <motion.button
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             onClick={() => navigate('/profile')}
-            className="flex items-center gap-2 text-gray-400 hover:text-white mb-8 transition-colors"
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
             Back to Profile
@@ -107,17 +107,17 @@ export default function BusinessProfilePage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-br from-gray-900 to-black border-2 border-orange-500/30 rounded-2xl p-8 text-center"
+            className="bg-gradient-to-br from-card to-background border-2 border-primary/30 rounded-2xl p-8 text-center"
           >
-            <div className="w-20 h-20 bg-orange-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-              <Building2 className="w-10 h-10 text-orange-400" />
+            <div className="w-20 h-20 bg-primary/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <Building2 className="w-10 h-10 text-brand-text" />
             </div>
             
-            <h1 className="text-3xl font-bold text-white mb-4">
+            <h1 className="text-3xl font-bold text-foreground mb-4">
               No Business Profile Yet
             </h1>
             
-            <p className="text-gray-400 max-w-md mx-auto mb-8">
+            <p className="text-muted-foreground max-w-md mx-auto mb-8">
               Create a business profile to unlock exclusive features like bulk CSV uploads, 
               NET payment terms, and dedicated account management.
             </p>
@@ -126,7 +126,7 @@ export default function BusinessProfilePage() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowOnboarding(true)}
-              className="px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold rounded-xl transition-all"
+              className="px-8 py-4 bg-gradient-to-r from-primary to-primary-hover hover:from-primary-hover hover:to-primary-hover text-primary-foreground font-bold rounded-xl transition-all"
             >
               Create Business Profile
             </motion.button>
@@ -149,14 +149,14 @@ export default function BusinessProfilePage() {
 
   // Profile exists - show details
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black pt-24 pb-12">
+    <div className="min-h-screen bg-gradient-to-br from-background via-card to-background pt-24 pb-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Back Button */}
         <motion.button
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           onClick={() => navigate('/profile')}
-          className="flex items-center gap-2 text-gray-400 hover:text-white mb-8 transition-colors"
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8 transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
           Back to Profile
@@ -169,8 +169,8 @@ export default function BusinessProfilePage() {
           className="flex items-start justify-between mb-8"
         >
           <div>
-            <h1 className="text-4xl font-bold text-white mb-2">Business Profile</h1>
-            <p className="text-gray-400">Manage your business account details</p>
+            <h1 className="text-4xl font-bold text-foreground mb-2">Business Profile</h1>
+            <p className="text-muted-foreground">Manage your business account details</p>
           </div>
           
           {/* Status Badge */}
@@ -186,18 +186,18 @@ export default function BusinessProfilePage() {
           animate={{ opacity: 1, y: 0 }}
           className={`mb-8 p-4 rounded-xl border ${
             isApproved 
-              ? 'bg-green-500/10 border-green-500/30' 
+              ? 'bg-success/10 border-success/30' 
               : isRejected 
-              ? 'bg-red-500/10 border-red-500/30'
-              : 'bg-yellow-500/10 border-yellow-500/30'
+              ? 'bg-destructive/10 border-destructive/30'
+              : 'bg-warning/10 border-warning/30'
           }`}
         >
           <div className="flex items-center gap-3">
             <StatusIcon className={`w-5 h-5 ${
-              isApproved ? 'text-green-400' : isRejected ? 'text-red-400' : 'text-yellow-400'
+              isApproved ? 'text-success' : isRejected ? 'text-destructive' : 'text-warning'
             }`} />
             <p className={`text-sm ${
-              isApproved ? 'text-green-300' : isRejected ? 'text-red-300' : 'text-yellow-300'
+              isApproved ? 'text-success' : isRejected ? 'text-destructive' : 'text-warning'
             }`}>
               {statusConfig.description}
             </p>
@@ -210,41 +210,41 @@ export default function BusinessProfilePage() {
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="bg-gradient-to-br from-gray-900 to-black border-2 border-orange-500/20 rounded-2xl p-6"
+            className="bg-gradient-to-br from-card to-background border-2 border-primary/20 rounded-2xl p-6"
           >
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                <Building2 className="w-5 h-5 text-orange-400" />
+              <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-brand-text" />
               </div>
-              <h3 className="text-lg font-bold text-white">Company Details</h3>
+              <h3 className="text-lg font-bold text-foreground">Company Details</h3>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="text-xs text-gray-500 uppercase tracking-wider">Company Name</label>
-                <p className="text-white font-medium mt-1">{businessProfile.company_name}</p>
+                <label className="text-xs text-subtle-foreground uppercase tracking-wider">Company Name</label>
+                <p className="text-foreground font-medium mt-1">{businessProfile.company_name}</p>
               </div>
               
               {businessProfile.company_reg_number && (
                 <div>
-                  <label className="text-xs text-gray-500 uppercase tracking-wider">Registration Number</label>
-                  <p className="text-white font-medium mt-1">{businessProfile.company_reg_number}</p>
+                  <label className="text-xs text-subtle-foreground uppercase tracking-wider">Registration Number</label>
+                  <p className="text-foreground font-medium mt-1">{businessProfile.company_reg_number}</p>
                 </div>
               )}
               
               {businessProfile.vat_number && (
                 <div>
-                  <label className="text-xs text-gray-500 uppercase tracking-wider">VAT Number</label>
-                  <p className="text-white font-medium mt-1">{businessProfile.vat_number}</p>
+                  <label className="text-xs text-subtle-foreground uppercase tracking-wider">VAT Number</label>
+                  <p className="text-foreground font-medium mt-1">{businessProfile.vat_number}</p>
                 </div>
               )}
               
               {businessProfile.address && (
                 <div>
-                  <label className="text-xs text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                  <label className="text-xs text-subtle-foreground uppercase tracking-wider flex items-center gap-1">
                     <MapPin className="w-3 h-3" /> Address
                   </label>
-                  <p className="text-white font-medium mt-1">{businessProfile.address}</p>
+                  <p className="text-foreground font-medium mt-1">{businessProfile.address}</p>
                 </div>
               )}
             </div>
@@ -254,36 +254,36 @@ export default function BusinessProfilePage() {
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="bg-gradient-to-br from-gray-900 to-black border-2 border-orange-500/20 rounded-2xl p-6"
+            className="bg-gradient-to-br from-card to-background border-2 border-primary/20 rounded-2xl p-6"
           >
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                <User className="w-5 h-5 text-blue-400" />
+              <div className="w-10 h-10 bg-info/20 rounded-lg flex items-center justify-center">
+                <User className="w-5 h-5 text-info" />
               </div>
-              <h3 className="text-lg font-bold text-white">Contact Information</h3>
+              <h3 className="text-lg font-bold text-foreground">Contact Information</h3>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="text-xs text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                <label className="text-xs text-subtle-foreground uppercase tracking-wider flex items-center gap-1">
                   <User className="w-3 h-3" /> Contact Person
                 </label>
-                <p className="text-white font-medium mt-1">{businessProfile.contact_person}</p>
+                <p className="text-foreground font-medium mt-1">{businessProfile.contact_person}</p>
               </div>
               
               <div>
-                <label className="text-xs text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                <label className="text-xs text-subtle-foreground uppercase tracking-wider flex items-center gap-1">
                   <Mail className="w-3 h-3" /> Email
                 </label>
-                <p className="text-white font-medium mt-1">{businessProfile.contact_email}</p>
+                <p className="text-foreground font-medium mt-1">{businessProfile.contact_email}</p>
               </div>
               
               {businessProfile.contact_phone && (
                 <div>
-                  <label className="text-xs text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                  <label className="text-xs text-subtle-foreground uppercase tracking-wider flex items-center gap-1">
                     <Phone className="w-3 h-3" /> Phone
                   </label>
-                  <p className="text-white font-medium mt-1">{businessProfile.contact_phone}</p>
+                  <p className="text-foreground font-medium mt-1">{businessProfile.contact_phone}</p>
                 </div>
               )}
             </div>
@@ -294,13 +294,13 @@ export default function BusinessProfilePage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="bg-gradient-to-br from-gray-900 to-black border-2 border-orange-500/20 rounded-2xl p-6 lg:col-span-2"
+            className="bg-gradient-to-br from-card to-background border-2 border-primary/20 rounded-2xl p-6 lg:col-span-2"
           >
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
-                <CreditCard className="w-5 h-5 text-green-400" />
+              <div className="w-10 h-10 bg-success/20 rounded-lg flex items-center justify-center">
+                <CreditCard className="w-5 h-5 text-success" />
               </div>
-              <h3 className="text-lg font-bold text-white">Payment Terms</h3>
+              <h3 className="text-lg font-bold text-foreground">Payment Terms</h3>
             </div>
 
             {/* Bug 2: "NET Terms Approved" must never show while the overall account is not
@@ -310,13 +310,13 @@ export default function BusinessProfilePage() {
             {!isApproved ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-yellow-400" />
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-400">
+                  <Clock className="w-5 h-5 text-warning" />
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-warning/20 text-warning">
                     Pending Account Review
                   </span>
                 </div>
-                <div className="bg-gray-800/50 rounded-xl p-4">
-                  <p className="text-sm text-gray-400">
+                <div className="bg-surface/50 rounded-xl p-4">
+                  <p className="text-sm text-muted-foreground">
                     Your payment terms{netTermsRequest?.status === 'pending' ? ' and NET terms application' : ''} will
                     be finalised once your business account is approved.
                   </p>
@@ -325,34 +325,34 @@ export default function BusinessProfilePage() {
             ) : netTermsRequest?.status === 'approved' || businessProfile.payment_terms !== 'prepaid' ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-400" />
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-500/20 text-green-400">
+                  <CheckCircle className="w-5 h-5 text-success" />
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-success/20 text-success">
                     NET Terms Approved
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                  <div className="bg-gray-800/50 rounded-xl p-4">
-                    <label className="text-xs text-gray-500 uppercase tracking-wider">Credit Limit</label>
-                    <p className="text-2xl font-bold text-white mt-1">
+                  <div className="bg-surface/50 rounded-xl p-4">
+                    <label className="text-xs text-subtle-foreground uppercase tracking-wider">Credit Limit</label>
+                    <p className="text-2xl font-bold text-foreground mt-1">
                       £{businessProfile.credit_limit?.toLocaleString() || '0'}
                     </p>
                   </div>
-                  <div className="bg-gray-800/50 rounded-xl p-4">
-                    <label className="text-xs text-gray-500 uppercase tracking-wider">Available Credit</label>
-                    <p className="text-2xl font-bold text-green-400 mt-1">
+                  <div className="bg-surface/50 rounded-xl p-4">
+                    <label className="text-xs text-subtle-foreground uppercase tracking-wider">Available Credit</label>
+                    <p className="text-2xl font-bold text-success mt-1">
                       £{businessProfile.available_credit?.toLocaleString() || businessProfile.credit_limit?.toLocaleString() || '0'}
                     </p>
                   </div>
-                  <div className="bg-gray-800/50 rounded-xl p-4">
-                    <label className="text-xs text-gray-500 uppercase tracking-wider">Payment Terms</label>
-                    <p className="text-2xl font-bold text-white mt-1">
+                  <div className="bg-surface/50 rounded-xl p-4">
+                    <label className="text-xs text-subtle-foreground uppercase tracking-wider">Payment Terms</label>
+                    <p className="text-2xl font-bold text-foreground mt-1">
                       NET {businessProfile.net_terms_days || 30}
                     </p>
                   </div>
-                  <div className="bg-gray-800/50 rounded-xl p-4">
-                    <label className="text-xs text-gray-500 uppercase tracking-wider">Outstanding</label>
-                    <p className="text-2xl font-bold text-orange-400 mt-1">
+                  <div className="bg-surface/50 rounded-xl p-4">
+                    <label className="text-xs text-subtle-foreground uppercase tracking-wider">Outstanding</label>
+                    <p className="text-2xl font-bold text-brand-text mt-1">
                       £{businessProfile.outstanding_balance?.toLocaleString() || '0'}
                     </p>
                   </div>
@@ -362,16 +362,16 @@ export default function BusinessProfilePage() {
               /* Pending Review */
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-yellow-400" />
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-400">
+                  <Clock className="w-5 h-5 text-warning" />
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-warning/20 text-warning">
                     Under Review
                   </span>
                 </div>
-                <div className="bg-gray-800/50 rounded-xl p-4">
-                  <p className="text-sm text-gray-400">
-                    Your application for <strong className="text-white">{netTermsRequest.requested_package}</strong> package is being reviewed.
+                <div className="bg-surface/50 rounded-xl p-4">
+                  <p className="text-sm text-muted-foreground">
+                    Your application for <strong className="text-foreground">{netTermsRequest.requested_package}</strong> package is being reviewed.
                   </p>
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-subtle-foreground mt-2">
                     Expected decision: 1–2 business days
                   </p>
                 </div>
@@ -380,14 +380,14 @@ export default function BusinessProfilePage() {
               /* Rejected */
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <XCircle className="w-5 h-5 text-red-400" />
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-400">
+                  <XCircle className="w-5 h-5 text-destructive" />
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-destructive/20 text-destructive">
                     Application Rejected
                   </span>
                 </div>
                 {netTermsRequest.rejection_reason && (
-                  <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4">
-                    <p className="text-sm text-red-300">{netTermsRequest.rejection_reason}</p>
+                  <div className="bg-destructive-surface border border-destructive/30 rounded-xl p-4">
+                    <p className="text-sm text-destructive">{netTermsRequest.rejection_reason}</p>
                   </div>
                 )}
                 {isApproved && (
@@ -395,7 +395,7 @@ export default function BusinessProfilePage() {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => setShowNetTermsForm(true)}
-                    className="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
+                    className="w-full py-2 bg-primary hover:bg-primary-hover text-primary-foreground rounded-lg font-medium transition-colors"
                   >
                     Re-apply
                   </motion.button>
@@ -405,24 +405,24 @@ export default function BusinessProfilePage() {
               /* No NET terms requested — show CTA */
               isApproved && (
                 <div className="space-y-4">
-                  <div className="bg-gradient-to-br from-orange-900/20 to-transparent border border-orange-500/20 rounded-xl p-6 text-center">
+                  <div className="bg-gradient-to-br from-brand-surface/20 to-transparent border border-primary/20 rounded-xl p-6 text-center">
                     <div className="flex justify-center mb-4">
-                      <div className="p-3 bg-orange-500/20 rounded-full">
-                        <Zap className="w-6 h-6 text-orange-400" />
+                      <div className="p-3 bg-primary/20 rounded-full">
+                        <Zap className="w-6 h-6 text-brand-text" />
                       </div>
                     </div>
-                    <h4 className="text-lg font-bold text-white mb-2">Unlock NET Payment Terms</h4>
-                    <ul className="text-sm text-gray-300 space-y-2 mb-6 text-left">
+                    <h4 className="text-lg font-bold text-foreground mb-2">Unlock NET Payment Terms</h4>
+                    <ul className="text-sm text-muted-foreground space-y-2 mb-6 text-left">
                       <li className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
+                        <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
                         Defer your payment up to 60 days
                       </li>
                       <li className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
+                        <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
                         Increase your cash flow
                       </li>
                       <li className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
+                        <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
                         Get a dedicated account manager
                       </li>
                     </ul>
@@ -430,7 +430,7 @@ export default function BusinessProfilePage() {
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => setShowNetTermsForm(true)}
-                      className="w-full py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold rounded-lg transition-all"
+                      className="w-full py-3 bg-gradient-to-r from-primary to-primary-hover hover:from-primary-hover hover:to-primary-hover text-primary-foreground font-bold rounded-lg transition-all"
                     >
                       Apply for NET Terms
                     </motion.button>
@@ -453,7 +453,7 @@ export default function BusinessProfilePage() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => navigate('/bulk-upload')}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold rounded-xl transition-all"
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-primary-hover hover:from-primary-hover hover:to-primary-hover text-primary-foreground font-bold rounded-xl transition-all"
             >
               Go to Bulk Upload
             </motion.button>
@@ -463,7 +463,7 @@ export default function BusinessProfilePage() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => navigate('/history')}
-            className="flex items-center gap-2 px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-xl border border-gray-700 transition-all"
+            className="flex items-center gap-2 px-6 py-3 bg-surface hover:bg-surface-hover text-foreground font-medium rounded-xl border border-border transition-all"
           >
             View Booking History
           </motion.button>

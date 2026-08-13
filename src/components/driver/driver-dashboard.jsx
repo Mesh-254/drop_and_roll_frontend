@@ -738,10 +738,10 @@ export default function DriverDashboard() {
                 disabled={toggleLoading}
                 className={`flex-1 sm:flex-none min-h-[44px] px-4 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
                   toggleLoading
-                    ? "bg-gray-400 text-white cursor-not-allowed opacity-60"
+                    ? "bg-surface-hover text-primary-foreground cursor-not-allowed opacity-60"
                     : manualTrackingEnabled
-                      ? "bg-orange-500 text-white hover:bg-orange-600 active:scale-95"
-                      : "bg-slate-600 text-white hover:bg-slate-700 active:scale-95"
+                      ? "bg-primary text-primary-foreground hover:bg-primary-hover active:scale-95"
+                      : "bg-surface-hover text-primary-foreground hover:bg-surface active:scale-95"
                 }`}
               >
                 <MapPin className="w-4 h-4" />
@@ -760,10 +760,10 @@ export default function DriverDashboard() {
               <p
                 className={`font-semibold capitalize text-sm ${
                   trackingStatus === "tracking"
-                    ? "text-green-600"
+                    ? "text-success"
                     : trackingStatus === "error"
-                      ? "text-red-600"
-                      : "text-yellow-600"
+                      ? "text-destructive"
+                      : "text-warning"
                 }`}
               >
                 {trackingStatus}
@@ -790,9 +790,9 @@ export default function DriverDashboard() {
           </div>
 
           {geolocationError && (
-            <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex gap-2">
-              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-600">{geolocationError}</p>
+            <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex gap-2">
+              <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-destructive">{geolocationError}</p>
             </div>
           )}
         </div>
@@ -829,7 +829,7 @@ export default function DriverDashboard() {
     <div className="flex flex-col lg:flex-row min-h-screen bg-background">
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/60 lg:hidden backdrop-blur-sm"
+          className="fixed inset-0 z-50 bg-overlay lg:hidden backdrop-blur-sm"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -879,7 +879,7 @@ export default function DriverDashboard() {
               <li>
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900"
+                  className="w-full flex items-center px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive-surface"
                 >
                   <LogOut className="h-5 w-5 mr-3" />
                   Log Out
@@ -898,7 +898,7 @@ export default function DriverDashboard() {
                   {profile ? profile.full_name : "Loading..."}
                 </p>
                 <div className="flex items-center gap-1">
-                  <Star className="h-4 w-4 text-yellow-500 fill-current flex-shrink-0" />
+                  <Star className="h-4 w-4 text-warning fill-current flex-shrink-0" />
                   <span className="text-sm font-medium text-sidebar-foreground">
                     {metrics.averageRating.toFixed(1) || "0.0"}
                   </span>
@@ -958,7 +958,7 @@ export default function DriverDashboard() {
             <div className="space-y-5 max-w-none">
               {/* Welcome Message */}
               <div className="mb-6">
-                <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
+                <h1 className="text-2xl md:text-3xl font-bold text-foreground">
                   Welcome back, {profile?.first_name || "Driver"}!
                 </h1>
               </div>
@@ -997,7 +997,7 @@ export default function DriverDashboard() {
                         className="flex items-center justify-between border-b border-border pb-3 last:border-b-0 last:pb-0"
                       >
                         <div className="flex items-center gap-2">
-                          <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                          <Star className="h-4 w-4 text-warning fill-warning" />
                           <span className="font-semibold text-foreground">
                             {rating.score ?? rating.rating ?? "N/A"}
                           </span>
@@ -1061,8 +1061,8 @@ export default function DriverDashboard() {
                         <span
                           className={`px-3 py-1 rounded-full text-sm font-medium ${
                             doc.verified
-                              ? "bg-green-500/10 text-green-600"
-                              : "bg-red-500/10 text-red-600"
+                              ? "bg-success/10 text-success"
+                              : "bg-destructive/10 text-destructive"
                           }`}
                         >
                           {doc.verified ? "Verified" : "Not Verified"}
@@ -1095,7 +1095,7 @@ export default function DriverDashboard() {
                         )}
                         {doc.file && (
                           <div className="flex items-center gap-2">
-                            <CheckCircle className="h-5 w-5 text-green-600" />
+                            <CheckCircle className="h-5 w-5 text-success" />
                             {/* NEW: View link */}
                             <a
                               href={doc.file}
@@ -1104,7 +1104,7 @@ export default function DriverDashboard() {
                               className="cursor-pointer p-2 hover:bg-muted rounded-lg transition-colors"
                               title="View Document"
                             >
-                              <Eye className="h-5 w-5 text-blue-600" />
+                              <Eye className="h-5 w-5 text-info" />
                             </a>
                           </div>
                         )}
@@ -1118,16 +1118,16 @@ export default function DriverDashboard() {
 
           {activeTab === "profile" && profile && (
             <div className="max-w-4xl space-y-6">
-              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-8 shadow-sm transition-all duration-300 hover:shadow-md">
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+              <div className="bg-card dark:bg-surface border border-border rounded-xl p-8 shadow-sm transition-all duration-300 hover:shadow-md">
+                <h3 className="text-xl font-semibold text-foreground mb-6">
                   Profile Information
                 </h3>
                 <div className="space-y-6">
-                  <div className="flex items-center justify-between p-4 bg-teal-50 dark:bg-teal-900 rounded-lg border border-gray-200 dark:border-gray-600">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                  <div className="flex items-center justify-between p-4 bg-success-surface rounded-lg border border-border dark:border-border-strong">
+                    <span className="text-sm font-medium text-muted-foreground">
                       Full Name
                     </span>
-                    <p className="text-base font-normal text-gray-900 dark:text-white">
+                    <p className="text-base font-normal text-foreground">
                       {profile.full_name
                         ? profile.full_name
                             .split(" ")
@@ -1140,22 +1140,22 @@ export default function DriverDashboard() {
                         : "N/A"}
                     </p>
                   </div>
-                  <div className="flex items-center justify-between p-4 bg-teal-50 dark:bg-teal-900 rounded-lg border border-gray-200 dark:border-gray-600">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                  <div className="flex items-center justify-between p-4 bg-success-surface rounded-lg border border-border dark:border-border-strong">
+                    <span className="text-sm font-medium text-muted-foreground">
                       Email
                     </span>
-                    <p className="text-base font-normal text-gray-900 dark:text-white">
+                    <p className="text-base font-normal text-foreground">
                       {profile.email
                         ? profile.email.charAt(0).toUpperCase() +
                           profile.email.slice(1)
                         : "N/A"}
                     </p>
                   </div>
-                  <div className="flex items-center justify-between p-4 bg-teal-50 dark:bg-teal-900 rounded-lg border border-gray-200 dark:border-gray-600">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                  <div className="flex items-center justify-between p-4 bg-success-surface rounded-lg border border-border dark:border-border-strong">
+                    <span className="text-sm font-medium text-muted-foreground">
                       Role
                     </span>
-                    <p className="text-base font-normal text-gray-900 dark:text-white">
+                    <p className="text-base font-normal text-foreground">
                       {profile.role
                         ? profile.role.charAt(0).toUpperCase() +
                           profile.role.slice(1)

@@ -68,7 +68,7 @@ export default function ErrorTable({
     <div className="space-y-4">
       {/* Action bar */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="text-sm text-gray-600 dark:text-gray-400">
+        <div className="text-sm text-muted-foreground">
           Showing {errors.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}–
           {Math.min(currentPage * pageSize, meta?.total || 0)} of {meta?.total || 0} failed rows
         </div>
@@ -78,7 +78,7 @@ export default function ErrorTable({
             whileTap={{ scale: 0.98 }}
             onClick={copyAllErrors}
             disabled={errors.length === 0}
-            className="flex-1 sm:flex-none px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
+            className="flex-1 sm:flex-none px-3 py-2 text-sm font-medium rounded-lg border border-border-strong text-muted-foreground hover:bg-muted dark:hover:bg-surface-hover/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
           >
             <Copy className="h-4 w-4" />
             <span className="hidden sm:inline">Copy All</span>
@@ -88,7 +88,7 @@ export default function ErrorTable({
             whileTap={{ scale: 0.98 }}
             onClick={onDownloadCSV}
             disabled={errors.length === 0}
-            className="flex-1 sm:flex-none px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
+            className="flex-1 sm:flex-none px-3 py-2 text-sm font-medium rounded-lg border border-border-strong text-muted-foreground hover:bg-muted dark:hover:bg-surface-hover/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
           >
             <Download className="h-4 w-4" />
             <span className="hidden sm:inline">Download</span>
@@ -98,7 +98,7 @@ export default function ErrorTable({
             whileTap={{ scale: 0.98 }}
             onClick={onRetry}
             disabled={errors.length === 0 || isRetrying}
-            className="flex-1 sm:flex-none px-3 py-2 text-sm font-medium rounded-lg bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
+            className="flex-1 sm:flex-none px-3 py-2 text-sm font-medium rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
           >
             {isRetrying ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -111,38 +111,38 @@ export default function ErrorTable({
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+      <div className="overflow-x-auto border border-border rounded-lg">
         {isLoading ? (
           <div className="space-y-2 p-4">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+              <div key={i} className="h-12 bg-surface-hover rounded animate-pulse" />
             ))}
           </div>
         ) : errors.length === 0 ? (
-          <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-            <div className="text-green-600 dark:text-green-400 text-xl mb-2">✓</div>
+          <div className="p-8 text-center text-subtle-foreground dark:text-muted-foreground">
+            <div className="text-success text-xl mb-2">✓</div>
             <p>No failed rows — everything processed successfully!</p>
           </div>
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 w-16">
+              <tr className="border-b border-border bg-muted dark:bg-surface/50">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground w-16">
                   Row
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 hidden md:table-cell">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground hidden md:table-cell">
                   Column
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">
                   Error Message
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 hidden lg:table-cell">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground hidden lg:table-cell">
                   Suggested Fix
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 hidden lg:table-cell">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground hidden lg:table-cell">
                   Raw Value
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 w-12">
+                <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground w-12">
                   Copy
                 </th>
               </tr>
@@ -161,39 +161,39 @@ export default function ErrorTable({
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="border-b border-gray-200 dark:border-gray-700 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors align-top"
+                      className="border-b border-border hover:bg-destructive-surface transition-colors align-top"
                     >
                       {errIdx === 0 ? (
                         <td
-                          className="px-4 py-3 text-sm font-mono text-gray-500 dark:text-gray-400 align-top"
+                          className="px-4 py-3 text-sm font-mono text-subtle-foreground dark:text-muted-foreground align-top"
                           rowSpan={rowErrors.length}
                         >
                           <div>{row.row_number}</div>
                           {row.row_reference && (
-                            <div className="text-[10px] text-gray-400 truncate max-w-[80px]" title={row.row_reference}>
+                            <div className="text-[10px] text-muted-foreground truncate max-w-[80px]" title={row.row_reference}>
                               {row.row_reference}
                             </div>
                           )}
                         </td>
                       ) : null}
-                      <td className="px-4 py-3 text-xs font-mono text-gray-600 dark:text-gray-400 hidden md:table-cell whitespace-nowrap">
+                      <td className="px-4 py-3 text-xs font-mono text-muted-foreground hidden md:table-cell whitespace-nowrap">
                         {err.column_name || '—'}
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        <div className="flex items-start gap-2 text-red-600 dark:text-red-400">
+                        <div className="flex items-start gap-2 text-destructive">
                           <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
                           <span className="text-xs">{err.error_message}</span>
                         </div>
                         {/* Column shown inline on small screens where its column is hidden */}
-                        <div className="text-[10px] text-gray-400 mt-1 md:hidden">
+                        <div className="text-[10px] text-muted-foreground mt-1 md:hidden">
                           Column: {err.column_name || '—'}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 hidden lg:table-cell">
+                      <td className="px-4 py-3 text-xs text-muted-foreground hidden lg:table-cell">
                         {err.suggested_fix || '—'}
                       </td>
                       <td
-                        className="px-4 py-3 text-xs font-mono text-gray-500 dark:text-gray-400 hidden lg:table-cell"
+                        className="px-4 py-3 text-xs font-mono text-subtle-foreground dark:text-muted-foreground hidden lg:table-cell"
                         title={err.raw_value ? String(err.raw_value) : undefined}
                       >
                         {truncate(err.raw_value)}
@@ -204,13 +204,13 @@ export default function ErrorTable({
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
                             onClick={() => copyRow(row)}
-                            className="inline-flex items-center justify-center p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            className="inline-flex items-center justify-center p-1 rounded hover:bg-surface-hover transition-colors"
                             title="Copy errors for this row"
                           >
                             {copiedRowId === (row.id ?? row.row_number) ? (
-                              <Check className="h-4 w-4 text-green-500" />
+                              <Check className="h-4 w-4 text-success" />
                             ) : (
-                              <Copy className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                              <Copy className="h-4 w-4 text-subtle-foreground dark:text-muted-foreground" />
                             )}
                           </motion.button>
                         </td>
@@ -232,7 +232,7 @@ export default function ErrorTable({
             whileTap={{ scale: 0.95 }}
             onClick={() => onPageChange(Math.max(1, currentPage - 1))}
             disabled={currentPage === 1}
-            className="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="px-3 py-2 rounded border border-border-strong text-sm font-medium text-muted-foreground hover:bg-muted dark:hover:bg-surface-hover/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             ← Prev
           </motion.button>
@@ -246,8 +246,8 @@ export default function ErrorTable({
                 onClick={() => onPageChange(page)}
                 className={`px-2 py-1 rounded text-sm font-medium transition-all ${
                   page === currentPage
-                    ? 'bg-orange-500 text-white'
-                    : 'border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                    ? 'bg-primary text-foreground'
+                    : 'border border-border-strong text-muted-foreground hover:bg-muted dark:hover:bg-surface-hover/50'
                 }`}
               >
                 {page}
@@ -260,7 +260,7 @@ export default function ErrorTable({
             whileTap={{ scale: 0.95 }}
             onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
             disabled={currentPage === totalPages}
-            className="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="px-3 py-2 rounded border border-border-strong text-sm font-medium text-muted-foreground hover:bg-muted dark:hover:bg-surface-hover/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             Next →
           </motion.button>

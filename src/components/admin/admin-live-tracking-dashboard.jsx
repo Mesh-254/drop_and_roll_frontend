@@ -257,8 +257,8 @@ export default function AdminLiveTrackingDashboard() {
       content: `
         <div class="p-2 text-sm">
           <p class="font-semibold">${driver.driver_name}</p>
-          <p class="text-xs text-gray-600">${driver.vehicle_type}</p>
-          <p class="text-xs text-gray-600">${driver.hub_name || "Unknown Hub"}</p>
+          <p class="text-xs text-muted-foreground">${driver.vehicle_type}</p>
+          <p class="text-xs text-muted-foreground">${driver.hub_name || "Unknown Hub"}</p>
           ${driver.speed_kmh ? `<p class="text-xs">Speed: ${driver.speed_kmh} km/h</p>` : ""}
         </div>
       `,
@@ -560,15 +560,15 @@ export default function AdminLiveTrackingDashboard() {
           <div className="flex items-center gap-2 mt-4 p-2 bg-muted rounded-lg">
             {wsConnected ? (
               <>
-                <Wifi className="w-4 h-4 text-green-500" />
-                <span className="text-xs text-green-600 font-medium">
+                <Wifi className="w-4 h-4 text-success" />
+                <span className="text-xs text-success font-medium">
                   Connected
                 </span>
               </>
             ) : (
               <>
-                <WifiOff className="w-4 h-4 text-red-500" />
-                <span className="text-xs text-red-600 font-medium">
+                <WifiOff className="w-4 h-4 text-destructive" />
+                <span className="text-xs text-destructive font-medium">
                   Disconnected
                 </span>
               </>
@@ -587,7 +587,7 @@ export default function AdminLiveTrackingDashboard() {
               Loading drivers...
             </div>
           ) : error ? (
-            <div className="p-4 bg-red-500/10 border-t border-red-500/20 text-red-600 text-sm flex gap-2">
+            <div className="p-4 bg-destructive/10 border-t border-destructive/20 text-destructive text-sm flex gap-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
@@ -702,7 +702,7 @@ export default function AdminLiveTrackingDashboard() {
                       >
                         <div className="flex items-start gap-2">
                           <span
-                            className="flex items-center justify-center w-6 h-6 rounded-full text-white text-xs font-bold flex-shrink-0"
+                            className="flex items-center justify-center w-6 h-6 rounded-full text-foreground text-xs font-bold flex-shrink-0"
                             style={{
                               backgroundColor: VEHICLE_COLORS["bike"],
                             }}

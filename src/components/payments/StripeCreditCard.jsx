@@ -69,10 +69,10 @@ export default function StripeCreditCard({
             invalid: { color: "#EF4444" },
           },
         }}
-        className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white"
+        className="w-full px-4 py-3 border border-border-strong rounded-lg bg-card"
       />
       {error && (
-        <div className="flex items-center text-red-500 text-sm">
+        <div className="flex items-center text-destructive text-sm">
           <AlertCircle size={16} className="mr-2" />
           {error}
         </div>
@@ -80,7 +80,7 @@ export default function StripeCreditCard({
       <button
         onClick={handleSubmit}
         disabled={processing || !stripe || !elements}
-        className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center justify-center"
+        className="w-full bg-primary hover:bg-primary-hover disabled:bg-surface-hover disabled:cursor-not-allowed text-primary-foreground font-bold py-3 px-6 rounded-lg transition-colors flex items-center justify-center"
       >
         {processing ? (
           <>

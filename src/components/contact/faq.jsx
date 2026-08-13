@@ -129,7 +129,7 @@ export default function FAQ() {
   };
 
   return (
-    <section id="faq" className="py-20 px-4 sm:px-6 lg:px-8 bg-black">
+    <section id="faq" className="py-20 px-4 sm:px-6 lg:px-8 bg-background">
       <div className="max-w-5xl mx-auto">
         {/* MODERN DESIGN UPGRADE: Centered header with subtitle */}
         <motion.div
@@ -140,15 +140,15 @@ export default function FAQ() {
           className="text-center mb-12"
         >
           <div className="flex items-center justify-center gap-3 mb-4">
-            <HelpCircle className="w-6 h-6 text-orange-500" />
-            <span className="text-orange-400 font-bold text-sm uppercase tracking-wider">
+            <HelpCircle className="w-6 h-6 text-brand-text" />
+            <span className="text-brand-text font-bold text-sm uppercase tracking-wider">
               Help & Support
             </span>
           </div>
-          <h2 className="text-5xl md:text-6xl font-bold text-white mb-6 text-balance">
+          <h2 className="text-5xl md:text-6xl font-bold text-foreground mb-6 text-balance">
             Frequently Asked Questions
           </h2>
-          <p className="text-lg text-gray-400 max-w-2xl mx-auto">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Find answers to common questions about our delivery services, pricing, and tracking.
           </p>
         </motion.div>
@@ -163,13 +163,13 @@ export default function FAQ() {
         >
           {/* Search Bar */}
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={20} />
             <input
               type="text"
               placeholder="Search FAQs..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 rounded-xl bg-gray-900/50 border border-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 hover:border-orange-500/30 transition-all duration-300"
+              className="w-full pl-12 pr-4 py-3 rounded-xl bg-card/50 border border-border text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-primary hover:border-primary/30 transition-all duration-300"
             />
           </div>
 
@@ -183,8 +183,8 @@ export default function FAQ() {
                 onClick={() => setSelectedCategory(category)}
                 className={`px-4 py-2 rounded-full font-bold text-sm transition-all duration-300 ${
                   selectedCategory === category
-                    ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/30"
-                    : "bg-gray-900/50 text-gray-400 hover:text-white hover:bg-gray-800/50 border border-gray-800"
+                    ? "bg-gradient-to-r from-primary to-primary-hover text-primary-foreground shadow-lg shadow-primary/30"
+                    : "bg-card/50 text-muted-foreground hover:text-primary-foreground hover:bg-surface/50 border border-border"
                 }`}
               >
                 {category}
@@ -208,8 +208,8 @@ export default function FAQ() {
               whileHover={{ y: -2 }}
               className={`group rounded-xl border transition-all duration-300 overflow-hidden ${
                 expandedId === faq.id
-                  ? "bg-gradient-to-br from-gray-900/80 to-black border-orange-500/50 shadow-lg shadow-orange-500/10"
-                  : "bg-gray-900/30 border-gray-800 hover:border-orange-500/30"
+                  ? "bg-gradient-to-br from-card/80 to-background border-primary/50 shadow-lg shadow-primary/10"
+                  : "bg-card/30 border-border hover:border-primary/30"
               }`}
             >
               <motion.button
@@ -220,16 +220,16 @@ export default function FAQ() {
               >
                 <div className="flex items-start gap-4 text-left flex-1">
                   <div className="flex-shrink-0 mt-1">
-                    <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center border border-orange-500/30">
-                      <span className="text-orange-400 text-xs font-bold">?</span>
+                    <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30">
+                      <span className="text-brand-text text-xs font-bold">?</span>
                     </div>
                   </div>
 
                   <div className="flex-1">
-                    <h3 className="text-lg font-bold text-white text-left group-hover:text-orange-400 transition-colors">
+                    <h3 className="text-lg font-bold text-foreground text-left group-hover:text-brand-text transition-colors">
                       {faq.question}
                     </h3>
-                    <span className="inline-block mt-2 text-xs font-bold px-3 py-1 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                    <span className="inline-block mt-2 text-xs font-bold px-3 py-1 rounded-full bg-primary/20 text-brand-text border border-primary/30">
                       {faq.category}
                     </span>
                   </div>
@@ -243,7 +243,7 @@ export default function FAQ() {
                   className="flex-shrink-0 mt-1"
                 >
                   <ChevronDown
-                    className="w-5 h-5 text-gray-400 group-hover:text-orange-400 transition-colors"
+                    className="w-5 h-5 text-muted-foreground group-hover:text-brand-text transition-colors"
                     strokeWidth={3}
                   />
                 </motion.div>
@@ -259,7 +259,7 @@ export default function FAQ() {
                 transition={{ duration: 0.3 }}
                 className="overflow-hidden"
               >
-                <div className="px-6 pb-4 text-gray-300 border-t border-gray-800/50">
+                <div className="px-6 pb-4 text-muted-foreground border-t border-border/50">
                   <motion.p
                     initial={{ opacity: 0, y: -10 }}
                     animate={
@@ -284,11 +284,11 @@ export default function FAQ() {
               animate={{ opacity: 1 }}
               className="text-center py-12"
             >
-              <HelpCircle className="mx-auto text-gray-600 mb-4" size={56} />
-              <h3 className="text-xl font-bold text-white mb-2">
+              <HelpCircle className="mx-auto text-muted-foreground mb-4" size={56} />
+              <h3 className="text-xl font-bold text-foreground mb-2">
                 No FAQs found
               </h3>
-              <p className="text-gray-400 mb-6">
+              <p className="text-muted-foreground mb-6">
                 Try adjusting your search or filters
               </p>
               <motion.button
@@ -297,7 +297,7 @@ export default function FAQ() {
                   setSearchQuery("");
                   setSelectedCategory("All");
                 }}
-                className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg font-bold transition-colors inline-block"
+                className="bg-primary hover:bg-primary-hover text-primary-foreground px-6 py-2 rounded-lg font-bold transition-colors inline-block"
               >
                 Clear Filters
               </motion.button>
@@ -311,13 +311,13 @@ export default function FAQ() {
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
           viewport={{ once: true }}
-          className="mt-16 bg-gradient-to-br from-orange-500/10 via-gray-900 to-gray-900 border border-orange-500/20 rounded-2xl p-8 sm:p-12"
+          className="mt-16 bg-gradient-to-br from-primary/10 via-card to-card border border-primary/20 rounded-2xl p-8 sm:p-12"
         >
           <div className="text-center mb-8">
-            <h3 className="text-2xl font-bold text-white mb-3">
+            <h3 className="text-2xl font-bold text-foreground mb-3">
               Still have questions?
             </h3>
-            <p className="text-gray-400 max-w-lg mx-auto">
+            <p className="text-muted-foreground max-w-lg mx-auto">
               Our support team is available 24/7 to help. Choose your preferred way to contact us.
             </p>
           </div>
@@ -329,8 +329,8 @@ export default function FAQ() {
                 icon: MessageCircle,
                 label: "Live Chat",
                 desc: "Average response: 2 minutes",
-                color: "text-blue-400",
-                bgColor: "bg-blue-500/20",
+                color: "text-info",
+                bgColor: "bg-info/20",
               },
               {
                 icon: Mail,
@@ -343,8 +343,8 @@ export default function FAQ() {
                 icon: Phone,
                 label: "Phone",
                 desc: "0800 123 4567",
-                color: "text-green-400",
-                bgColor: "bg-green-500/20",
+                color: "text-success",
+                bgColor: "bg-success/20",
               },
             ].map((method, idx) => {
               const Icon = method.icon;
@@ -352,13 +352,13 @@ export default function FAQ() {
                 <motion.div
                   key={idx}
                   whileHover={{ y: -4 }}
-                  className="bg-gray-900/50 border border-gray-800 hover:border-orange-500/30 rounded-xl p-6 transition-all duration-300 text-center cursor-pointer hover:shadow-lg hover:shadow-orange-500/10"
+                  className="bg-card/50 border border-border hover:border-primary/30 rounded-xl p-6 transition-all duration-300 text-center cursor-pointer hover:shadow-lg hover:shadow-primary/10"
                 >
                   <div className={`${method.bgColor} rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-4`}>
                     <Icon className={method.color} size={24} />
                   </div>
-                  <h4 className="font-bold text-white mb-2">{method.label}</h4>
-                  <p className="text-sm text-gray-400">{method.desc}</p>
+                  <h4 className="font-bold text-foreground mb-2">{method.label}</h4>
+                  <p className="text-sm text-muted-foreground">{method.desc}</p>
                 </motion.div>
               );
             })}

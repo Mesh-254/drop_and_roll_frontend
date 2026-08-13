@@ -41,7 +41,7 @@ const MapComponent = ({
   dropoffAddress,
   isLoading = false,
   error = null,
-  className = "w-full h-64 rounded-lg border border-gray-300 dark:border-gray-600",
+  className = "w-full h-64 rounded-lg border border-border-strong",
 }) => {
   const [mapLoadError, setMapLoadError] = useState(null)
   const [directions, setDirections] = useState(null)
@@ -51,17 +51,17 @@ const MapComponent = ({
   if (mapLoadError || error) {
     console.error("Google Maps load error:", mapLoadError || error)
     return (
-      <div className={`${className} bg-red-50 dark:bg-red-900/20 flex items-center justify-center`}>
-        <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-        <p className="text-red-600 dark:text-red-300">{mapLoadError?.message || error || "Failed to load map"}</p>
+      <div className={`${className} bg-destructive-surface flex items-center justify-center`}>
+        <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+        <p className="text-destructive">{mapLoadError?.message || error || "Failed to load map"}</p>
       </div>
     )
   }
 
   if (isLoading) {
     return (
-      <div className={`${className} bg-gray-100 dark:bg-gray-800 flex items-center justify-center`}>
-        <Loader2 className="h-12 w-12 text-orange-500 animate-spin" />
+      <div className={`${className} bg-muted dark:bg-surface flex items-center justify-center`}>
+        <Loader2 className="h-12 w-12 text-brand-text animate-spin" />
       </div>
     )
   }

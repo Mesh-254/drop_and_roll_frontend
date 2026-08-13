@@ -122,14 +122,14 @@ const ParcelDetails = ({ parcels = [], onUpdate, showErrors = false }) => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-          <Package className="h-5 w-5 text-orange-500 mr-2" />
+        <h3 className="text-lg font-semibold text-foreground flex items-center">
+          <Package className="h-5 w-5 text-brand-text mr-2" />
           Parcel Details
         </h3>
         <button
           type="button"
           onClick={handleAddParcel}
-          className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+          className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary-hover rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 dark:focus:ring-offset-gray-900"
         >
           <Plus className="h-4 w-4" />
           Add Parcel
@@ -138,17 +138,17 @@ const ParcelDetails = ({ parcels = [], onUpdate, showErrors = false }) => {
 
       {/* Error Summary Box */}
       {showErrors && hasErrors && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+        <div className="bg-destructive-surface border border-destructive/30 rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+            <AlertCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
             <div>
-              <h4 className="font-semibold text-red-800 dark:text-red-300 mb-2">
+              <h4 className="font-semibold text-destructive mb-2">
                 Parcel Validation Errors
               </h4>
-              <ul className="space-y-1 text-red-700 dark:text-red-400 text-sm">
+              <ul className="space-y-1 text-destructive text-sm">
                 {validationResults.summary.map((error, idx) => (
                   <li key={idx} className="flex items-start gap-2">
-                    <span className="text-red-500 mt-1">•</span>
+                    <span className="text-destructive mt-1">•</span>
                     <span>{error}</span>
                   </li>
                 ))}
@@ -160,9 +160,9 @@ const ParcelDetails = ({ parcels = [], onUpdate, showErrors = false }) => {
 
       {/* Empty State */}
       {(!parcels || parcels.length === 0) && (
-        <div className="text-center p-8 bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
-          <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
+        <div className="text-center p-8 bg-muted dark:bg-surface rounded-lg border-2 border-dashed border-border-strong">
+          <Package className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+          <p className="text-muted-foreground mb-4">
             No parcels added yet. Click "Add Parcel" to get started.
           </p>
         </div>
@@ -173,17 +173,17 @@ const ParcelDetails = ({ parcels = [], onUpdate, showErrors = false }) => {
         {parcels && parcels.map((parcel, index) => (
           <div
             key={parcel.id || index}
-            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 space-y-4"
+            className="bg-card dark:bg-surface border border-border rounded-lg p-6 space-y-4"
           >
             {/* Parcel Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700">
-              <h4 className="font-semibold text-gray-900 dark:text-white">
+            <div className="flex items-center justify-between pb-4 border-b border-border">
+              <h4 className="font-semibold text-foreground">
                 Parcel {index + 1}
               </h4>
               <button
                 type="button"
                 onClick={() => handleRemoveParcel(index)}
-                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
+                className="p-2 text-destructive hover:bg-destructive-surface rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-destructive"
                 aria-label={`Remove parcel ${index + 1}`}
               >
                 <Trash2 className="h-5 w-5" />
@@ -192,7 +192,7 @@ const ParcelDetails = ({ parcels = [], onUpdate, showErrors = false }) => {
 
             {/* Weight Field */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-muted-foreground mb-2">
                 Weight (kg) *
               </label>
               <input
@@ -211,14 +211,14 @@ const ParcelDetails = ({ parcels = [], onUpdate, showErrors = false }) => {
                   }
                 }}
                 placeholder="e.g., 2.5"
-                className={`w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 transition-colors ${
+                className={`w-full px-4 py-2 border rounded-lg bg-card dark:bg-surface-hover text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 transition-colors ${
                   showFieldError(index, 'weight_kg', parcel.weight_kg)
-                    ? 'border-red-500 focus:ring-red-500'
-                    : 'border-gray-300 dark:border-gray-600 focus:ring-orange-500'
+                    ? 'border-destructive focus:ring-destructive'
+                    : 'border-border-strong focus:ring-ring'
                 }`}
               />
               {showFieldError(index, 'weight_kg', parcel.weight_kg) && (
-                <div className="flex items-center text-red-500 text-sm mt-1">
+                <div className="flex items-center text-destructive text-sm mt-1">
                   <AlertCircle className="h-4 w-4 mr-1 flex-shrink-0" />
                   {showFieldError(index, 'weight_kg', parcel.weight_kg)}
                 </div>
@@ -227,13 +227,13 @@ const ParcelDetails = ({ parcels = [], onUpdate, showErrors = false }) => {
 
             {/* Dimensions Section */}
             <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="block text-sm font-medium text-muted-foreground">
                 Dimensions (cm) *
               </label>
               <div className="grid grid-cols-3 gap-3">
                 {['length', 'width', 'height'].map((dim) => (
                   <div key={dim}>
-                    <label className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1 block">
+                    <label className="text-xs text-muted-foreground uppercase tracking-wide mb-1 block">
                       {dim}
                     </label>
                     <input
@@ -254,14 +254,14 @@ const ParcelDetails = ({ parcels = [], onUpdate, showErrors = false }) => {
                         }
                       }}
                       placeholder="0"
-                      className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 text-center focus:outline-none focus:ring-2 transition-colors ${
+                      className={`w-full px-3 py-2 border rounded-lg bg-input text-foreground placeholder-subtle-foreground text-center focus:outline-none focus:ring-2 transition-colors ${
                         showFieldError(index, `dimension_${dim}`, parcel.dimensions[dim])
-                          ? 'border-red-500 focus:ring-red-500'
-                          : 'border-gray-300 dark:border-gray-600 focus:ring-orange-500'
+                          ? 'border-destructive focus:ring-destructive'
+                          : 'border-border-strong focus:ring-ring'
                       }`}
                     />
                     {showFieldError(index, `dimension_${dim}`, parcel.dimensions[dim]) && (
-                      <div className="text-red-500 text-xs mt-1 flex items-center">
+                      <div className="text-destructive text-xs mt-1 flex items-center">
                         <AlertCircle className="h-3 w-3 mr-0.5 flex-shrink-0" />
                         {showFieldError(index, `dimension_${dim}`, parcel.dimensions[dim])}
                       </div>
@@ -273,7 +273,7 @@ const ParcelDetails = ({ parcels = [], onUpdate, showErrors = false }) => {
                   dimensions (not on a pristine, all-blank parcel). */}
               {getFieldError(index, 'dimensions_overall') &&
                 (showErrors || ['length', 'width', 'height'].some((d) => !isBlank(parcel.dimensions[d]))) && (
-                <div className="flex items-center text-red-500 text-sm mt-2">
+                <div className="flex items-center text-destructive text-sm mt-2">
                   <AlertCircle className="h-4 w-4 mr-1 flex-shrink-0" />
                   {getFieldError(index, 'dimensions_overall')}
                 </div>
@@ -287,11 +287,11 @@ const ParcelDetails = ({ parcels = [], onUpdate, showErrors = false }) => {
                 id={`fragile_${index}`}
                 checked={parcel.fragile || false}
                 onChange={(e) => handleParcelUpdate(index, 'fragile', e.target.checked)}
-                className="w-4 h-4 text-orange-500 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-orange-500 cursor-pointer"
+                className="w-4 h-4 text-brand-text bg-card dark:bg-surface-hover border border-border-strong rounded focus:ring-2 focus:ring-ring cursor-pointer"
               />
               <label
                 htmlFor={`fragile_${index}`}
-                className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+                className="text-sm font-medium text-muted-foreground cursor-pointer"
               >
                 This parcel contains fragile items
               </label>
@@ -300,9 +300,9 @@ const ParcelDetails = ({ parcels = [], onUpdate, showErrors = false }) => {
             {/* Warning for large values */}
             {(parcel.weight_kg > 30 ||
               Object.values(parcel.dimensions).some((v) => v > 150)) && (
-              <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                <div className="text-sm text-amber-800 dark:text-amber-300">
+              <div className="flex items-start gap-3 bg-warning-surface border border-warning/30 rounded-lg p-3">
+                <AlertTriangle className="h-5 w-5 text-warning mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-warning">
                   <strong>Note:</strong> This is a large or heavy parcel. Ensure it's properly packed.
                 </div>
               </div>

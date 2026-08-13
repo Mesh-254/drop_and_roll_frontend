@@ -143,27 +143,27 @@ export default function ProfileDropdown() {
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center gap-3 px-4 py-2 rounded-xl transition-all duration-300 ${
           isOpen
-            ? "bg-orange-500/20 border border-orange-500/50 shadow-lg shadow-orange-500/20"
-            : "hover:bg-gray-800 border border-gray-700/50"
+            ? "bg-primary/20 border border-primary/50 shadow-lg shadow-primary/20"
+            : "hover:bg-surface border border-border/50"
         }`}
       >
         <div className={`w-10 h-10 rounded-lg font-bold flex items-center justify-center transition-all ${
           isOpen
-            ? "bg-gradient-to-br from-orange-500 to-orange-600 text-white"
-            : "bg-gray-800 text-gray-300 group-hover:bg-orange-500/20 group-hover:text-orange-400"
+            ? "bg-gradient-to-br from-primary to-primary-hover text-primary-foreground"
+            : "bg-surface text-muted-foreground group-hover:bg-primary/20 group-hover:text-brand-text"
         }`}>
           {getInitials()}
         </div>
         <div className="hidden sm:flex flex-col items-start">
-          <span className="text-sm font-bold text-white">{user.full_name}</span>
-          <span className="text-xs text-gray-400">{user.email}</span>
+          <span className="text-sm font-bold text-foreground">{user.full_name}</span>
+          <span className="text-xs text-muted-foreground">{user.email}</span>
         </div>
         <motion.div
           animate={{ rotate: isOpen ? 180 : 0 }}
           transition={{ duration: 0.3 }}
           className="hidden sm:flex"
         >
-          <ChevronDown className="w-4 h-4 text-gray-400" />
+          <ChevronDown className="w-4 h-4 text-muted-foreground" />
         </motion.div>
       </motion.button>
 
@@ -175,22 +175,22 @@ export default function ProfileDropdown() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="absolute right-0 mt-2 w-96 max-h-[600px] bg-gradient-to-br from-gray-900 via-black to-gray-900 border border-gray-800 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden z-50"
+            className="absolute right-0 mt-2 w-96 max-h-[600px] bg-gradient-to-br from-card via-background to-card border border-border rounded-2xl shadow-2xl shadow-black/50 overflow-hidden z-50"
           >
             {/* Header with user info */}
-            <div className="bg-gradient-to-r from-orange-500/10 to-transparent border-b border-gray-800 px-6 py-6">
+            <div className="bg-gradient-to-r from-primary/10 to-transparent border-b border-border px-6 py-6">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center font-bold text-white text-lg">
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center font-bold text-primary-foreground text-lg">
                   {getInitials()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-white font-bold text-base truncate">
+                  <h3 className="text-foreground font-bold text-base truncate">
                     {user.full_name}
                   </h3>
-                  <p className="text-gray-400 text-xs truncate">{user.email}</p>
+                  <p className="text-muted-foreground text-xs truncate">{user.email}</p>
                   <div className="flex items-center gap-2 mt-2">
-                    <span className="inline-flex items-center gap-1 text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full border border-green-500/30">
-                      <span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
+                    <span className="inline-flex items-center gap-1 text-xs bg-success/20 text-success px-2 py-1 rounded-full border border-success/30">
+                      <span className="w-1.5 h-1.5 bg-success rounded-full"></span>
                       Active
                     </span>
                   </div>
@@ -199,7 +199,7 @@ export default function ProfileDropdown() {
             </div>
 
             {/* NAVIGATION & PROFILE UPGRADE: User stats - removed "Total Spent" */}
-            <div className="grid grid-cols-2 gap-3 px-6 py-6 border-b border-gray-800/50">
+            <div className="grid grid-cols-2 gap-3 px-6 py-6 border-b border-border/50">
               {[
                 { label: "Total Orders", value: bookingsCount, icon: Package },
                 { label: "Member Since", value: memberSince, icon: Calendar },
@@ -209,11 +209,11 @@ export default function ProfileDropdown() {
                   <motion.div
                     key={idx}
                     whileHover={{ y: -2 }}
-                    className="bg-gray-800/30 border border-gray-700/30 rounded-lg p-3 text-center hover:border-orange-500/30 transition-all"
+                    className="bg-surface/30 border border-border/30 rounded-lg p-3 text-center hover:border-primary/30 transition-all"
                   >
-                    <Icon className="w-4 h-4 text-orange-500 mx-auto mb-2" />
-                    <p className="text-xs text-gray-400 mb-1">{stat.label}</p>
-                    <p className="text-sm font-bold text-white">{stat.value}</p>
+                    <Icon className="w-4 h-4 text-brand-text mx-auto mb-2" />
+                    <p className="text-xs text-muted-foreground mb-1">{stat.label}</p>
+                    <p className="text-sm font-bold text-foreground">{stat.value}</p>
                   </motion.div>
                 );
               })}
@@ -235,10 +235,10 @@ export default function ProfileDropdown() {
                           setActiveSubmenu(isSubmenuOpen ? null : item.id);
                         }
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-800/50 transition-colors group"
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-surface/50 transition-colors group"
                     >
-                      <Icon className="w-5 h-5 text-orange-400 group-hover:text-orange-300 transition-colors" />
-                      <span className="flex-1 text-left text-sm font-medium text-gray-300 group-hover:text-white transition-colors">
+                      <Icon className="w-5 h-5 text-brand-text group-hover:text-brand-text transition-colors" />
+                      <span className="flex-1 text-left text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
                         {item.label}
                       </span>
                       {hasSubmenu && (
@@ -246,7 +246,7 @@ export default function ProfileDropdown() {
                           animate={{ rotate: isSubmenuOpen ? 180 : 0 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <ChevronDown className="w-4 h-4 text-gray-500" />
+                          <ChevronDown className="w-4 h-4 text-subtle-foreground" />
                         </motion.div>
                       )}
                     </motion.button>
@@ -273,7 +273,7 @@ export default function ProfileDropdown() {
                                     setIsOpen(false);
                                     setActiveSubmenu(null);
                                   }}
-                                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-gray-800/50 transition-all"
+                                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-surface/50 transition-all"
                                 >
                                   <SubIcon className="w-4 h-4 flex-shrink-0" />
                                   <span>{subitem.label}</span>
@@ -290,14 +290,14 @@ export default function ProfileDropdown() {
             </div>
 
             {/* Divider */}
-            <div className="border-t border-gray-800/50" />
+            <div className="border-t border-border/50" />
 
             {/* Logout Button - MODERN DESIGN UPGRADE: Full-width prominent CTA */}
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-6 py-4 text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all font-bold text-sm"
+              className="w-full flex items-center gap-3 px-6 py-4 text-destructive hover:text-destructive hover:bg-destructive/10 transition-all font-bold text-sm"
             >
               <LogOut className="w-5 h-5" />
               <span>Logout</span>

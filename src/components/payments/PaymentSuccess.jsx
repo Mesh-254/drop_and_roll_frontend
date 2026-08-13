@@ -128,23 +128,23 @@ export default function PaymentSuccess() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
+      <div className="min-h-screen bg-muted flex items-center justify-center">
+        <Loader2 className="h-8 w-8 text-brand-text animate-spin" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-muted py-8">
         <div className="max-w-2xl mx-auto px-4">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Error</h1>
-            <p className="text-red-500">{error}</p>
+            <h1 className="text-3xl font-bold text-foreground mb-2">Error</h1>
+            <p className="text-destructive">{error}</p>
           </div>
           <button
             onClick={() => navigate("/history")}
-            className="bg-white hover:bg-gray-50 text-gray-700 font-bold py-3 px-6 rounded-lg border border-gray-300"
+            className="bg-card hover:bg-muted text-muted-foreground font-bold py-3 px-6 rounded-lg border border-border-strong"
           >
             Back to Bookings
           </button>
@@ -154,41 +154,41 @@ export default function PaymentSuccess() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-80 py-25">
+    <div className="min-h-screen bg-background py-25">
       <div className="max-w-2xl mx-auto px-4">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4">
-            <CheckCircle className="h-12 w-12 text-green-500" />
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-success-surface rounded-full mb-4">
+            <CheckCircle className="h-12 w-12 text-success" />
           </div>
-          <h1 className="text-3xl font-bold text-green-200 mb-2">
+          <h1 className="text-3xl font-bold text-success mb-2">
             Payment Successful
           </h1>
-          <p className="text-gray-200">
+          <p className="text-foreground">
             Thank you for your payment! Your booking is confirmed.
           </p>
         </div>
 
         {transaction && (
-          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">
+          <div className="bg-card rounded-2xl shadow-lg p-6 mb-6">
+            <h2 className="text-xl font-bold text-foreground mb-4">
               Transaction Details
             </h2>
             <div className="space-y-3">
-              <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                <span className="text-gray-600">Transaction ID:</span>
-                <span className="font-mono text-sm text-gray-900">
+              <div className="flex justify-between items-center py-2 border-b border-border">
+                <span className="text-muted-foreground">Transaction ID:</span>
+                <span className="font-mono text-sm text-foreground">
                   {transaction.reference}
                 </span>
               </div>
-              <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                <span className="text-gray-600">Amount:</span>
-                <span className="text-gray-900">GBP {transaction.amount}</span>
+              <div className="flex justify-between items-center py-2 border-b border-border">
+                <span className="text-muted-foreground">Amount:</span>
+                <span className="text-foreground">GBP {transaction.amount}</span>
               </div>
-              <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                <span className="text-gray-600">Status:</span>
+              <div className="flex justify-between items-center py-2 border-b border-border">
+                <span className="text-muted-foreground">Status:</span>
                 <span
-                  className={`text-gray-900 capitalize ${
-                    transaction.status === "success" ? "text-green-500" : ""
+                  className={`text-foreground capitalize ${
+                    transaction.status === "success" ? "text-success" : ""
                   }`}
                 >
                   {transaction.status}
@@ -196,8 +196,8 @@ export default function PaymentSuccess() {
               </div>
               {booking && (
                 <div className="flex justify-between items-center py-2">
-                  <span className="text-gray-600">Booking ID:</span>
-                  <span className="font-mono text-sm text-gray-900">
+                  <span className="text-muted-foreground">Booking ID:</span>
+                  <span className="font-mono text-sm text-foreground">
                     {booking.id}
                   </span>
                 </div>
@@ -207,28 +207,28 @@ export default function PaymentSuccess() {
         )}
 
         {booking && (
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-              <Package className="h-6 w-6 text-orange-500 mr-2" />
+          <div className="bg-card rounded-2xl shadow-lg p-6">
+            <h2 className="text-xl font-bold text-foreground mb-4 flex items-center">
+              <Package className="h-6 w-6 text-brand-text mr-2" />
               Booking Details
             </h2>
             <div className="space-y-3">
-              <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                <span className="text-gray-600">Tracking Number:</span>
-                <span className="font-mono text-sm text-gray-900">
+              <div className="flex justify-between items-center py-2 border-b border-border">
+                <span className="text-muted-foreground">Tracking Number:</span>
+                <span className="font-mono text-sm text-foreground">
                   {booking.tracking_number}
                 </span>
               </div>
-              <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                <span className="text-gray-600">Pickup Address:</span>
-                <span className="text-sm text-gray-900">
+              <div className="flex justify-between items-center py-2 border-b border-border">
+                <span className="text-muted-foreground">Pickup Address:</span>
+                <span className="text-sm text-foreground">
                   {booking.pickup_address?.line1},{" "}
                   {booking.pickup_address?.city}
                 </span>
               </div>
-              <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                <span className="text-gray-600">Dropoff Address:</span>
-                <span className="text-sm text-gray-900">
+              <div className="flex justify-between items-center py-2 border-b border-border">
+                <span className="text-muted-foreground">Dropoff Address:</span>
+                <span className="text-sm text-foreground">
                   {booking.dropoff_address?.line1},{" "}
                   {booking.dropoff_address?.city}
                 </span>

@@ -184,27 +184,27 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
       initial={{ opacity: 0, y: 20, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.35 }}
-      className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl p-8 space-y-6"
+      className="backdrop-blur-xl bg-foreground/10 border border-foreground/20 rounded-3xl shadow-2xl p-8 space-y-6"
     >
       {/* Header */}
       <div className="text-center">
-        <div className="inline-flex items-center gap-2 mb-4 px-4 py-2 bg-orange-500/20 border border-orange-500/30 rounded-full">
-          <Zap size={16} className="text-orange-400" />
-          <span className="text-xs font-semibold text-orange-300 uppercase tracking-wider">
+        <div className="inline-flex items-center gap-2 mb-4 px-4 py-2 bg-primary/20 border border-primary/30 rounded-full">
+          <Zap size={16} className="text-brand-text" />
+          <span className="text-xs font-semibold text-brand-text uppercase tracking-wider">
             Drop 'N Roll
           </span>
         </div>
-        <h2 className="text-3xl font-bold text-white mb-1">Welcome back</h2>
-        <p className="text-gray-300 text-sm">Sign in to your account</p>
+        <h2 className="text-3xl font-bold text-foreground mb-1">Welcome back</h2>
+        <p className="text-muted-foreground text-sm">Sign in to your account</p>
       </div>
 
       {/* Session-expiry notice — distinct, non-alarming, and only shown when the
           user was redirected here by an expiry (never on a normal login). Kept
           separate from the red error banner below. */}
       {expiredNotice && !errors.general && (
-        <div className="bg-amber-500/15 border border-amber-500/40 rounded-xl p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-          <p className="text-amber-100 text-sm">
+        <div className="bg-warning/15 border border-warning/40 rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
+          <p className="text-warning text-sm">
             Your session expired — please log in again.
           </p>
         </div>
@@ -212,9 +212,9 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
 
       {/* General error */}
       {errors.general && (
-        <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-          <p className="text-red-200 text-sm">{errors.general}</p>
+        <div className="bg-destructive/20 border border-destructive/50 rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+          <p className="text-destructive text-sm">{errors.general}</p>
         </div>
       )}
 
@@ -222,7 +222,7 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
         {/* Email */}
         <div>
           <div className="relative group">
-            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-400/60 group-focus-within:text-orange-400 w-5 h-5 transition-colors" />
+            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-text/60 group-focus-within:text-brand-text w-5 h-5 transition-colors" />
             <input
               ref={firstInputRef}
               type="email"
@@ -230,45 +230,45 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email address"
               autoComplete="email"
-              className={`w-full py-3 pl-12 pr-4 bg-white/10 border rounded-xl backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 transition-all duration-200 ${
+              className={`w-full py-3 pl-12 pr-4 bg-foreground/10 border rounded-xl backdrop-blur-sm text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 transition-all duration-200 ${
                 errors.email
-                  ? "border-red-500/50 focus:ring-red-500/50"
-                  : "border-white/20 focus:ring-orange-500/50 focus:border-orange-500/30"
+                  ? "border-destructive/50 focus:ring-destructive/50"
+                  : "border-foreground/20 focus:ring-ring/50 focus:border-primary/30"
               }`}
             />
           </div>
           {errors.email && (
-            <p className="text-red-400 text-sm mt-1 ml-4">{errors.email}</p>
+            <p className="text-destructive text-sm mt-1 ml-4">{errors.email}</p>
           )}
         </div>
 
         {/* Password */}
         <div>
           <div className="relative group">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-400/60 group-focus-within:text-orange-400 w-5 h-5 transition-colors" />
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-text/60 group-focus-within:text-brand-text w-5 h-5 transition-colors" />
             <input
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
               autoComplete="current-password"
-              className={`w-full py-3 pl-12 pr-12 bg-white/10 border rounded-xl backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 transition-all duration-200 ${
+              className={`w-full py-3 pl-12 pr-12 bg-foreground/10 border rounded-xl backdrop-blur-sm text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 transition-all duration-200 ${
                 errors.password
-                  ? "border-red-500/50 focus:ring-red-500/50"
-                  : "border-white/20 focus:ring-orange-500/50 focus:border-orange-500/30"
+                  ? "border-destructive/50 focus:ring-destructive/50"
+                  : "border-foreground/20 focus:ring-ring/50 focus:border-primary/30"
               }`}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-400 transition-colors"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-brand-text transition-colors"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
           </div>
           {errors.password && (
-            <p className="text-red-400 text-sm mt-1 ml-4">{errors.password}</p>
+            <p className="text-destructive text-sm mt-1 ml-4">{errors.password}</p>
           )}
         </div>
 
@@ -279,14 +279,14 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
               type="checkbox"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
-              className="w-4 h-4 accent-orange-500 cursor-pointer"
+              className="w-4 h-4 accent-primary cursor-pointer"
             />
-            <span className="text-gray-300">Remember me</span>
+            <span className="text-muted-foreground">Remember me</span>
           </label>
           <Link
             to="/forgot-password"
             onClick={onClose}
-            className="text-orange-400 hover:text-orange-300 transition-colors font-medium"
+            className="text-brand-text hover:text-brand-text transition-colors font-medium"
           >
             Forgot password?
           </Link>
@@ -308,7 +308,7 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
           disabled={isLoading || (challengeRequired && !turnstileToken)}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          className="w-full py-3 mt-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-orange-500/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full py-3 mt-4 bg-gradient-to-r from-primary to-primary-hover text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {isLoading ? (
             <>
@@ -325,10 +325,10 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
         {/* Divider */}
         <div className="relative my-2">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-white/10" />
+            <div className="w-full border-t border-foreground/10" />
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-3 bg-slate-900/80 text-gray-400">or continue with</span>
+            <span className="px-3 bg-card/80 text-muted-foreground">or continue with</span>
           </div>
         </div>
 
@@ -349,20 +349,20 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
       </form>
 
       {/* Switch to register */}
-      <p className="text-center text-gray-400 text-sm">
+      <p className="text-center text-muted-foreground text-sm">
         Don't have an account?{" "}
         {onSwitchToRegister ? (
           <button
             type="button"
             onClick={onSwitchToRegister}
-            className="text-orange-400 hover:text-orange-300 font-semibold transition-colors"
+            className="text-brand-text hover:text-brand-text font-semibold transition-colors"
           >
             Create one
           </button>
         ) : (
           <Link
             to="/register"
-            className="text-orange-400 hover:text-orange-300 font-semibold transition-colors"
+            className="text-brand-text hover:text-brand-text font-semibold transition-colors"
           >
             Create one
           </Link>
@@ -370,11 +370,11 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
       </p>
 
       {/* Terms */}
-      <p className="text-center text-gray-500 text-xs leading-relaxed">
+      <p className="text-center text-subtle-foreground text-xs leading-relaxed">
         By continuing, you agree to Drop 'N Roll's{" "}
-        <span className="text-orange-400 cursor-pointer">Terms of Service</span>{" "}
+        <span className="text-brand-text cursor-pointer">Terms of Service</span>{" "}
         and{" "}
-        <span className="text-orange-400 cursor-pointer">Privacy Policy</span>
+        <span className="text-brand-text cursor-pointer">Privacy Policy</span>
       </p>
     </motion.div>
   );

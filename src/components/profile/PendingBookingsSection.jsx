@@ -55,8 +55,8 @@ export default function PendingBookingsSection() {
   if (state.loading) {
     return (
       <div className="mt-8 flex items-center justify-center py-4">
-        <Loader className="w-5 h-5 animate-spin text-orange-400" />
-        <span className="ml-2 text-gray-400 text-sm">Checking for pending payments…</span>
+        <Loader className="w-5 h-5 animate-spin text-brand-text" />
+        <span className="ml-2 text-muted-foreground text-sm">Checking for pending payments…</span>
       </div>
     );
   }
@@ -65,7 +65,7 @@ export default function PendingBookingsSection() {
   // nothing; a fetch error shows a quiet one-liner instead of a scary banner.
   if (state.error) {
     return (
-      <p className="mt-8 text-sm text-gray-500 flex items-center gap-2">
+      <p className="mt-8 text-sm text-subtle-foreground flex items-center gap-2">
         <AlertCircle className="w-4 h-4" />
         Couldn't check for pending payments right now.
       </p>
@@ -81,14 +81,14 @@ export default function PendingBookingsSection() {
       className="mt-8"
       data-testid="pending-bookings-section"
     >
-      <div className="bg-gradient-to-br from-gray-900 to-black border-2 border-amber-500/30 rounded-2xl p-8">
+      <div className="bg-gradient-to-br from-card to-background border-2 border-warning/30 rounded-2xl p-8">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
-            <Clock className="w-5 h-5 text-amber-400" />
+          <div className="w-10 h-10 rounded-lg bg-warning/20 flex items-center justify-center">
+            <Clock className="w-5 h-5 text-warning" />
           </div>
           <div>
-            <h3 className="text-2xl font-bold text-white">Pending Payments</h3>
-            <p className="text-sm text-gray-400">
+            <h3 className="text-2xl font-bold text-foreground">Pending Payments</h3>
+            <p className="text-sm text-muted-foreground">
               These bookings are saved but not confirmed until you pay.
             </p>
           </div>
@@ -100,16 +100,16 @@ export default function PendingBookingsSection() {
             return (
               <div
                 key={row.booking_id}
-                className="flex flex-col md:flex-row md:items-center gap-3 bg-gray-800/40 border border-gray-700/40 rounded-xl p-4"
+                className="flex flex-col md:flex-row md:items-center gap-3 bg-surface/40 border border-border/40 rounded-xl p-4"
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-medium truncate">
+                  <p className="text-foreground text-sm font-medium truncate">
                     {row.pickup || "Pickup"} → {row.dropoff || "Drop-off"}
                   </p>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                    <span className="text-orange-300 font-semibold">£{row.final_price}</span>
+                  <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                    <span className="text-brand-text font-semibold">£{row.final_price}</span>
                     {remaining && (
-                      <span className="flex items-center gap-1 text-amber-400">
+                      <span className="flex items-center gap-1 text-warning">
                         <Clock className="w-3 h-3" />
                         {remaining}
                       </span>
@@ -122,9 +122,9 @@ export default function PendingBookingsSection() {
                   onClick={() => handleCompletePayment(row)}
                   disabled={!row.transaction?.id}
                   className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r
-                             from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700
-                             disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed
-                             text-white text-sm font-bold rounded-lg transition-all shrink-0"
+                             from-primary to-primary-hover hover:from-primary-hover hover:to-primary-hover
+                             disabled:from-surface-hover disabled:to-surface-hover disabled:cursor-not-allowed
+                             text-primary-foreground text-sm font-bold rounded-lg transition-all shrink-0"
                 >
                   <CreditCard className="w-4 h-4" />
                   Complete payment

@@ -99,13 +99,13 @@ const AddressAutocomplete = ({
   if (!places || isLoading) {
     return (
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
+        <label className="block text-sm font-medium text-muted-foreground">{label}</label>
         <div className="flex items-center justify-center h-10">
-          <Loader2 className="h-5 w-5 text-orange-500 animate-spin" />
-          <span className="ml-2 text-sm text-gray-500">Loading autocomplete...</span>
+          <Loader2 className="h-5 w-5 text-brand-text animate-spin" />
+          <span className="ml-2 text-sm text-subtle-foreground">Loading autocomplete...</span>
         </div>
         {validation && (
-          <div className="flex items-center text-red-500 text-sm">
+          <div className="flex items-center text-destructive text-sm">
             <AlertCircle size={16} className="mr-2" />
             {validation}
           </div>
@@ -116,7 +116,7 @@ const AddressAutocomplete = ({
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
+      <label className="block text-sm font-medium text-muted-foreground">{label}</label>
       <input
         ref={inputRef}
         type="text"
@@ -124,14 +124,14 @@ const AddressAutocomplete = ({
         onChange={(e) => typeof onPostcodeChange === "function" && onPostcodeChange(e.target.value)}
         placeholder={placeholder || `Enter ${label.toLowerCase()} address`}
         disabled={disabled}
-        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors disabled:opacity-50"
+        className="w-full px-4 py-3 border border-border-strong rounded-lg bg-card dark:bg-surface text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors disabled:opacity-50"
       />
       {suggestions.length > 0 && (
-        <ul className="mt-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800">
+        <ul className="mt-2 border border-border-strong rounded-lg bg-card dark:bg-surface">
           {suggestions.map((suggestion, index) => (
             <li
               key={index}
-              className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+              className="px-4 py-2 hover:bg-muted dark:hover:bg-surface-hover cursor-pointer"
               onClick={() => typeof onSelect === "function" && onSelect(suggestion)}
             >
               {suggestion.line1}, {suggestion.city}
@@ -140,7 +140,7 @@ const AddressAutocomplete = ({
         </ul>
       )}
       {validation && (
-        <div className="flex items-center text-red-500 text-sm">
+        <div className="flex items-center text-destructive text-sm">
           <AlertCircle size={16} className="mr-2" />
           {validation}
         </div>

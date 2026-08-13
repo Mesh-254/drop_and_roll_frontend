@@ -62,7 +62,7 @@ const ShipmentTypeSelector = ({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={32} className="animate-spin text-orange-500" />
+        <Loader2 size={32} className="animate-spin text-brand-text" />
       </div>
     );
   }
@@ -70,8 +70,8 @@ const ShipmentTypeSelector = ({
   if (error) {
     return (
       <div className="text-center py-12">
-        <AlertCircle size={48} className="mx-auto text-red-500 mb-4" />
-        <p className="text-red-600 dark:text-red-400">{error}</p>
+        <AlertCircle size={48} className="mx-auto text-destructive mb-4" />
+        <p className="text-destructive">{error}</p>
       </div>
     );
   }
@@ -87,18 +87,18 @@ const ShipmentTypeSelector = ({
             p-6 rounded-xl border-2 transition-all transform hover:scale-105 text-left
             ${
               selectedType?.id === type.id
-                ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
-                : "border-gray-200 dark:border-gray-700 hover:border-orange-300 dark:hover:border-orange-600"
+                ? "border-primary bg-brand-surface"
+                : "border-border hover:border-primary/30 dark:hover:border-primary"
             }
           `}
         >
           <div className="flex items-center mb-3">
-            <Package className="h-8 w-8 text-orange-500 mr-3" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <Package className="h-8 w-8 text-brand-text mr-3" />
+            <h3 className="text-lg font-semibold text-foreground">
               {type.name}
             </h3>
           </div>
-          <p className="text-gray-600 dark:text-gray-400 text-sm">
+          <p className="text-muted-foreground text-sm">
             {type.description}
           </p>
         </button>
@@ -118,7 +118,7 @@ const ServiceSelector = ({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={32} className="animate-spin text-orange-500" />
+        <Loader2 size={32} className="animate-spin text-brand-text" />
       </div>
     );
   }
@@ -126,8 +126,8 @@ const ServiceSelector = ({
   if (error) {
     return (
       <div className="text-center py-12">
-        <AlertCircle size={48} className="mx-auto text-red-500 mb-4" />
-        <p className="text-red-600 dark:text-red-400">{error}</p>
+        <AlertCircle size={48} className="mx-auto text-destructive mb-4" />
+        <p className="text-destructive">{error}</p>
       </div>
     );
   }
@@ -143,23 +143,23 @@ const ServiceSelector = ({
             p-6 rounded-xl border-2 transition-all transform hover:scale-105 text-left
             ${
               selectedService?.id === service.id
-                ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
-                : "border-gray-200 dark:border-gray-700 hover:border-orange-300 dark:hover:border-orange-600"
+                ? "border-primary bg-brand-surface"
+                : "border-border hover:border-primary/30 dark:hover:border-primary"
             }
           `}
         >
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center">
-              <Truck className="h-8 w-8 text-orange-500 mr-3" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <Truck className="h-8 w-8 text-brand-text mr-3" />
+              <h3 className="text-lg font-semibold text-foreground">
                 {service.name}
               </h3>
             </div>
-            <span className="text-lg font-bold text-orange-500">
+            <span className="text-lg font-bold text-brand-text">
               £{service.price}
             </span>
           </div>
-          <p className="text-gray-600 dark:text-gray-400 text-sm">
+          <p className="text-muted-foreground text-sm">
             {service.description}
           </p>
         </button>
@@ -171,10 +171,10 @@ const ServiceSelector = ({
 export const QuoteDisplay = ({ quote, onDownloadPDF, isLoading, formData }) => {
   if (isLoading) {
     return (
-      <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6">
+      <div className="bg-muted dark:bg-surface rounded-xl p-6">
         <div className="flex items-center justify-center py-8">
-          <Loader2 size={32} className="animate-spin text-orange-500 mr-3" />
-          <span className="text-gray-600 dark:text-gray-400">
+          <Loader2 size={32} className="animate-spin text-brand-text mr-3" />
+          <span className="text-muted-foreground">
             Calculating quote...
           </span>
         </div>
@@ -184,10 +184,10 @@ export const QuoteDisplay = ({ quote, onDownloadPDF, isLoading, formData }) => {
 
   if (!quote) {
     return (
-      <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6">
+      <div className="bg-muted dark:bg-surface rounded-xl p-6">
         <div className="text-center py-8">
-          <Calculator className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">
+          <Calculator className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+          <p className="text-muted-foreground">
             Complete the form to see your quote
           </p>
         </div>
@@ -198,17 +198,17 @@ export const QuoteDisplay = ({ quote, onDownloadPDF, isLoading, formData }) => {
   const breakdown = quote.meta || {};
 
   return (
-    <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-xl p-6 border border-orange-200 dark:border-orange-800">
+    <div className="bg-gradient-to-br from-brand-surface to-brand-surface dark:from-brand-surface/20 dark:to-primary-hover/20 rounded-xl p-6 border border-primary/30">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center">
-          <Calculator className="h-6 w-6 text-orange-500 mr-3" />
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+          <Calculator className="h-6 w-6 text-brand-text mr-3" />
+          <h3 className="text-xl font-bold text-foreground">
             Quote Breakdown
           </h3>
         </div>
         <button
           onClick={onDownloadPDF}
-          className="flex items-center px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors"
+          className="flex items-center px-4 py-2 bg-primary hover:bg-primary-hover text-primary-foreground rounded-lg transition-colors"
         >
           <Download size={16} className="mr-2" />
           Download PDF
@@ -216,53 +216,53 @@ export const QuoteDisplay = ({ quote, onDownloadPDF, isLoading, formData }) => {
       </div>
 
       <div className="space-y-3">
-        <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
-          <span className="text-gray-700 dark:text-gray-300">
+        <div className="flex justify-between items-center py-2 border-b border-primary/30">
+          <span className="text-muted-foreground">
             Base Price
           </span>
-          <span className="font-medium text-gray-900 dark:text-white">
+          <span className="font-medium text-foreground">
             £{breakdown.base_price?.toFixed(2) || "0.00"}
           </span>
         </div>
 
         {breakdown.extra_parcels > 0 && (
-          <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
-            <span className="text-gray-700 dark:text-gray-300">
+          <div className="flex justify-between items-center py-2 border-b border-primary/30">
+            <span className="text-muted-foreground">
               Extra Parcels ({breakdown.extra_parcels} × £{breakdown.extra_parcel_charge_per?.toFixed(2)})
             </span>
-            <span className="font-medium text-gray-900 dark:text-white">
+            <span className="font-medium text-foreground">
               £{breakdown.extra_parcel_fee?.toFixed(2) || "0.00"}
             </span>
           </div>
         )}
 
         {breakdown.extra_distance_miles > 0 && (
-          <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
-            <span className="text-gray-700 dark:text-gray-300">
+          <div className="flex justify-between items-center py-2 border-b border-primary/30">
+            <span className="text-muted-foreground">
               Distance Charge ({breakdown.extra_distance_miles?.toFixed(1)} miles beyond {breakdown.free_miles?.toFixed(0)} free)
             </span>
-            <span className="font-medium text-gray-900 dark:text-white">
+            <span className="font-medium text-foreground">
               £{breakdown.extra_distance_charge?.toFixed(2) || "0.00"}
             </span>
           </div>
         )}
 
         {breakdown.insurance_fee > 0 && (
-          <div className="flex justify-between items-center py-2 border-b border-orange-200 dark:border-orange-700">
-            <span className="text-gray-700 dark:text-gray-300">
+          <div className="flex justify-between items-center py-2 border-b border-primary/30">
+            <span className="text-muted-foreground">
               Insurance Fee
             </span>
-            <span className="font-medium text-gray-900 dark:text-white">
+            <span className="font-medium text-foreground">
               £{breakdown.insurance_fee?.toFixed(2) || "0.00"}
             </span>
           </div>
         )}
 
-        <div className="flex justify-between items-center py-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg px-4 mt-4">
-          <span className="text-lg font-bold text-gray-900 dark:text-white">
+        <div className="flex justify-between items-center py-3 bg-brand-surface rounded-lg px-4 mt-4">
+          <span className="text-lg font-bold text-foreground">
             Total Price
           </span>
-          <span className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+          <span className="text-2xl font-bold text-brand-text">
             £{breakdown.final_price?.toFixed(2) || "0.00"}
           </span>
         </div>
@@ -827,25 +827,25 @@ export default function GetQuoteModal({
 
   return (
     <APIProvider apiKey={apiKey} libraries={libraries}>
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-y-auto animate-in zoom-in-95 duration-300">
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-orange-500 text-white rounded-t-2xl">
+      <div className="fixed inset-0 bg-overlay flex items-center justify-center z-50 p-4">
+        <div className="bg-card rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-y-auto animate-in zoom-in-95 duration-300">
+          <div className="flex items-center justify-between p-6 border-b border-border bg-primary text-primary-foreground rounded-t-2xl">
             <div>
               <h2 className="text-2xl font-bold">Get Quote & Book</h2>
-              <p className="text-orange-100 text-sm">
+              <p className="text-brand-text text-sm">
                 Step {currentStep} of 5: {stepTitles[currentStep - 1]}
               </p>
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-orange-600 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-orange-300"
+              className="p-2 hover:bg-primary-hover rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
               aria-label="Close modal"
             >
               <X size={24} />
             </button>
           </div>
 
-          <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800">
+          <div className="px-6 py-4 bg-muted dark:bg-surface">
             <div className="flex items-center justify-between">
               {stepTitles.map((title, index) => {
                 const stepNumber = index + 1;
@@ -859,10 +859,10 @@ export default function GetQuoteModal({
                       w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors
                       ${
                         isCompleted
-                          ? "bg-green-500 text-white"
+                          ? "bg-success text-foreground"
                           : isActive
-                            ? "bg-orange-500 text-white"
-                            : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                            ? "bg-primary text-foreground"
+                            : "bg-surface-hover text-muted-foreground"
                       }
                     `}
                     >
@@ -873,17 +873,17 @@ export default function GetQuoteModal({
                       ml-2 text-sm font-medium hidden sm:block
                       ${
                         isActive
-                          ? "text-orange-500"
+                          ? "text-brand-text"
                           : isCompleted
-                            ? "text-green-500"
-                            : "text-gray-500 dark:text-gray-400"
+                            ? "text-success"
+                            : "text-subtle-foreground dark:text-muted-foreground"
                       }
                     `}
                     >
                       {title}
                     </span>
                     {index < stepTitles.length - 1 && (
-                      <div className="w-8 h-0.5 bg-gray-200 dark:bg-gray-700 mx-4 hidden sm:block" />
+                      <div className="w-8 h-0.5 bg-surface-hover mx-4 hidden sm:block" />
                     )}
                   </div>
                 );
@@ -895,10 +895,10 @@ export default function GetQuoteModal({
             {currentStep === 1 && (
               <div className="space-y-6">
                 <div className="text-center">
-                  <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+                  <h3 className="text-2xl font-semibold text-foreground mb-2">
                     What are you shipping?
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-400">
+                  <p className="text-muted-foreground">
                     Select the type of shipment to get started
                   </p>
                 </div>
@@ -913,7 +913,7 @@ export default function GetQuoteModal({
                 />
 
                 {validation.shipmentType && (
-                  <div className="flex items-center text-red-500 text-sm">
+                  <div className="flex items-center text-destructive text-sm">
                     <AlertCircle size={16} className="mr-2" />
                     {validation.shipmentType}
                   </div>
@@ -925,16 +925,16 @@ export default function GetQuoteModal({
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+                    <h3 className="text-2xl font-semibold text-foreground mb-2">
                       Choose Core Service Offering
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <p className="text-muted-foreground">
                       Selected: {formData.shipmentType?.name}
                     </p>
                   </div>
                   <button
                     onClick={prevStep}
-                    className="flex items-center text-orange-500 hover:text-orange-600 text-sm font-medium px-4 py-2 border border-orange-500 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+                    className="flex items-center text-brand-text hover:text-brand-text text-sm font-medium px-4 py-2 border border-primary rounded-lg hover:bg-brand-surface transition-colors"
                   >
                     <ChevronLeft size={16} className="mr-1" />
                     Change Type
@@ -951,7 +951,7 @@ export default function GetQuoteModal({
                 />
 
                 {validation.service && (
-                  <div className="flex items-center text-red-500 text-sm">
+                  <div className="flex items-center text-destructive text-sm">
                     <AlertCircle size={16} className="mr-2" />
                     {validation.service}
                   </div>
@@ -964,17 +964,17 @@ export default function GetQuoteModal({
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+                    <h3 className="text-2xl font-semibold text-foreground mb-2">
                       Your Parcels
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <p className="text-muted-foreground">
                       Service: {formData.service?.name} • (Maximum 5 parcels per
                       booking)
                     </p>
                   </div>
                   <button
                     onClick={prevStep}
-                    className="flex items-center text-orange-500 hover:text-orange-600 text-sm font-medium px-4 py-2 border border-orange-500 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+                    className="flex items-center text-brand-text hover:text-brand-text text-sm font-medium px-4 py-2 border border-primary rounded-lg hover:bg-brand-surface transition-colors"
                   >
                     <ChevronLeft size={16} className="mr-1" />
                     Change Service
@@ -982,10 +982,10 @@ export default function GetQuoteModal({
                 </div>
 
                 {/* Total Weight Display */}
-                <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                <div className="bg-brand-surface border border-primary/30 rounded-lg p-4">
+                  <p className="text-sm text-muted-foreground">
                     Total weight:{" "}
-                    <span className="font-bold text-orange-600 dark:text-orange-400">
+                    <span className="font-bold text-brand-text">
                       {totalWeight.toFixed(1)} kg
                     </span>
                   </p>
@@ -1011,7 +1011,7 @@ export default function GetQuoteModal({
                 {formData.parcels.length < 5 && (
                   <button
                     onClick={handleAddParcel}
-                    className="w-full py-3 px-4 rounded-lg border-2 border-dashed border-orange-300 dark:border-orange-700 text-orange-500 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/10 font-medium transition-colors flex items-center justify-center gap-2"
+                    className="w-full py-3 px-4 rounded-lg border-2 border-dashed border-primary/30 text-brand-text hover:bg-brand-surface font-medium transition-colors flex items-center justify-center gap-2"
                   >
                     <Plus size={20} />
                     Add Another Parcel
@@ -1019,7 +1019,7 @@ export default function GetQuoteModal({
                 )}
 
                 {/* Insurance Option */}
-                <div className="space-y-4 mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <div className="space-y-4 mt-6 pt-6 border-t border-border">
                   <div className="flex items-center space-x-3">
                     <input
                       type="checkbox"
@@ -1031,11 +1031,11 @@ export default function GetQuoteModal({
                           insurance: e.target.checked,
                         }))
                       }
-                      className="w-5 h-5 text-orange-500 border-gray-300 dark:border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
+                      className="w-5 h-5 text-brand-text border-border-strong rounded focus:ring-ring focus:ring-2"
                     />
                     <label
                       htmlFor="insurance"
-                      className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                      className="text-sm font-medium text-muted-foreground"
                     >
                       Add insurance coverage for all parcels
                     </label>
@@ -1045,7 +1045,7 @@ export default function GetQuoteModal({
                     <div>
                       <label
                         htmlFor="insuranceAmount"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                        className="block text-sm font-medium text-muted-foreground mb-2"
                       >
                         Total Insurance Amount (£)
                       </label>
@@ -1067,18 +1067,18 @@ export default function GetQuoteModal({
                           placeholder="Enter insurance value"
                           aria-invalid={!!insuranceError}
                           aria-describedby={insuranceError ? "insuranceAmount-error" : undefined}
-                          className={`w-full px-4 py-3 pr-10 border-2 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors ${
+                          className={`w-full px-4 py-3 pr-10 border-2 rounded-lg bg-card dark:bg-surface text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors ${
                             insuranceError
-                              ? "border-red-500"
+                              ? "border-destructive"
                               : insuranceValid
-                                ? "border-green-500"
-                                : "border-gray-300 dark:border-gray-600"
+                                ? "border-success"
+                                : "border-border-strong"
                           }`}
                         />
                         {insuranceValid && (
                           <Check
                             size={18}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-success"
                             aria-hidden="true"
                           />
                         )}
@@ -1087,7 +1087,7 @@ export default function GetQuoteModal({
                         <div
                           id="insuranceAmount-error"
                           role="alert"
-                          className="flex items-center text-red-500 text-sm mt-2"
+                          className="flex items-center text-destructive text-sm mt-2"
                         >
                           <AlertCircle size={16} className="mr-2 shrink-0" />
                           {insuranceError}
@@ -1103,10 +1103,10 @@ export default function GetQuoteModal({
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+                    <h3 className="text-2xl font-semibold text-foreground mb-2">
                       Pickup & Dropoff Locations
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <p className="text-muted-foreground">
                       Total Weight: {totalWeight.toFixed(1)}kg •{" "}
                       {formData.parcels.length} parcel
                       {formData.parcels.length !== 1 ? "s" : ""}
@@ -1114,7 +1114,7 @@ export default function GetQuoteModal({
                   </div>
                   <button
                     onClick={prevStep}
-                    className="flex items-center text-orange-500 hover:text-orange-600 text-sm font-medium px-4 py-2 border border-orange-500 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+                    className="flex items-center text-brand-text hover:text-brand-text text-sm font-medium px-4 py-2 border border-primary rounded-lg hover:bg-brand-surface transition-colors"
                   >
                     <ChevronLeft size={16} className="mr-1" />
                     Change Details
@@ -1160,17 +1160,17 @@ export default function GetQuoteModal({
                 </div>
 
                 {formData.pickupAddress && (
-                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                  <div className="bg-success-surface border border-success/30 rounded-lg p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
-                        <div className="flex items-center justify-center w-6 h-6 bg-green-500 rounded-full">
-                          <Check className="h-4 w-4 text-white" />
+                        <div className="flex items-center justify-center w-6 h-6 bg-success rounded-full">
+                          <Check className="h-4 w-4 text-foreground" />
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                          <p className="text-sm font-medium text-success">
                             Pickup Location Selected
                           </p>
-                          <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                          <p className="text-sm text-success mt-1">
                             {formData.pickupAddress.line1},{" "}
                             {formData.pickupAddress.city}{" "}
                             {formData.pickupAddress.postal_code}
@@ -1185,7 +1185,7 @@ export default function GetQuoteModal({
                           }));
                           setPickupPostcode("");
                         }}
-                        className="text-sm text-green-600 hover:text-green-800 font-medium"
+                        className="text-sm text-success hover:text-success font-medium"
                       >
                         Edit
                       </button>
@@ -1194,17 +1194,17 @@ export default function GetQuoteModal({
                 )}
 
                 {formData.dropoffAddress && (
-                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                  <div className="bg-success-surface border border-success/30 rounded-lg p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
-                        <div className="flex items-center justify-center w-6 h-6 bg-green-500 rounded-full">
-                          <Check className="h-4 w-4 text-white" />
+                        <div className="flex items-center justify-center w-6 h-6 bg-success rounded-full">
+                          <Check className="h-4 w-4 text-foreground" />
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                          <p className="text-sm font-medium text-success">
                             Dropoff Location Selected
                           </p>
-                          <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                          <p className="text-sm text-success mt-1">
                             {formData.dropoffAddress.line1},{" "}
                             {formData.dropoffAddress.city}{" "}
                             {formData.dropoffAddress.postal_code}
@@ -1219,7 +1219,7 @@ export default function GetQuoteModal({
                           }));
                           setDropoffPostcode("");
                         }}
-                        className="text-sm text-green-600 hover:text-green-800 font-medium"
+                        className="text-sm text-success hover:text-success font-medium"
                       >
                         Edit
                       </button>
@@ -1230,11 +1230,11 @@ export default function GetQuoteModal({
                 {formData.pickupAddress && formData.dropoffAddress && (
                   <div className="mt-6">
                     <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-lg font-medium text-gray-900 dark:text-white">
+                      <h4 className="text-lg font-medium text-foreground">
                         Route Preview
                       </h4>
                       {formData.distanceKm > 0 && (
-                        <span className="text-sm font-medium text-orange-600 dark:text-orange-400">
+                        <span className="text-sm font-medium text-brand-text">
                           Distance: {formData.distanceKm}km
                         </span>
                       )}
@@ -1243,7 +1243,7 @@ export default function GetQuoteModal({
                     {/* <MapComponent
                       pickupAddress={formData.pickupAddress}
                       dropoffAddress={formData.dropoffAddress}
-                      className="w-full h-64 rounded-lg border border-gray-300 dark:border-gray-600"
+                      className="w-full h-64 rounded-lg border border-border-strong"
                     /> */}
                   </div>
                 )}
@@ -1254,16 +1254,16 @@ export default function GetQuoteModal({
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+                    <h3 className="text-2xl font-semibold text-foreground mb-2">
                       Insurance & Quote
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <p className="text-muted-foreground">
                       Review your quote and provide contact details
                     </p>
                   </div>
                   <button
                     onClick={prevStep}
-                    className="flex items-center text-orange-500 hover:text-orange-600 text-sm font-medium px-4 py-2 border border-orange-500 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+                    className="flex items-center text-brand-text hover:text-brand-text text-sm font-medium px-4 py-2 border border-primary rounded-lg hover:bg-brand-surface transition-colors"
                   >
                     <ChevronLeft size={16} className="mr-1" />
                     Change Locations
@@ -1271,8 +1271,8 @@ export default function GetQuoteModal({
                 </div>
 
                 {validation.quoteError && (
-                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                    <div className="flex items-center text-red-600 dark:text-red-400">
+                  <div className="bg-destructive-surface border border-destructive/30 rounded-lg p-4">
+                    <div className="flex items-center text-destructive">
                       <AlertCircle size={16} className="mr-2" />
                       <span>{validation.quoteError}</span>
                     </div>
@@ -1280,17 +1280,17 @@ export default function GetQuoteModal({
                 )}
 
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                    <User className="h-5 w-5 text-orange-500 mr-2" />
+                  <h3 className="text-lg font-semibold text-foreground flex items-center">
+                    <User className="h-5 w-5 text-brand-text mr-2" />
                     Receiver Contact Information
                   </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <p className="text-sm text-muted-foreground">
                     Provide contact details for the person receiving the parcel
                   </p>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-muted-foreground mb-2">
                         <Mail className="h-4 w-4 inline mr-1" />
                         Receiver Email *
                       </label>
@@ -1305,10 +1305,10 @@ export default function GetQuoteModal({
                           )
                         }
                         placeholder="Enter receiver's email address"
-                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                        className="w-full px-4 py-3 border border-border-strong rounded-lg bg-card dark:bg-surface text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors"
                       />
                       {validation.receiverEmail && (
-                        <div className="flex items-center text-red-500 text-sm mt-2">
+                        <div className="flex items-center text-destructive text-sm mt-2">
                           <AlertCircle size={16} className="mr-2" />
                           {validation.receiverEmail}
                         </div>
@@ -1316,7 +1316,7 @@ export default function GetQuoteModal({
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-muted-foreground mb-2">
                         <Phone className="h-4 w-4 inline mr-1" />
                         Receiver Phone *
                       </label>
@@ -1336,10 +1336,10 @@ export default function GetQuoteModal({
                           }
                         }}
                         placeholder="e.g., 07123 456789"
-                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                        className="w-full px-4 py-3 border border-border-strong rounded-lg bg-card dark:bg-surface text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors"
                       />
                       {validation.receiverPhone && (
-                        <div className="flex items-center text-red-500 text-sm mt-2">
+                        <div className="flex items-center text-destructive text-sm mt-2">
                           <AlertCircle size={16} className="mr-2" />
                           {validation.receiverPhone}
                         </div>
@@ -1358,12 +1358,12 @@ export default function GetQuoteModal({
             )}
           </div>
 
-          <div className="flex justify-between items-center p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-b-2xl">
+          <div className="flex justify-between items-center p-6 border-t border-border bg-muted dark:bg-surface rounded-b-2xl">
             <div className="flex space-x-3">
               {currentStep > 1 && (
                 <button
                   onClick={prevStep}
-                  className="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="flex items-center px-4 py-2 text-muted-foreground hover:text-foreground border border-border-strong rounded-lg hover:bg-muted dark:hover:bg-surface-hover transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <ChevronLeft size={16} className="mr-1" />
                   Back
@@ -1376,7 +1376,7 @@ export default function GetQuoteModal({
                 <button
                   onClick={nextStep}
                   disabled={!checkStepValidity(formData)}
-                  className="flex items-center px-6 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all transform hover:scale-105 disabled:transform-none focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="flex items-center px-6 py-3 bg-primary hover:bg-primary-hover disabled:bg-surface-hover disabled:cursor-not-allowed text-primary-foreground font-medium rounded-lg transition-all transform hover:scale-105 disabled:transform-none focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   Next
                   <ChevronRight size={16} className="ml-1" />
@@ -1387,7 +1387,7 @@ export default function GetQuoteModal({
                   disabled={
                     isLoadingQuote || !quote || !checkStepValidity(formData)
                   }
-                  className="flex items-center px-6 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold rounded-lg transition-all transform hover:scale-105 disabled:transform-none focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="flex items-center px-6 py-3 bg-primary hover:bg-primary-hover disabled:bg-surface-hover disabled:cursor-not-allowed text-primary-foreground font-bold rounded-lg transition-all transform hover:scale-105 disabled:transform-none focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   {isLoadingQuote ? (
                     <>

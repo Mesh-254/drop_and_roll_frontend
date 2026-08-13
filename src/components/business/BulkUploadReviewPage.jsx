@@ -32,9 +32,9 @@
  * seam, and it accepts both shapes so a row is never blank because a field
  * moved.
  *
- * IT ASSUMED A DARK SURFACE. Hardcoded `text-white` / `text-slate-300` on a
- * `bg-white dark:bg-gray-800` wizard modal. Tailwind v4 keys `dark:` off the OS
- * preference and this app forces `bg-black text-white` on the body regardless,
+ * IT ASSUMED A DARK SURFACE. Hardcoded `text-foreground` / `text-muted-foreground` on a
+ * `bg-card dark:bg-surface` wizard modal. Tailwind v4 keys `dark:` off the OS
+ * preference and this app forces `bg-background text-foreground` on the body regardless,
  * so on a light-mode machine the modal was white and this content was light
  * grey on white — legible in exactly one of the two places it renders. `dark:`
  * is now pinned to the app's own theme class (index.css), and the surface is
@@ -111,44 +111,44 @@ const money = (v) => `£${Number(v || 0).toFixed(2)}`;
  */
 const THEME = {
   dark: {
-    heading: "text-white",
-    body: "text-slate-300",
-    muted: "text-slate-400",
-    strong: "text-white",
-    rule: "border-slate-700",
-    card: "border-slate-700 bg-slate-800/40",
-    cardHover: "hover:bg-slate-700/40",
-    chipBg: "bg-slate-700/60 text-slate-200",
-    notice: "text-amber-300",
-    failCard: "border-red-800/70 bg-red-950/30",
-    failTitle: "text-red-200",
-    failBody: "text-red-100/80",
-    failHint: "text-red-200/70",
-    okIcon: "text-green-400",
-    failIcon: "text-red-400",
-    skipIcon: "text-slate-400",
-    ghostBtn: "border-slate-600 text-slate-200 hover:bg-slate-700",
-    meterTrack: "bg-slate-700",
+    heading: "text-foreground",
+    body: "text-muted-foreground",
+    muted: "text-muted-foreground",
+    strong: "text-foreground",
+    rule: "border-border",
+    card: "border-border bg-surface/40",
+    cardHover: "hover:bg-surface/40",
+    chipBg: "bg-surface/60 text-foreground",
+    notice: "text-warning",
+    failCard: "border-destructive/30 bg-destructive-surface",
+    failTitle: "text-destructive",
+    failBody: "text-destructive/80",
+    failHint: "text-destructive/70",
+    okIcon: "text-success",
+    failIcon: "text-destructive",
+    skipIcon: "text-muted-foreground",
+    ghostBtn: "border-border text-foreground hover:bg-surface",
+    meterTrack: "bg-surface",
   },
   light: {
-    heading: "text-slate-900",
-    body: "text-slate-600",
-    muted: "text-slate-500",
-    strong: "text-slate-900",
-    rule: "border-slate-200",
-    card: "border-slate-200 bg-slate-50",
-    cardHover: "hover:bg-slate-100",
-    chipBg: "bg-slate-200 text-slate-700",
-    notice: "text-amber-700",
-    failCard: "border-red-200 bg-red-50",
-    failTitle: "text-red-800",
-    failBody: "text-red-700",
-    failHint: "text-red-600",
-    okIcon: "text-green-600",
-    failIcon: "text-red-500",
-    skipIcon: "text-slate-500",
-    ghostBtn: "border-slate-300 text-slate-700 hover:bg-slate-100",
-    meterTrack: "bg-slate-200",
+    heading: "text-foreground",
+    body: "text-muted-foreground",
+    muted: "text-subtle-foreground",
+    strong: "text-foreground",
+    rule: "border-border",
+    card: "border-border bg-muted",
+    cardHover: "hover:bg-muted",
+    chipBg: "bg-surface-hover text-muted-foreground",
+    notice: "text-warning",
+    failCard: "border-destructive/30 bg-destructive-surface",
+    failTitle: "text-destructive",
+    failBody: "text-destructive",
+    failHint: "text-destructive",
+    okIcon: "text-success",
+    failIcon: "text-destructive",
+    skipIcon: "text-subtle-foreground",
+    ghostBtn: "border-border-strong text-muted-foreground hover:bg-muted",
+    meterTrack: "bg-surface-hover",
   },
 };
 
@@ -295,7 +295,7 @@ export default function BulkUploadReviewPage({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-24" role="status">
-        <Loader2 className="h-6 w-6 animate-spin text-orange-400" />
+        <Loader2 className="h-6 w-6 animate-spin text-brand-text" />
         <span className={`ml-3 ${t.body}`}>Loading your results…</span>
       </div>
     );
@@ -414,7 +414,7 @@ export default function BulkUploadReviewPage({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => navigate(done.to)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-semibold"
             >
               {done.money ? (
                 <CreditCard className="h-4 w-4" />
@@ -447,7 +447,7 @@ export default function BulkUploadReviewPage({
             whileTap={{ scale: 0.98 }}
             onClick={handleContinue}
             disabled={isContinuing}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 disabled:bg-slate-600 text-white text-sm font-semibold"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary hover:bg-primary-hover disabled:bg-surface-hover text-primary-foreground text-sm font-semibold"
           >
             {isContinuing ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -481,19 +481,19 @@ function OutcomeMeter({ counts, totalRows, theme }) {
     {
       key: "successful",
       n: counts.successful,
-      className: "bg-green-500",
+      className: "bg-success",
       label: "booked",
     },
     {
       key: "skipped",
       n: counts.skipped,
-      className: "bg-slate-400",
+      className: "bg-surface-hover",
       label: "skipped",
     },
     {
       key: "failed",
       n: counts.failed,
-      className: "bg-red-500",
+      className: "bg-destructive",
       label: "failed",
     },
   ].filter((s) => s.n > 0);

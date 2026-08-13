@@ -45,7 +45,7 @@ export default function ProfilePage() {
   // Short version: this app has no light mode to switch to. `scripts/audit_theme.mjs`
   // reports that NOT ONE file in src/ flips cleanly — every file carrying
   // `dark:` pairs also carries unpaired dark-only utilities — and `body` is
-  // unconditionally `bg-black text-white`. Removing `.dark` therefore does not
+  // unconditionally `bg-background text-foreground`. Removing `.dark` therefore does not
   // produce a light app; it produces whatever screen you happen to be on, half
   // in one theme and half in the other.
   //
@@ -104,12 +104,12 @@ export default function ProfilePage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-black pt-24 pb-12 flex items-center justify-center">
+      <div className="min-h-screen bg-background pt-24 pb-12 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-400 mb-4">Please log in to view your profile.</p>
+          <p className="text-muted-foreground mb-4">Please log in to view your profile.</p>
           <button
             onClick={() => navigate("/login")}
-            className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-full font-bold transition-all"
+            className="px-6 py-2 bg-primary hover:bg-primary-hover text-primary-foreground rounded-full font-bold transition-all"
           >
             Go to Login
           </button>
@@ -119,7 +119,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black pt-24 pb-12">
+    <div className="min-h-screen bg-gradient-to-br from-background via-card to-background pt-24 pb-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <motion.div
@@ -127,8 +127,8 @@ export default function ProfilePage() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <h1 className="text-4xl font-bold text-white mb-2">My Profile</h1>
-          <p className="text-gray-400">Manage your account settings and preferences</p>
+          <h1 className="text-4xl font-bold text-foreground mb-2">My Profile</h1>
+          <p className="text-muted-foreground">Manage your account settings and preferences</p>
         </motion.div>
 
         {/* Main Content Grid */}
@@ -139,27 +139,27 @@ export default function ProfilePage() {
             animate={{ opacity: 1, x: 0 }}
             className="lg:col-span-1"
           >
-            <div className="bg-gradient-to-br from-gray-900 to-black border-2 border-orange-500/30 rounded-2xl p-6">
+            <div className="bg-gradient-to-br from-card to-background border-2 border-primary/30 rounded-2xl p-6">
               {/* Avatar */}
               <div className="flex flex-col items-center mb-6">
-                <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center font-bold text-white text-4xl shadow-lg shadow-orange-500/30 mb-4">
+                <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center font-bold text-primary-foreground text-4xl shadow-lg shadow-primary/30 mb-4">
                   {user?.full_name?.[0] || "?"}
                 </div>
-                <h2 className="text-xl font-bold text-white text-center">
+                <h2 className="text-xl font-bold text-foreground text-center">
                   {user?.full_name || "User"}
                 </h2>
-                <p className="text-sm text-gray-400 text-center mt-2">{user?.email}</p>
-                <div className="flex items-center gap-2 mt-4 bg-green-500/20 px-3 py-1 rounded-full border border-green-500/30">
-                  <span className="w-2 h-2 bg-green-400 rounded-full"></span>
-                  <span className="text-xs text-green-400 font-bold">Active</span>
+                <p className="text-sm text-muted-foreground text-center mt-2">{user?.email}</p>
+                <div className="flex items-center gap-2 mt-4 bg-success/20 px-3 py-1 rounded-full border border-success/30">
+                  <span className="w-2 h-2 bg-success rounded-full"></span>
+                  <span className="text-xs text-success font-bold">Active</span>
                 </div>
               </div>
 
               {/* Role Badge */}
-              <div className="bg-gray-800/50 rounded-lg p-4 mb-6 border border-gray-700/30">
-                <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Account Role</p>
-                <div className="inline-flex items-center gap-2 bg-blue-500/20 text-blue-400 px-3 py-2 rounded-lg text-sm font-bold border border-blue-500/30">
-                  <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
+              <div className="bg-surface/50 rounded-lg p-4 mb-6 border border-border/30">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Account Role</p>
+                <div className="inline-flex items-center gap-2 bg-info/20 text-info px-3 py-2 rounded-lg text-sm font-bold border border-info/30">
+                  <span className="w-2 h-2 bg-info rounded-full"></span>
                   {user?.role?.toUpperCase() || "CUSTOMER"}
                 </div>
               </div>
@@ -176,10 +176,10 @@ export default function ProfilePage() {
             animate={{ opacity: 1, x: 0 }}
             className="lg:col-span-2"
           >
-            <div className="bg-gradient-to-br from-gray-900 to-black border-2 border-orange-500/20 rounded-2xl p-8">
+            <div className="bg-gradient-to-br from-card to-background border-2 border-primary/20 rounded-2xl p-8">
               {/* Form Header */}
-              <div className="flex items-center justify-between mb-8 pb-6 border-b border-gray-700/30">
-                <h3 className="text-2xl font-bold text-white">
+              <div className="flex items-center justify-between mb-8 pb-6 border-b border-border/30">
+                <h3 className="text-2xl font-bold text-foreground">
                   {isEditing ? "Edit Profile" : "Profile Information"}
                 </h3>
                 {!isEditing && (
@@ -187,7 +187,7 @@ export default function ProfilePage() {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setIsEditing(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded-lg border border-orange-500/30 transition-all"
+                    className="flex items-center gap-2 px-4 py-2 bg-primary/20 hover:bg-primary/30 text-brand-text rounded-lg border border-primary/30 transition-all"
                   >
                     Edit Profile
                   </motion.button>
@@ -199,7 +199,7 @@ export default function ProfilePage() {
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mb-6 p-4 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg text-sm"
+                  className="mb-6 p-4 bg-destructive/10 border border-destructive/30 text-destructive rounded-lg text-sm"
                 >
                   {error}
                 </motion.div>
@@ -208,7 +208,7 @@ export default function ProfilePage() {
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mb-6 p-4 bg-green-500/10 border border-green-500/30 text-green-400 rounded-lg text-sm"
+                  className="mb-6 p-4 bg-success/10 border border-success/30 text-success rounded-lg text-sm"
                 >
                   {success}
                 </motion.div>
@@ -218,7 +218,7 @@ export default function ProfilePage() {
               <div className="space-y-6 mb-8">
                 {/* First Name */}
                 <div>
-                  <label className="block text-sm font-bold text-gray-300 mb-2">
+                  <label className="block text-sm font-bold text-muted-foreground mb-2">
                     First Name
                   </label>
                   {isEditing ? (
@@ -227,11 +227,11 @@ export default function ProfilePage() {
                       name="firstName"
                       value={formData.firstName}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      className="w-full px-4 py-3 bg-surface/50 border border-border text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                       placeholder="Enter first name"
                     />
                   ) : (
-                    <div className="px-4 py-3 bg-gray-800/30 border border-gray-700/30 text-white rounded-lg">
+                    <div className="px-4 py-3 bg-surface/30 border border-border/30 text-foreground rounded-lg">
                       {formData.firstName || "—"}
                     </div>
                   )}
@@ -239,7 +239,7 @@ export default function ProfilePage() {
 
                 {/* Last Name */}
                 <div>
-                  <label className="block text-sm font-bold text-gray-300 mb-2">
+                  <label className="block text-sm font-bold text-muted-foreground mb-2">
                     Last Name
                   </label>
                   {isEditing ? (
@@ -248,11 +248,11 @@ export default function ProfilePage() {
                       name="lastName"
                       value={formData.lastName}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      className="w-full px-4 py-3 bg-surface/50 border border-border text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                       placeholder="Enter last name"
                     />
                   ) : (
-                    <div className="px-4 py-3 bg-gray-800/30 border border-gray-700/30 text-white rounded-lg">
+                    <div className="px-4 py-3 bg-surface/30 border border-border/30 text-foreground rounded-lg">
                       {formData.lastName || "—"}
                     </div>
                   )}
@@ -260,13 +260,13 @@ export default function ProfilePage() {
 
                 {/* Email (Read-only) */}
                 <div>
-                  <label className="block text-sm font-bold text-gray-300 mb-2">
+                  <label className="block text-sm font-bold text-muted-foreground mb-2">
                     Email Address
                   </label>
-                  <div className="px-4 py-3 bg-gray-800/30 border border-gray-700/30 text-gray-400 rounded-lg">
+                  <div className="px-4 py-3 bg-surface/30 border border-border/30 text-muted-foreground rounded-lg">
                     {user?.email}
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-subtle-foreground mt-2">
                     To change email, please contact support.
                   </p>
                 </div>
@@ -284,7 +284,7 @@ export default function ProfilePage() {
                     whileTap={{ scale: 0.95 }}
                     onClick={handleSaveProfile}
                     disabled={isSaving}
-                    className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 disabled:from-gray-500 disabled:to-gray-600 text-white font-bold rounded-lg transition-all"
+                    className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-primary-hover hover:from-primary-hover hover:to-primary-hover disabled:from-surface-hover disabled:to-surface-hover text-primary-foreground font-bold rounded-lg transition-all"
                   >
                     {isSaving ? (
                       <>
@@ -305,7 +305,7 @@ export default function ProfilePage() {
                       setIsEditing(false);
                       setError("");
                     }}
-                    className="flex items-center justify-center gap-2 px-6 py-3 border-2 border-gray-700 hover:border-gray-600 text-gray-400 hover:text-gray-300 font-bold rounded-lg transition-all"
+                    className="flex items-center justify-center gap-2 px-6 py-3 border-2 border-border hover:border-border-strong text-muted-foreground hover:text-muted-foreground font-bold rounded-lg transition-all"
                   >
                     <X className="w-5 h-5" />
                     Cancel
@@ -327,18 +327,18 @@ export default function ProfilePage() {
             transition={{ delay: 0.2 }}
             className="mt-8"
           >
-            <div className="bg-gradient-to-br from-gray-900 to-black border-2 border-orange-500/20 rounded-2xl p-8">
+            <div className="bg-gradient-to-br from-card to-background border-2 border-primary/20 rounded-2xl p-8">
               <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center">
-                  <Building2 className="w-5 h-5 text-orange-400" />
+                <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-brand-text" />
                 </div>
-                <h3 className="text-2xl font-bold text-white">Business Account</h3>
+                <h3 className="text-2xl font-bold text-foreground">Business Account</h3>
               </div>
 
               {businessLoading ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader className="w-6 h-6 animate-spin text-orange-400" />
-                  <span className="ml-2 text-gray-400">Loading business profile...</span>
+                  <Loader className="w-6 h-6 animate-spin text-brand-text" />
+                  <span className="ml-2 text-muted-foreground">Loading business profile...</span>
                 </div>
               ) : hasProfile ? (
                 // Business profile exists - show summary
@@ -346,23 +346,23 @@ export default function ProfilePage() {
                   {/* Company Info */}
                   <div className="flex items-start justify-between">
                     <div>
-                      {/* <p className="text-lg font-semibold text-white">{businessProfile.company_name}</p> */}
-                      <p className="text-sm text-gray-400 mt-1">{businessProfile.contact_email}</p>
+                      {/* <p className="text-lg font-semibold text-foreground">{businessProfile.company_name}</p> */}
+                      <p className="text-sm text-muted-foreground mt-1">{businessProfile.contact_email}</p>
                     </div>
                     {/* Status Badge */}
                     <div>
                       {isApproved ? (
-                        <div className="flex items-center gap-2 bg-green-500/20 text-green-400 px-3 py-1.5 rounded-full text-sm font-bold border border-green-500/30">
+                        <div className="flex items-center gap-2 bg-success/20 text-success px-3 py-1.5 rounded-full text-sm font-bold border border-success/30">
                           <CheckCircle className="w-4 h-4" />
                           Approved
                         </div>
                       ) : isPending ? (
-                        <div className="flex items-center gap-2 bg-amber-500/20 text-amber-400 px-3 py-1.5 rounded-full text-sm font-bold border border-amber-500/30">
+                        <div className="flex items-center gap-2 bg-warning/20 text-warning px-3 py-1.5 rounded-full text-sm font-bold border border-warning/30">
                           <Clock className="w-4 h-4" />
                           Pending Review
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 bg-red-500/20 text-red-400 px-3 py-1.5 rounded-full text-sm font-bold border border-red-500/30">
+                        <div className="flex items-center gap-2 bg-destructive/20 text-destructive px-3 py-1.5 rounded-full text-sm font-bold border border-destructive/30">
                           <XCircle className="w-4 h-4" />
                           Rejected
                         </div>
@@ -372,13 +372,13 @@ export default function ProfilePage() {
 
                   {/* Approved profile - show NET terms and credit info */}
                   {isApproved && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-700/30">
-                      <div className="bg-gray-800/30 rounded-lg p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border/30">
+                      <div className="bg-surface/30 rounded-lg p-4">
                         <div className="flex items-center gap-2 mb-2">
-                          <CreditCard className="w-4 h-4 text-gray-400" />
-                          <p className="text-xs text-gray-400 uppercase tracking-wider">Payment Terms</p>
+                          <CreditCard className="w-4 h-4 text-muted-foreground" />
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider">Payment Terms</p>
                         </div>
-                        <p className="text-white font-semibold">
+                        <p className="text-foreground font-semibold">
                           {businessProfile.payment_terms === 'prepaid' ? 'Prepaid' : 
                            businessProfile.payment_terms === 'net_7' ? 'NET 7 Days' :
                            businessProfile.payment_terms === 'net_30' ? 'NET 30 Days' :
@@ -386,9 +386,9 @@ export default function ProfilePage() {
                         </p>
                       </div>
                       {businessProfile.credit_limit > 0 && (
-                        <div className="bg-gray-800/30 rounded-lg p-4">
-                          <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Available Credit</p>
-                          <p className="text-white font-semibold">
+                        <div className="bg-surface/30 rounded-lg p-4">
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Available Credit</p>
+                          <p className="text-foreground font-semibold">
                             £{Number(businessProfile.available_credit || businessProfile.credit_limit).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
                           </p>
                         </div>
@@ -398,8 +398,8 @@ export default function ProfilePage() {
 
                   {/* Pending profile - info message */}
                   {isPending && (
-                    <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                      <p className="text-sm text-amber-400">
+                    <div className="p-4 bg-warning/10 border border-warning/30 rounded-lg">
+                      <p className="text-sm text-warning">
                         Your business profile is currently under review. You&apos;ll receive an email once approved.
                       </p>
                     </div>
@@ -408,35 +408,35 @@ export default function ProfilePage() {
                   {/* View/Manage Business Profile link */}
                   <Link
                     to="/business/profile"
-                    className="flex items-center justify-between px-4 py-3 bg-gray-800/50 hover:bg-gray-800 rounded-lg transition-all group"
+                    className="flex items-center justify-between px-4 py-3 bg-surface/50 hover:bg-surface rounded-lg transition-all group"
                   >
-                    <span className="text-gray-300 group-hover:text-white transition-colors">
+                    <span className="text-muted-foreground group-hover:text-foreground transition-colors">
                       Manage Business Profile
                     </span>
-                    <ArrowRight className="w-4 h-4 text-gray-500 group-hover:text-orange-400 transition-colors" />
+                    <ArrowRight className="w-4 h-4 text-subtle-foreground group-hover:text-brand-text transition-colors" />
                   </Link>
                 </div>
               ) : (
                 // No business profile - show CTA to create one
                 <div className="text-center py-6">
-                  <div className="w-16 h-16 rounded-full bg-gray-800/50 flex items-center justify-center mx-auto mb-4">
-                    <Building2 className="w-8 h-8 text-gray-500" />
+                  <div className="w-16 h-16 rounded-full bg-surface/50 flex items-center justify-center mx-auto mb-4">
+                    <Building2 className="w-8 h-8 text-subtle-foreground" />
                   </div>
-                  <h4 className="text-lg font-semibold text-white mb-2">Upgrade to Business Account</h4>
-                  <p className="text-gray-400 text-sm mb-6 max-w-md mx-auto">
+                  <h4 className="text-lg font-semibold text-foreground mb-2">Upgrade to Business Account</h4>
+                  <p className="text-muted-foreground text-sm mb-6 max-w-md mx-auto">
                     Unlock bulk uploads, NET payment terms, volume discounts, and dedicated support for your business.
                   </p>
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setShowBusinessOnboarding(true)}
-                    className="px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold rounded-lg transition-all inline-flex items-center gap-2"
+                    className="px-6 py-3 bg-gradient-to-r from-primary to-primary-hover hover:from-primary-hover hover:to-primary-hover text-primary-foreground font-bold rounded-lg transition-all inline-flex items-center gap-2"
                   >
                     <Building2 className="w-5 h-5" />
                     Create Business Profile
                   </motion.button>
-                  <p className="text-xs text-gray-500 mt-4">
-                    Or <Link to="/business/register" className="text-orange-400 hover:text-orange-300 underline">register as a new business</Link>
+                  <p className="text-xs text-subtle-foreground mt-4">
+                    Or <Link to="/business/register" className="text-brand-text hover:text-brand-text underline">register as a new business</Link>
                   </p>
                 </div>
               )}
@@ -456,12 +456,12 @@ export default function ProfilePage() {
             whileHover={{ scale: 1.02, y: -2 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => navigate("/history")}
-            className="p-6 bg-gradient-to-br from-gray-900 to-black border-2 border-orange-500/20 hover:border-orange-500/50 rounded-xl text-center transition-all group"
+            className="p-6 bg-gradient-to-br from-card to-background border-2 border-primary/20 hover:border-primary/50 rounded-xl text-center transition-all group"
           >
-            <p className="text-lg font-bold text-white group-hover:text-orange-400 transition-colors">
+            <p className="text-lg font-bold text-foreground group-hover:text-brand-text transition-colors">
               View Booking History
             </p>
-            <p className="text-sm text-gray-400 mt-2">Check your past and current bookings</p>
+            <p className="text-sm text-muted-foreground mt-2">Check your past and current bookings</p>
           </motion.button>
 
           {/* View FAQs */}
@@ -469,12 +469,12 @@ export default function ProfilePage() {
             whileHover={{ scale: 1.02, y: -2 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => navigate("/faqs")}
-            className="p-6 bg-gradient-to-br from-gray-900 to-black border-2 border-orange-500/20 hover:border-orange-500/50 rounded-xl text-center transition-all group"
+            className="p-6 bg-gradient-to-br from-card to-background border-2 border-primary/20 hover:border-primary/50 rounded-xl text-center transition-all group"
           >
-            <p className="text-lg font-bold text-white group-hover:text-orange-400 transition-colors">
+            <p className="text-lg font-bold text-foreground group-hover:text-brand-text transition-colors">
               FAQs & Help
             </p>
-            <p className="text-sm text-gray-400 mt-2">Get answers to common questions</p>
+            <p className="text-sm text-muted-foreground mt-2">Get answers to common questions</p>
           </motion.button>
         </motion.div>
 
@@ -492,7 +492,7 @@ export default function ProfilePage() {
               logout();
               navigate("/");
             }}
-            className="px-8 py-3 bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold rounded-lg border border-red-500/30 transition-all"
+            className="px-8 py-3 bg-destructive/20 hover:bg-destructive/30 text-destructive font-bold rounded-lg border border-destructive/30 transition-all"
           >
             Logout
           </motion.button>

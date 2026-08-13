@@ -83,14 +83,14 @@ export default function StripeApplePay({
   ]);
 
   if (loading) {
-    return <Loader2 className="h-6 w-6 text-orange-500 animate-spin mx-auto" />;
+    return <Loader2 className="h-6 w-6 text-brand-text animate-spin mx-auto" />;
   }
   if (!paymentRequest) return null;
 
   return (
     <div className="space-y-4">
       {error && (
-        <div className="flex items-center text-red-500 text-sm">
+        <div className="flex items-center text-destructive text-sm">
           <AlertCircle size={16} className="mr-2" />
           {error}
         </div>

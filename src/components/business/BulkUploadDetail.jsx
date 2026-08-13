@@ -180,21 +180,21 @@ export default function BulkUploadDetail() {
   // re-triggering this once `upload` is populated) ──────────────────────────
   if (isLoadingUpload && !upload) {
     return (
-      <div className="min-h-screen bg-white dark:bg-gray-900 pt-20">
+      <div className="min-h-screen bg-card pt-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-8" />
-          <div className="h-10 w-2/3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-3" />
-          <div className="h-4 w-1/3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-10" />
+          <div className="h-4 w-40 bg-surface-hover rounded animate-pulse mb-8" />
+          <div className="h-10 w-2/3 bg-surface-hover rounded animate-pulse mb-3" />
+          <div className="h-4 w-1/3 bg-surface-hover rounded animate-pulse mb-10" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             {[0, 1, 2, 3].map((i) => (
               <div
                 key={i}
-                className="h-24 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"
+                className="h-24 bg-surface-hover rounded-lg animate-pulse"
               />
             ))}
           </div>
           <div className="flex justify-center pt-8">
-            <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
+            <Loader2 className="h-8 w-8 text-brand-text animate-spin" />
           </div>
         </div>
       </div>
@@ -208,17 +208,17 @@ export default function BulkUploadDetail() {
     const Icon = isPermission ? Lock : isNotFound ? AlertCircle : ServerCrash;
 
     return (
-      <div className="min-h-screen bg-white dark:bg-gray-900 pt-20">
+      <div className="min-h-screen bg-card pt-20">
         <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-          <Icon className="h-14 w-14 text-gray-400 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          <Icon className="h-14 w-14 text-muted-foreground mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-foreground mb-2">
             {isPermission
               ? "You don't have access to this upload"
               : isNotFound
                 ? "Upload not found"
                 : "Couldn't load this upload"}
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-8">
+          <p className="text-muted-foreground mb-8">
             {isPermission
               ? "This bulk upload belongs to a different account."
               : isNotFound
@@ -232,7 +232,7 @@ export default function BulkUploadDetail() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={refetchUpload}
-                className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium flex items-center justify-center gap-2"
+                className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-primary-foreground rounded-lg font-medium flex items-center justify-center gap-2"
               >
                 <RotateCcw className="h-4 w-4" />
                 Try again
@@ -242,7 +242,7 @@ export default function BulkUploadDetail() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => navigate("/bulk-upload")}
-              className="px-5 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium flex items-center justify-center gap-2"
+              className="px-5 py-2.5 border border-border-strong text-muted-foreground rounded-lg font-medium flex items-center justify-center gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to uploads
@@ -255,15 +255,15 @@ export default function BulkUploadDetail() {
 
   // ─── Main render ──────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 pt-20">
+    <div className="min-h-screen bg-card pt-20">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back button */}
         <motion.button
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           onClick={() => navigate("/bulk-upload")}
-          className="flex items-center gap-2 text-gray-500 dark:text-gray-400
-                     hover:text-gray-900 dark:hover:text-white transition mb-8"
+          className="flex items-center gap-2 text-subtle-foreground dark:text-muted-foreground
+                     hover:text-foreground transition mb-8"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to uploads
@@ -276,10 +276,10 @@ export default function BulkUploadDetail() {
           className="mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3"
         >
           <div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2">
+            <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-2">
               {upload.batch_name || "Bulk Upload"}
             </h1>
-            <p className="text-gray-600 dark:text-gray-400 text-sm">
+            <p className="text-muted-foreground text-sm">
               Uploaded {new Date(upload.created_at).toLocaleDateString()} at{" "}
               {new Date(upload.created_at).toLocaleTimeString()}
             </p>
@@ -314,10 +314,10 @@ export default function BulkUploadDetail() {
                       className={`w-8 h-8 rounded-full flex items-center justify-center
                                   text-sm font-bold transition-all ${
                                     isDone
-                                      ? "bg-green-500 text-white"
+                                      ? "bg-success text-foreground"
                                       : isActive
-                                        ? "bg-orange-500 text-white ring-4 ring-orange-500/20"
-                                        : "bg-gray-200 dark:bg-gray-700 text-gray-500"
+                                        ? "bg-primary text-foreground ring-4 ring-ring/20"
+                                        : "bg-surface-hover text-subtle-foreground"
                                   }`}
                     >
                       {isDone ? "✓" : idx + 1}
@@ -325,10 +325,10 @@ export default function BulkUploadDetail() {
                     <p
                       className={`text-xs mt-2 text-center font-medium line-clamp-2 ${
                         isActive
-                          ? "text-orange-500"
+                          ? "text-brand-text"
                           : isDone
-                            ? "text-green-600 dark:text-green-400"
-                            : "text-gray-400"
+                            ? "text-success"
+                            : "text-muted-foreground"
                       }`}
                     >
                       {label}
@@ -338,8 +338,8 @@ export default function BulkUploadDetail() {
                     <div
                       className={`flex-1 h-0.5 mx-1 rounded hidden sm:block ${
                         getStepStatus(idx) === "done"
-                          ? "bg-green-400"
-                          : "bg-gray-200 dark:bg-gray-700"
+                          ? "bg-success"
+                          : "bg-surface-hover"
                       }`}
                     />
                   )}
@@ -358,21 +358,21 @@ export default function BulkUploadDetail() {
         >
           {/* Payment Pending */}
           {isPaymentPending && (
-            <div className="p-6 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40 rounded-xl flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-              <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-800/30 flex items-center justify-center flex-shrink-0">
-                <Clock className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+            <div className="p-6 bg-warning-surface border border-warning/30 rounded-xl flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+              <div className="w-12 h-12 rounded-full bg-warning-surface dark:bg-warning/30 flex items-center justify-center flex-shrink-0">
+                <Clock className="h-6 w-6 text-warning" />
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-amber-800 dark:text-amber-300 text-lg">
+                <h3 className="font-bold text-warning text-lg">
                   Payment Required
                 </h3>
-                <p className="text-sm text-amber-700 dark:text-amber-400/80 mt-1">
+                <p className="text-sm text-warning dark:text-warning/80 mt-1">
                   Your {upload.successful} booking
                   {upload.successful !== 1 ? "s are" : " is"} processed and
                   reserved. Complete payment to schedule deliveries.
                 </p>
                 {amount && (
-                  <p className="text-lg font-bold text-amber-800 dark:text-amber-300 mt-2">
+                  <p className="text-lg font-bold text-warning mt-2">
                     Amount due: £{amount}
                   </p>
                 )}
@@ -381,7 +381,7 @@ export default function BulkUploadDetail() {
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => navigate(`/pay/bulk/${upload.id}`)}
-                className="w-full sm:w-auto px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all whitespace-nowrap"
+                className="w-full sm:w-auto px-6 py-3 bg-warning hover:bg-warning text-warning-foreground rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-warning/20 transition-all whitespace-nowrap"
               >
                 <CreditCard className="h-5 w-5" />
                 Pay £{amount || "amount"}
@@ -391,18 +391,18 @@ export default function BulkUploadDetail() {
 
           {/* Completed */}
           {upload.status === "completed" && (
-            <div className="p-6 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30 rounded-lg flex gap-4 items-start">
-              <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+            <div className="p-6 bg-success-surface border border-success/30 rounded-lg flex gap-4 items-start">
+              <CheckCircle2 className="h-6 w-6 text-success flex-shrink-0 mt-0.5" />
               <div>
-                <h3 className="font-bold text-green-700 dark:text-green-400 text-lg">
+                <h3 className="font-bold text-success text-lg">
                   All Bookings Created Successfully
                 </h3>
-                <p className="text-sm text-green-600 dark:text-green-400/80 mt-1">
+                <p className="text-sm text-success dark:text-success/80 mt-1">
                   All {upload.total_rows} rows processed. {upload.successful}{" "}
                   bookings created and scheduled.
                 </p>
                 {amount && (
-                  <p className="text-sm text-green-600 dark:text-green-400/80 mt-2 font-semibold">
+                  <p className="text-sm text-success dark:text-success/80 mt-2 font-semibold">
                     Total: £{amount}
                   </p>
                 )}
@@ -412,13 +412,13 @@ export default function BulkUploadDetail() {
 
           {/* Partial */}
           {upload.status === "partial" && (
-            <div className="p-6 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-lg flex gap-4 items-start">
-              <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="p-6 bg-warning-surface border border-warning/30 rounded-lg flex gap-4 items-start">
+              <AlertTriangle className="h-6 w-6 text-warning flex-shrink-0 mt-0.5" />
               <div>
-                <h3 className="font-bold text-amber-700 dark:text-amber-400 text-lg">
+                <h3 className="font-bold text-warning text-lg">
                   {upload.successful} of {upload.total_rows} Rows Processed
                 </h3>
-                <p className="text-sm text-amber-600 dark:text-amber-400/80 mt-1">
+                <p className="text-sm text-warning dark:text-warning/80 mt-1">
                   {upload.failed} row{upload.failed !== 1 ? "s had" : " had"}{" "}
                   errors. Review and retry below.
                 </p>
@@ -428,13 +428,13 @@ export default function BulkUploadDetail() {
 
           {/* Failed */}
           {upload.status === "failed" && (
-            <div className="p-6 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-lg flex gap-4 items-start">
-              <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="p-6 bg-destructive-surface border border-destructive/30 rounded-lg flex gap-4 items-start">
+              <AlertCircle className="h-6 w-6 text-destructive flex-shrink-0 mt-0.5" />
               <div>
-                <h3 className="font-bold text-red-700 dark:text-red-400 text-lg">
+                <h3 className="font-bold text-destructive text-lg">
                   Upload Failed
                 </h3>
-                <p className="text-sm text-red-600 dark:text-red-400/80 mt-1">
+                <p className="text-sm text-destructive dark:text-destructive/80 mt-1">
                   {upload.total_rows > 0
                     ? "Every row in this file failed validation. Review the errors below, fix the file, and re-upload."
                     : "This upload couldn't be completed — processing timed out before any rows were created. No charge was made. Please re-upload to try again."}
@@ -449,13 +449,13 @@ export default function BulkUploadDetail() {
           {["completed", "partial"].includes(upload.status) &&
             (upload.successful || 0) === 0 &&
             (upload.skipped || 0) > 0 && (
-              <div className="p-6 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 rounded-lg flex gap-4 items-start">
-                <AlertCircle className="h-6 w-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <div className="p-6 bg-info-surface border border-info/30 rounded-lg flex gap-4 items-start">
+                <AlertCircle className="h-6 w-6 text-info flex-shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="font-bold text-blue-700 dark:text-blue-400 text-lg">
+                  <h3 className="font-bold text-info text-lg">
                     Already Booked — No New Bookings Created
                   </h3>
-                  <p className="text-sm text-blue-600 dark:text-blue-400/80 mt-1">
+                  <p className="text-sm text-info dark:text-info/80 mt-1">
                     {upload.skipped} row{upload.skipped !== 1 ? "s" : ""}{" "}
                     matched a booking you already have, so nothing was
                     duplicated and nothing was charged. The "Already booked"
@@ -471,14 +471,14 @@ export default function BulkUploadDetail() {
           {/* Draft — validated but never submitted. No Celery task exists, so
               this will sit here until the user submits or discards it. */}
           {isDraft && (
-            <div className="p-6 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-lg">
+            <div className="p-6 bg-warning-surface border border-warning/30 rounded-lg">
               <div className="flex gap-4 items-start">
-                <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <AlertTriangle className="h-6 w-6 text-warning flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <h3 className="font-bold text-amber-700 dark:text-amber-400 text-lg">
+                  <h3 className="font-bold text-warning text-lg">
                     Not Submitted Yet
                   </h3>
-                  <p className="text-sm text-amber-600 dark:text-amber-400/80 mt-1">
+                  <p className="text-sm text-warning dark:text-warning/80 mt-1">
                     {confirmContext?.row_count
                       ? `${confirmContext.row_count} rows were uploaded and checked, but never sent for processing`
                       : "This file was uploaded and checked, but never sent for processing"}
@@ -507,7 +507,7 @@ export default function BulkUploadDetail() {
                   </div>
 
                   {draftActionError && (
-                    <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                    <p className="text-sm text-destructive mt-2">
                       {draftActionError}
                     </p>
                   )}
@@ -533,7 +533,7 @@ export default function BulkUploadDetail() {
                         isLoadingConfirmContext ||
                         confirmIncomplete
                       }
-                      className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white text-sm font-semibold"
+                      className="px-4 py-2 rounded-lg bg-warning hover:bg-warning disabled:opacity-60 text-warning-foreground text-sm font-semibold"
                     >
                       {isSubmittingDraft
                         ? "Submitting…"
@@ -543,7 +543,7 @@ export default function BulkUploadDetail() {
                       type="button"
                       onClick={discardDraft}
                       disabled={isSubmittingDraft}
-                      className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-60 text-sm font-semibold text-gray-700 dark:text-gray-300"
+                      className="px-4 py-2 rounded-lg border border-border-strong hover:bg-muted dark:hover:bg-surface disabled:opacity-60 text-sm font-semibold text-muted-foreground"
                     >
                       Discard
                     </button>
@@ -556,14 +556,14 @@ export default function BulkUploadDetail() {
           {/* Stalled — submitted, but the status has not moved in minutes.
               Polling has stopped; say so rather than animate a dead bar. */}
           {isStalled && !isDraft && (
-            <div className="p-6 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-lg">
+            <div className="p-6 bg-warning-surface border border-warning/30 rounded-lg">
               <div className="flex gap-4 items-start">
-                <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <AlertTriangle className="h-6 w-6 text-warning flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <h3 className="font-bold text-amber-700 dark:text-amber-400 text-lg">
+                  <h3 className="font-bold text-warning text-lg">
                     Taking Longer Than Expected
                   </h3>
-                  <p className="text-sm text-amber-600 dark:text-amber-400/80 mt-1">
+                  <p className="text-sm text-warning dark:text-warning/80 mt-1">
                     This upload hasn't progressed for several minutes. It may
                     still finish — our system automatically clears genuinely
                     stuck uploads within 15 minutes and nothing is charged for
@@ -573,7 +573,7 @@ export default function BulkUploadDetail() {
                   <button
                     type="button"
                     onClick={refetchUpload}
-                    className="mt-4 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold"
+                    className="mt-4 px-4 py-2 rounded-lg bg-warning hover:bg-warning text-warning-foreground text-sm font-semibold"
                   >
                     Check Again
                   </button>
@@ -584,13 +584,13 @@ export default function BulkUploadDetail() {
 
           {/* Cancelled */}
           {upload.status === "cancelled" && (
-            <div className="p-6 bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-lg flex gap-4 items-start">
-              <AlertCircle className="h-6 w-6 text-gray-500 flex-shrink-0 mt-0.5" />
+            <div className="p-6 bg-muted dark:bg-surface/40 border border-border rounded-lg flex gap-4 items-start">
+              <AlertCircle className="h-6 w-6 text-subtle-foreground flex-shrink-0 mt-0.5" />
               <div>
-                <h3 className="font-bold text-gray-700 dark:text-gray-300 text-lg">
+                <h3 className="font-bold text-muted-foreground text-lg">
                   Upload Cancelled
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   This upload was cancelled before it was processed.
                 </p>
               </div>
@@ -670,9 +670,9 @@ export default function BulkUploadDetail() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="mb-8 p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 rounded-lg text-center"
+            className="mb-8 p-4 bg-info-surface border border-info/30 rounded-lg text-center"
           >
-            <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">
+            <p className="text-sm font-semibold text-info">
               {upload.bulk_discount_pct}% bulk discount applied
             </p>
           </motion.div>
@@ -790,7 +790,7 @@ function TabSelector({
   ];
 
   return (
-    <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+    <div className="flex gap-2 border-b border-border overflow-x-auto">
       {tabs.map((tab) => (
         <button
           key={tab.id}
@@ -798,8 +798,8 @@ function TabSelector({
           disabled={tab.disabled}
           className={`px-4 py-3 font-medium text-sm whitespace-nowrap border-b-2 transition-all ${
             activeTab === tab.id
-              ? "border-orange-500 text-orange-600 dark:text-orange-400"
-              : "border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+              ? "border-primary text-brand-text"
+              : "border-transparent text-muted-foreground hover:text-foreground"
           } ${tab.disabled ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           {tab.label}
@@ -848,11 +848,11 @@ function OverviewTab({ upload, amount }) {
       </div>
 
       {upload.notes && (
-        <div className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-          <p className="text-sm text-gray-600 dark:text-gray-400 font-medium mb-2">
+        <div className="p-4 bg-muted dark:bg-surface border border-border rounded-lg">
+          <p className="text-sm text-muted-foreground font-medium mb-2">
             Notes
           </p>
-          <p className="text-gray-900 dark:text-gray-100">{upload.notes}</p>
+          <p className="text-foreground">{upload.notes}</p>
         </div>
       )}
     </div>
@@ -874,8 +874,8 @@ function ErrorsTab({
   if (upload.failed === 0) {
     return (
       <div className="text-center py-12">
-        <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4 opacity-50" />
-        <p className="text-gray-600 dark:text-gray-400 font-medium">
+        <CheckCircle2 className="h-12 w-12 text-success mx-auto mb-4 opacity-50" />
+        <p className="text-muted-foreground font-medium">
           No errors — all rows processed successfully!
         </p>
       </div>
@@ -888,8 +888,8 @@ function ErrorsTab({
           rows that failed, leaving every existing booking alone. Saying so
           here is the point of the hint — re-uploading the whole file works
           too, but then the customer has to answer the duplicate question. */}
-      <div className="p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 rounded-lg">
-        <p className="text-sm text-blue-700 dark:text-blue-400">
+      <div className="p-4 bg-info-surface border border-info/30 rounded-lg">
+        <p className="text-sm text-info">
           <span className="font-semibold">Fixing these?</span> Download the
           report, correct the rows, then use{" "}
           <span className="font-semibold">Retry</span> below. Retry re-runs only
@@ -900,8 +900,8 @@ function ErrorsTab({
       </div>
 
       {retryError && (
-        <div className="p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-lg">
-          <p className="text-sm text-red-700 dark:text-red-400">{retryError}</p>
+        <div className="p-4 bg-destructive-surface border border-destructive/30 rounded-lg">
+          <p className="text-sm text-destructive">{retryError}</p>
         </div>
       )}
 
@@ -960,8 +960,8 @@ function SuccessfulTab({
     return (
       <div>
         <div className="text-center py-12">
-          <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4 opacity-50" />
-          <p className="text-gray-600 dark:text-gray-400 font-medium">
+          <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+          <p className="text-muted-foreground font-medium">
             {skippedRows.length > 0
               ? "No NEW bookings were created — every valid row already had one."
               : "No successful bookings in this upload."}
@@ -1001,7 +1001,7 @@ function SuccessfulTab({
             type="button"
             onClick={handleDownloadAll}
             disabled={downloadingAll}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-orange-600 hover:bg-orange-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-hover hover:bg-primary-hover disabled:opacity-60 disabled:cursor-not-allowed text-primary-foreground text-sm font-semibold transition-colors"
           >
             {downloadingAll ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -1013,9 +1013,9 @@ function SuccessfulTab({
         </div>
       )}
 
-      <div className="p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30 rounded-lg flex items-start gap-3">
-        <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-        <p className="text-sm text-green-700 dark:text-green-400">
+      <div className="p-4 bg-success-surface border border-success/30 rounded-lg flex items-start gap-3">
+        <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
+        <p className="text-sm text-success">
           {upload.successful} booking
           {upload.successful !== 1 ? "s have" : " has"} been created and are
           ready for scheduling. Tap a row below to jump to it in Booking
@@ -1023,7 +1023,7 @@ function SuccessfulTab({
           {(upload.skipped || 0) > 0 && (
             <>
               {" "}
-              <span className="text-amber-700 dark:text-amber-400">
+              <span className="text-warning">
                 {upload.skipped} row{upload.skipped !== 1 ? "s" : ""} matched an
                 existing booking (duplicate reference) and did not create a new
                 one — see below.
@@ -1034,40 +1034,40 @@ function SuccessfulTab({
       </div>
 
       {/* Successful rows table */}
-      <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
+      <div className="overflow-x-auto border border-border rounded-lg">
         {isFetching && rows.length === 0 ? (
           <div className="space-y-2 p-4">
             {[0, 1, 2].map((i) => (
               <div
                 key={i}
-                className="h-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
+                className="h-12 bg-surface-hover rounded animate-pulse"
               />
             ))}
           </div>
         ) : rows.length === 0 ? (
-          <div className="p-8 text-center text-gray-500 dark:text-gray-400 text-sm">
+          <div className="p-8 text-center text-subtle-foreground dark:text-muted-foreground text-sm">
             No successful rows to show on this page.
           </div>
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 w-16">
+              <tr className="border-b border-border bg-muted dark:bg-surface/50">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground w-16">
                   Row
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground">
                   Tracking #
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 hidden md:table-cell">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground hidden md:table-cell">
                   Route
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 dark:text-gray-300">
+                <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground">
                   Price
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 w-28">
+                <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground w-28">
                   Label
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 w-24">
+                <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground w-24">
                   Booking
                 </th>
               </tr>
@@ -1076,27 +1076,27 @@ function SuccessfulTab({
               {rows.map((row) => (
                 <tr
                   key={row.id ?? row.row_number}
-                  className="border-b border-gray-200 dark:border-gray-700 hover:bg-green-50 dark:hover:bg-green-900/10 transition-colors"
+                  className="border-b border-border hover:bg-success-surface transition-colors"
                 >
-                  <td className="px-4 py-3 text-sm font-mono text-gray-500 dark:text-gray-400">
+                  <td className="px-4 py-3 text-sm font-mono text-subtle-foreground dark:text-muted-foreground">
                     {row.row_number}
                   </td>
-                  <td className="px-4 py-3 text-sm font-mono text-gray-700 dark:text-gray-300">
+                  <td className="px-4 py-3 text-sm font-mono text-muted-foreground">
                     {row.tracking_number || "—"}
                     {Array.isArray(row.warnings) && row.warnings.length > 0 && (
                       <span
                         title={row.warnings.join("\n")}
-                        className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 align-middle"
+                        className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-warning-surface text-warning align-middle"
                       >
                         <AlertTriangle className="h-3 w-3" />
                         Substituted default
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 hidden md:table-cell">
+                  <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell">
                     {row.pickup_city || "—"} → {row.dropoff_city || "—"}
                   </td>
-                  <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-white">
+                  <td className="px-4 py-3 text-sm text-right font-medium text-foreground">
                     {row.computed_price
                       ? `£${parseFloat(row.computed_price).toFixed(2)}`
                       : "—"}
@@ -1107,7 +1107,7 @@ function SuccessfulTab({
                         onClick={() => handleRowLabel(row)}
                         disabled={downloadingRow === (row.id ?? row.row_number)}
                         title="Download shipping label"
-                        className="inline-flex items-center gap-1 text-xs font-medium text-orange-600 dark:text-orange-400 hover:underline disabled:opacity-60"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-brand-text hover:underline disabled:opacity-60"
                       >
                         {downloadingRow === (row.id ?? row.row_number) ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
@@ -1118,7 +1118,7 @@ function SuccessfulTab({
                       </button>
                     ) : (
                       <span
-                        className="inline-flex items-center gap-1 text-xs text-gray-400"
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground"
                         title="Label still generating"
                       >
                         <Loader2 className="h-3 w-3 animate-spin" />
@@ -1130,12 +1130,12 @@ function SuccessfulTab({
                     {row.booking_url ? (
                       <button
                         onClick={() => onViewBooking(row.booking_url)}
-                        className="inline-flex items-center gap-1 text-xs font-medium text-orange-600 dark:text-orange-400 hover:underline"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-brand-text hover:underline"
                       >
                         View <ExternalLink className="h-3 w-3" />
                       </button>
                     ) : (
-                      <span className="text-xs text-gray-400">—</span>
+                      <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </td>
                 </tr>
@@ -1151,17 +1151,17 @@ function SuccessfulTab({
           <button
             onClick={() => onPageChange(Math.max(1, page - 1))}
             disabled={page === 1}
-            className="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="px-3 py-2 rounded border border-border-strong text-sm font-medium text-muted-foreground hover:bg-muted dark:hover:bg-surface-hover/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             ← Prev
           </button>
-          <span className="text-sm text-gray-600 dark:text-gray-400 px-2">
+          <span className="text-sm text-muted-foreground px-2">
             Page {page} of {totalPages}
           </span>
           <button
             onClick={() => onPageChange(Math.min(totalPages, page + 1))}
             disabled={page === totalPages}
-            className="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="px-3 py-2 rounded border border-border-strong text-sm font-medium text-muted-foreground hover:bg-muted dark:hover:bg-surface-hover/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             Next →
           </button>
@@ -1190,12 +1190,12 @@ function SkippedRowsTable({ skippedRows = [] }) {
   return (
     <div className="mt-8">
       <div className="flex items-center gap-2 mb-3">
-        <h4 className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+        <h4 className="text-sm font-semibold text-warning">
           Already booked — matched existing bookings ({skippedRows.length})
         </h4>
       </div>
-      <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-lg mb-3">
-        <p className="text-sm text-amber-700 dark:text-amber-400">
+      <div className="p-4 bg-warning-surface border border-warning/30 rounded-lg mb-3">
+        <p className="text-sm text-warning">
           These rows reused a <span className="font-mono">reference</span> that
           already belongs to one of your bookings — either from earlier in this
           file or from a batch you uploaded in the last 30 days. The existing
@@ -1203,17 +1203,17 @@ function SkippedRowsTable({ skippedRows = [] }) {
           billed.
         </p>
       </div>
-      <div className="overflow-x-auto border border-amber-200 dark:border-amber-900/30 rounded-lg">
+      <div className="overflow-x-auto border border-warning/30 rounded-lg">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-amber-200 dark:border-amber-900/30 bg-amber-50 dark:bg-amber-900/10">
-              <th className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-300 w-16">
+            <tr className="border-b border-warning/30 bg-warning-surface">
+              <th className="px-4 py-3 text-left text-xs font-semibold text-warning w-16">
                 Row
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-300">
+              <th className="px-4 py-3 text-left text-xs font-semibold text-warning">
                 Reference
               </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-amber-800 dark:text-amber-300">
+              <th className="px-4 py-3 text-left text-xs font-semibold text-warning">
                 Outcome
               </th>
             </tr>
@@ -1222,15 +1222,15 @@ function SkippedRowsTable({ skippedRows = [] }) {
             {skippedRows.map((row) => (
               <tr
                 key={row.id ?? row.row_number}
-                className="border-b border-amber-100 dark:border-amber-900/20"
+                className="border-b border-warning/30"
               >
-                <td className="px-4 py-3 text-sm font-mono text-gray-500 dark:text-gray-400">
+                <td className="px-4 py-3 text-sm font-mono text-subtle-foreground dark:text-muted-foreground">
                   {row.row_number}
                 </td>
-                <td className="px-4 py-3 text-sm font-mono text-gray-700 dark:text-gray-300">
+                <td className="px-4 py-3 text-sm font-mono text-muted-foreground">
                   {row.row_reference || "—"}
                 </td>
-                <td className="px-4 py-3 text-xs text-amber-700 dark:text-amber-400">
+                <td className="px-4 py-3 text-xs text-warning">
                   <span className="inline-flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" />
                     Matched existing booking — no new booking created
@@ -1247,13 +1247,13 @@ function SkippedRowsTable({ skippedRows = [] }) {
 
 function KPICard({ label, value, icon: Icon, color = "default" }) {
   const colors = {
-    default: "bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white",
+    default: "bg-muted dark:bg-surface text-foreground",
     green:
-      "bg-green-50 dark:bg-green-900/10 text-green-600 dark:text-green-400",
-    red: "bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400",
-    blue: "bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400",
+      "bg-success-surface text-success",
+    red: "bg-destructive-surface text-destructive",
+    blue: "bg-info-surface text-info",
     amber:
-      "bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400",
+      "bg-warning-surface text-warning",
   };
 
   return (
@@ -1277,17 +1277,17 @@ function KPICard({ label, value, icon: Icon, color = "default" }) {
 
 function InfoCard({ title, items }) {
   return (
-    <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-      <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+    <div className="p-4 border border-border rounded-lg bg-muted dark:bg-surface/50">
+      <h4 className="text-sm font-semibold text-foreground mb-3">
         {title}
       </h4>
       <div className="space-y-2">
         {items.map((item, idx) => (
           <div key={idx} className="flex justify-between items-start">
-            <span className="text-xs text-gray-600 dark:text-gray-400">
+            <span className="text-xs text-muted-foreground">
               {item.label}
             </span>
-            <span className="text-sm font-medium text-gray-900 dark:text-white text-right">
+            <span className="text-sm font-medium text-foreground text-right">
               {item.value}
             </span>
           </div>

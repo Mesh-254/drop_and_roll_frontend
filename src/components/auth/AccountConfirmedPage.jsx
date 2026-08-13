@@ -101,21 +101,21 @@ const AccountConfirmedPage = () => {
 
   if (confirmationStatus === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-orange-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-surface via-card to-brand-surface dark:from-card dark:via-surface dark:to-card">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Confirming your email...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Confirming your email...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-orange-50 via-white to-orange-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-brand-surface via-card to-brand-surface dark:from-card dark:via-surface dark:to-card">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-8 text-center"
+        className="bg-card dark:bg-surface rounded-2xl shadow-2xl max-w-md w-full p-8 text-center"
       >
         {confirmationStatus === "success" ? (
           <>
@@ -123,15 +123,15 @@ const AccountConfirmedPage = () => {
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-              className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6"
+              className="w-20 h-20 bg-success-surface rounded-full flex items-center justify-center mx-auto mb-6"
             >
-              <CheckCircle className="w-12 h-12 text-green-500" />
+              <CheckCircle className="w-12 h-12 text-success" />
             </motion.div>
             <motion.h1
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="text-2xl font-bold text-gray-900 dark:text-white mb-4"
+              className="text-2xl font-bold text-foreground mb-4"
             >
               Account Confirmed!
             </motion.h1>
@@ -139,7 +139,7 @@ const AccountConfirmedPage = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
-              className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed"
+              className="text-muted-foreground mb-6 leading-relaxed"
             >
               {successDetail}
             </motion.p>
@@ -147,9 +147,9 @@ const AccountConfirmedPage = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
-              className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4 mb-6 border border-orange-200 dark:border-orange-800"
+              className="bg-brand-surface rounded-lg p-4 mb-6 border border-primary/30"
             >
-              <p className="text-orange-700 dark:text-orange-300 text-sm">
+              <p className="text-brand-text text-sm">
                 Redirecting to homepage in{" "}
                 <span className="font-bold text-lg">{countdown}</span> seconds...
               </p>
@@ -162,13 +162,13 @@ const AccountConfirmedPage = () => {
             >
               <Link
                 to="/login"
-                className="w-full py-3 px-4 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
+                className="w-full py-3 px-4 bg-primary text-primary-foreground rounded-full hover:bg-primary-hover transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
               >
                 Sign in now <ArrowRight className="w-5 h-5 ml-2" />
               </Link>
               <Link
                 to="/"
-                className="w-full py-3 px-4 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 flex items-center justify-center"
+                className="w-full py-3 px-4 border border-border-strong text-muted-foreground rounded-full hover:bg-muted dark:hover:bg-surface-hover transition-all duration-200 flex items-center justify-center"
               >
                 <Home className="w-5 h-5 mr-2" /> Go to homepage
               </Link>
@@ -181,15 +181,15 @@ const AccountConfirmedPage = () => {
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-              className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-6"
+              className="w-20 h-20 bg-info-surface rounded-full flex items-center justify-center mx-auto mb-6"
             >
-              <UserCheck className="w-12 h-12 text-blue-500" />
+              <UserCheck className="w-12 h-12 text-info" />
             </motion.div>
             <motion.h1
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="text-2xl font-bold text-gray-900 dark:text-white mb-4"
+              className="text-2xl font-bold text-foreground mb-4"
             >
               Account Already Active!
             </motion.h1>
@@ -197,7 +197,7 @@ const AccountConfirmedPage = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
-              className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed"
+              className="text-muted-foreground mb-6 leading-relaxed"
             >
               {errorMessage} {/* Backend message: "This account... Please sign in." */}
             </motion.p>
@@ -205,9 +205,9 @@ const AccountConfirmedPage = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
-              className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 mb-6 border border-blue-200 dark:border-blue-800"
+              className="bg-info-surface rounded-lg p-4 mb-6 border border-info/30"
             >
-              <p className="text-blue-700 dark:text-blue-300 text-sm">
+              <p className="text-info text-sm">
                 Redirecting to sign in in{" "}
                 <span className="font-bold text-lg">{redirectCountdown}</span> seconds...
               </p>
@@ -220,13 +220,13 @@ const AccountConfirmedPage = () => {
             >
               <Link
                 to="/login"
-                className="w-full py-3 px-4 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
+                className="w-full py-3 px-4 bg-primary text-primary-foreground rounded-full hover:bg-primary-hover transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
               >
                 <LogOut className="w-5 h-5 mr-2" /> Sign in now
               </Link>
               <Link
                 to="/"
-                className="w-full py-3 px-4 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 flex items-center justify-center"
+                className="w-full py-3 px-4 border border-border-strong text-muted-foreground rounded-full hover:bg-muted dark:hover:bg-surface-hover transition-all duration-200 flex items-center justify-center"
               >
                 <Home className="w-5 h-5 mr-2" /> Go to homepage
               </Link>
@@ -239,15 +239,15 @@ const AccountConfirmedPage = () => {
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-              className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-6"
+              className="w-20 h-20 bg-destructive-surface rounded-full flex items-center justify-center mx-auto mb-6"
             >
-              <AlertCircle className="w-12 h-12 text-red-500" />
+              <AlertCircle className="w-12 h-12 text-destructive" />
             </motion.div>
             <motion.h1
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="text-2xl font-bold text-gray-900 dark:text-white mb-4"
+              className="text-2xl font-bold text-foreground mb-4"
             >
               Confirmation Failed
             </motion.h1>
@@ -255,7 +255,7 @@ const AccountConfirmedPage = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
-              className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed"
+              className="text-muted-foreground mb-6 leading-relaxed"
             >
               We couldn't confirm your email this time.
             </motion.p>
@@ -263,10 +263,10 @@ const AccountConfirmedPage = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
-              className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 mb-6 border border-red-200 dark:border-red-800"
+              className="bg-destructive-surface rounded-lg p-4 mb-6 border border-destructive/30"
             >
-              <p className="text-red-700 dark:text-red-300 text-sm">{errorMessage}</p>
-              <p className="text-red-700 dark:text-red-300 text-sm mt-2">
+              <p className="text-destructive text-sm">{errorMessage}</p>
+              <p className="text-destructive text-sm mt-2">
                 Redirecting to resend in{" "}
                 <span className="font-bold text-lg">{redirectCountdown}</span> seconds...
               </p>
@@ -279,13 +279,13 @@ const AccountConfirmedPage = () => {
             >
               <Link
                 to="/resend-confirmation"
-                className="w-full py-3 px-4 bg-orange-500 text-white rounded-full hover:bg-orange-600 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
+                className="w-full py-3 px-4 bg-primary text-primary-foreground rounded-full hover:bg-primary-hover transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center"
               >
                 Resend confirmation email <ArrowRight className="w-5 h-5 ml-2" />
               </Link>
               <Link
                 to="/register"
-                className="w-full py-3 px-4 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 flex items-center justify-center"
+                className="w-full py-3 px-4 border border-border-strong text-muted-foreground rounded-full hover:bg-muted dark:hover:bg-surface-hover transition-all duration-200 flex items-center justify-center"
               >
                 Back to registration
               </Link>

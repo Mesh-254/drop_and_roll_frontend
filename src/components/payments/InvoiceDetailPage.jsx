@@ -62,12 +62,12 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 // ─── Status helpers ───────────────────────────────────────────────────────────
 
 const STATUS_STYLES = {
-  draft:     "bg-slate-700 text-slate-300 border-slate-600",
-  issued:    "bg-blue-900/50 text-blue-300 border-blue-700",
-  partial:   "bg-yellow-900/50 text-yellow-300 border-yellow-700",
-  paid:      "bg-green-900/50 text-green-300 border-green-700",
-  overdue:   "bg-red-900/50 text-red-300 border-red-700",
-  cancelled: "bg-slate-800 text-slate-500 border-slate-700",
+  draft:     "bg-surface text-muted-foreground border-border",
+  issued:    "bg-info-surface text-info border-info/30",
+  partial:   "bg-warning-surface text-warning border-warning/30",
+  paid:      "bg-success-surface text-success border-success/30",
+  overdue:   "bg-destructive-surface text-destructive border-destructive/30",
+  cancelled: "bg-surface text-subtle-foreground border-border",
 };
 
 // ─── Stripe inner form ────────────────────────────────────────────────────────
@@ -117,8 +117,8 @@ function StripePayForm({ clientSecret, transactionId, amount, currency, onSucces
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-4">
-        <label className="block text-sm font-medium text-slate-300 mb-3">
+      <div className="bg-surface/50 border border-border rounded-xl p-4">
+        <label className="block text-sm font-medium text-muted-foreground mb-3">
           Card details
         </label>
         <CardElement
@@ -137,7 +137,7 @@ function StripePayForm({ clientSecret, transactionId, amount, currency, onSucces
       </div>
 
       {cardError && (
-        <p className="text-sm text-red-400 flex items-center gap-1.5">
+        <p className="text-sm text-destructive flex items-center gap-1.5">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           {cardError}
         </p>
@@ -146,10 +146,10 @@ function StripePayForm({ clientSecret, transactionId, amount, currency, onSucces
       <button
         type="submit"
         disabled={!stripe || processing}
-        className={`w-full py-3 text-white rounded-xl font-semibold transition flex items-center justify-center gap-2 ${
+        className={`w-full py-3 text-foreground rounded-xl font-semibold transition flex items-center justify-center gap-2 ${
           processing
-            ? "bg-slate-600 cursor-not-allowed"
-            : "bg-orange-500 hover:bg-orange-600"
+            ? "bg-surface-hover cursor-not-allowed"
+            : "bg-primary hover:bg-primary-hover"
         }`}
       >
         {processing ? (
@@ -180,18 +180,18 @@ function CopyField({ label, value }) {
   };
 
   return (
-    <div className="flex items-center justify-between gap-3 py-2.5 border-b border-slate-700/50 last:border-0">
+    <div className="flex items-center justify-between gap-3 py-2.5 border-b border-border/50 last:border-0">
       <div className="min-w-0">
-        <p className="text-xs text-slate-400 uppercase tracking-wide">{label}</p>
-        <p className="text-sm font-medium text-white truncate">{value}</p>
+        <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
+        <p className="text-sm font-medium text-foreground truncate">{value}</p>
       </div>
       <button
         type="button"
         onClick={handleCopy}
         aria-label={`Copy ${label}`}
-        className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium transition"
+        className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-surface hover:bg-surface-hover text-foreground text-xs font-medium transition"
       >
-        {copied ? <><Check className="w-3.5 h-3.5 text-green-400" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+        {copied ? <><Check className="w-3.5 h-3.5 text-success" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
       </button>
     </div>
   );
@@ -204,7 +204,7 @@ function CopyField({ label, value }) {
 function BankTransferPanel({ invoice, details }) {
   return (
     <div className="space-y-4">
-      <div className="bg-slate-700/40 border border-slate-600 rounded-xl p-4">
+      <div className="bg-surface/40 border border-border rounded-xl p-4">
         <CopyField label="Bank" value={details.bank_name} />
         <CopyField label="Account name" value={details.account_name} />
         <CopyField label="Sort code" value={details.sort_code} />
@@ -213,14 +213,14 @@ function BankTransferPanel({ invoice, details }) {
         <CopyField label="Payment reference (use this exactly)" value={invoice.invoice_number} />
         <div className="flex items-center justify-between gap-3 pt-2.5">
           <div>
-            <p className="text-xs text-slate-400 uppercase tracking-wide">Amount</p>
-            <p className="text-sm font-semibold text-orange-300">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Amount</p>
+            <p className="text-sm font-semibold text-brand-text">
               {invoice.currency} {parseFloat(invoice.outstanding || 0).toFixed(2)}
             </p>
           </div>
         </div>
       </div>
-      <p className="text-xs text-slate-400 flex items-start gap-1.5">
+      <p className="text-xs text-muted-foreground flex items-start gap-1.5">
         <Info className="w-4 h-4 shrink-0 mt-0.5" />
         {details.note}
       </p>
@@ -322,11 +322,11 @@ function PaymentPanel({ invoice, onPaid }) {
               className={`flex-1 py-2 rounded-lg border text-sm font-medium transition ${
                 selectedGateway === id
                   ? id === "paypal"
-                    ? "border-blue-500 bg-blue-500/10 text-blue-300"
+                    ? "border-info bg-info/10 text-info"
                     : id === "bank"
-                      ? "border-emerald-500 bg-emerald-500/10 text-emerald-300"
-                      : "border-orange-500 bg-orange-500/10 text-orange-300"
-                  : "border-slate-600 text-slate-400 hover:border-slate-500"
+                      ? "border-success bg-success/10 text-success"
+                      : "border-primary bg-primary/10 text-brand-text"
+                  : "border-border text-muted-foreground hover:border-border-strong"
               }`}
             >
               {label}
@@ -340,9 +340,9 @@ function PaymentPanel({ invoice, onPaid }) {
         ) : (
         <button
           onClick={() => handleInitiatePayment(selectedGateway)}
-          className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl
+          className="w-full py-3 bg-primary hover:bg-primary-hover text-primary-foreground rounded-xl
                      font-semibold transition flex items-center justify-center gap-2
-                     shadow-lg shadow-orange-500/20"
+                     shadow-lg shadow-primary/20"
         >
           {selectedGateway === "paypal" ? (
             <><ExternalLink className="w-5 h-5" /> Pay via PayPal</>
@@ -357,8 +357,8 @@ function PaymentPanel({ invoice, onPaid }) {
 
   if (phase === "loading") {
     return (
-      <div className="flex items-center gap-2 text-slate-400 py-3">
-        <Loader2 className="w-5 h-5 animate-spin text-orange-500" />
+      <div className="flex items-center gap-2 text-muted-foreground py-3">
+        <Loader2 className="w-5 h-5 animate-spin text-brand-text" />
         Preparing {selectedGateway === "paypal" ? "PayPal" : "Stripe"}…
       </div>
     );
@@ -367,12 +367,12 @@ function PaymentPanel({ invoice, onPaid }) {
   if (phase === "error") {
     return (
       <div className="space-y-3">
-        <p className="text-sm text-red-400 flex items-center gap-1.5">
+        <p className="text-sm text-destructive flex items-center gap-1.5">
           <AlertTriangle className="w-4 h-4" />{err}
         </p>
         <button
           onClick={() => setPhase("idle")}
-          className="w-full py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl
+          className="w-full py-2.5 bg-surface hover:bg-surface-hover text-foreground rounded-xl
                      font-medium text-sm transition"
         >
           Try Again
@@ -383,7 +383,7 @@ function PaymentPanel({ invoice, onPaid }) {
 
   if (phase === "success") {
     return (
-      <div className="flex items-center gap-2 text-green-400 py-3">
+      <div className="flex items-center gap-2 text-success py-3">
         <CheckCircle className="w-5 h-5" />
         Payment successful! Invoice has been updated.
       </div>
@@ -395,8 +395,8 @@ function PaymentPanel({ invoice, onPaid }) {
     return (
       <div className="space-y-4 text-center">
         <div className="flex flex-col items-center gap-2 py-2">
-          <Loader2 className="w-7 h-7 animate-spin text-blue-400" />
-          <p className="text-slate-300 text-sm font-medium">Redirecting to PayPal…</p>
+          <Loader2 className="w-7 h-7 animate-spin text-info" />
+          <p className="text-muted-foreground text-sm font-medium">Redirecting to PayPal…</p>
         </div>
         <button
           onClick={() => { window.location.href = payData.approval_url; }}
@@ -453,9 +453,9 @@ function PaymentPanel({ invoice, onPaid }) {
 
 function DetailRow({ label, value, className = "" }) {
   return (
-    <div className="flex justify-between items-start py-2.5 border-b border-slate-700/50 last:border-0">
-      <span className="text-slate-400 text-sm">{label}</span>
-      <span className={`text-sm font-medium text-right ${className || "text-white"}`}>
+    <div className="flex justify-between items-start py-2.5 border-b border-border/50 last:border-0">
+      <span className="text-muted-foreground text-sm">{label}</span>
+      <span className={`text-sm font-medium text-right ${className || "text-foreground"}`}>
         {value}
       </span>
     </div>
@@ -510,23 +510,23 @@ export default function InvoiceDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center  pt-20">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-400" />
+      <div className="min-h-screen bg-card flex items-center justify-center  pt-20">
+        <Loader2 className="w-8 h-8 animate-spin text-brand-text" />
       </div>
     );
   }
 
   if (error || !invoice) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center  pt-20">
+      <div className="min-h-screen bg-card flex items-center justify-center  pt-20">
         <div className="text-center">
-          <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <p className="text-white text-lg font-semibold mb-2">
+          <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-4" />
+          <p className="text-foreground text-lg font-semibold mb-2">
             {error || "Invoice not found"}
           </p>
           <button
             onClick={() => navigate("/billing")}
-            className="mt-4 px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-medium transition"
+            className="mt-4 px-6 py-2.5 bg-surface hover:bg-surface-hover text-foreground rounded-xl font-medium transition"
           >
             Back to Billing
           </button>
@@ -560,7 +560,7 @@ export default function InvoiceDetailPage() {
     // z-50. `py-10` (40px) let the invoice heading + back arrow render UNDER the
     // nav. Every other full page under this header uses pt-20; the title sits
     // right at the top here so we use pt-24 for breathing room.
-    <div className="min-h-screen bg-slate-900 px-4 pt-24 pb-10">
+    <div className="min-h-screen bg-card px-4 pt-24 pb-10">
       <div className="max-w-2xl mx-auto space-y-6">
 
         {/* Header — back button gets its own fixed cell so it can never overlap
@@ -570,18 +570,18 @@ export default function InvoiceDetailPage() {
           <button
             onClick={handleBack}
             aria-label="Back"
-            className="flex-shrink-0 p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+            className="flex-shrink-0 p-2 rounded-lg bg-surface hover:bg-surface text-muted-foreground transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-bold text-white truncate">
+            <h1 className="text-2xl font-bold text-foreground truncate">
               Invoice {invoice.invoice_number}
             </h1>
-            <p className="text-sm text-slate-400 truncate">{invoice.business_name}</p>
+            <p className="text-sm text-muted-foreground truncate">{invoice.business_name}</p>
             {/* Bulk-vs-single distinction (spec §4) */}
             {isBulkInvoice && (
-              <span className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-500/15 text-orange-300 border border-orange-500/40">
+              <span className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-primary/15 text-brand-text border border-primary/40">
                 <Layers className="w-3.5 h-3.5" />
                 Bulk Payment
                 {invoice.booking_count != null && ` · ${invoice.booking_count} booking${invoice.booking_count !== 1 ? "s" : ""}`}
@@ -598,23 +598,23 @@ export default function InvoiceDetailPage() {
         </div>
 
         {/* Amounts card */}
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
+        <div className="bg-surface border border-border rounded-2xl p-6">
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div>
-              <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Total</p>
-              <p className="text-2xl font-bold text-white">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Total</p>
+              <p className="text-2xl font-bold text-foreground">
                 {invoice.currency} {parseFloat(invoice.amount).toFixed(2)}
               </p>
             </div>
             <div>
-              <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Paid</p>
-              <p className="text-2xl font-bold text-green-400">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Paid</p>
+              <p className="text-2xl font-bold text-success">
                 {invoice.currency} {parseFloat(invoice.paid_amount || 0).toFixed(2)}
               </p>
             </div>
             <div>
-              <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Outstanding</p>
-              <p className={`text-2xl font-bold ${outstanding > 0 ? "text-orange-400" : "text-slate-400"}`}>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Outstanding</p>
+              <p className={`text-2xl font-bold ${outstanding > 0 ? "text-brand-text" : "text-muted-foreground"}`}>
                 {invoice.currency} {outstanding.toFixed(2)}
               </p>
             </div>
@@ -626,9 +626,9 @@ export default function InvoiceDetailPage() {
               {!showPayPanel ? (
                 <button
                   onClick={() => setShowPayPanel(true)}
-                  className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl
+                  className="w-full py-3 bg-primary hover:bg-primary-hover text-primary-foreground rounded-xl
                              font-semibold transition flex items-center justify-center gap-2
-                             shadow-lg shadow-orange-500/20"
+                             shadow-lg shadow-primary/20"
                 >
                   <CreditCard className="w-5 h-5" />
                   Pay Now — {invoice.currency} {outstanding.toFixed(2)}
@@ -636,10 +636,10 @@ export default function InvoiceDetailPage() {
               ) : (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-white">Online Payment</p>
+                    <p className="text-sm font-semibold text-foreground">Online Payment</p>
                     <button
                       onClick={() => setShowPayPanel(false)}
-                      className="text-xs text-slate-400 hover:text-slate-200 transition"
+                      className="text-xs text-muted-foreground hover:text-foreground transition"
                     >
                       Cancel
                     </button>
@@ -651,7 +651,7 @@ export default function InvoiceDetailPage() {
           )}
 
           {invoice.status === "paid" && (
-            <div className="flex items-center gap-2 text-green-400 py-2">
+            <div className="flex items-center gap-2 text-success py-2">
               <CheckCircle className="w-5 h-5" />
               <span className="font-medium">Invoice Paid</span>
             </div>
@@ -659,15 +659,15 @@ export default function InvoiceDetailPage() {
         </div>
 
         {/* Invoice details */}
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
-          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">
+        <div className="bg-surface border border-border rounded-2xl p-6">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
             Invoice Details
           </h2>
           <div className="space-y-0">
             <DetailRow label="Invoice Number"  value={invoice.invoice_number} />
             <DetailRow label="Issue Date"      value={invoice.issue_date} />
             <DetailRow label="Due Date"        value={invoice.due_date}
-              className={invoice.is_overdue ? "text-red-400 font-semibold" : "text-white"} />
+              className={invoice.is_overdue ? "text-destructive font-semibold" : "text-foreground"} />
             <DetailRow label="Payment Terms"   value={invoice.payment_terms_display || invoice.payment_terms} />
             {invoice.bulk_upload && (
               <DetailRow
@@ -675,7 +675,7 @@ export default function InvoiceDetailPage() {
                 value={
                   <button
                     onClick={() => navigate(`/bulk-upload/${invoice.bulk_upload}`)}
-                    className="text-orange-400 hover:text-orange-300 text-sm transition"
+                    className="text-brand-text hover:text-brand-text text-sm transition"
                   >
                     View Upload →
                   </button>
@@ -698,16 +698,16 @@ export default function InvoiceDetailPage() {
               href={invoice.pdf_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-600
-                         text-white rounded-xl font-medium text-sm transition"
+              className="flex items-center gap-2 px-4 py-2.5 bg-surface hover:bg-surface-hover
+                         text-foreground rounded-xl font-medium text-sm transition"
             >
               <Download className="w-4 h-4" /> Download PDF
             </a>
           )}
           <button
             onClick={() => navigate("/billing")}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-600
-                       text-white rounded-xl font-medium text-sm transition"
+            className="flex items-center gap-2 px-4 py-2.5 bg-surface hover:bg-surface-hover
+                       text-foreground rounded-xl font-medium text-sm transition"
           >
             <ArrowLeft className="w-4 h-4" /> All Invoices
           </button>

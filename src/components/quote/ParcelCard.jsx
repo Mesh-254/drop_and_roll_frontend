@@ -120,32 +120,32 @@ export default function ParcelCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.3 }}
-      className="rounded-2xl border-2 border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/10 overflow-hidden hover:border-orange-300 dark:hover:border-orange-700 transition-colors"
+      className="rounded-2xl border-2 border-primary/30 bg-brand-surface overflow-hidden hover:border-primary/30 transition-colors"
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-orange-100/50 dark:bg-orange-900/20 border-b border-orange-200 dark:border-orange-800">
+      <div className="flex items-center justify-between p-4 bg-brand-surface border-b border-primary/30">
         <div className="flex items-center gap-3 flex-1">
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-1 hover:bg-orange-200 dark:hover:bg-orange-900/40 rounded-lg transition-colors"
+            className="p-1 hover:bg-brand-surface rounded-lg transition-colors"
           >
             {isExpanded ? (
               <ChevronUp
                 size={20}
-                className="text-orange-600 dark:text-orange-400"
+                className="text-brand-text"
               />
             ) : (
               <ChevronDown
                 size={20}
-                className="text-orange-600 dark:text-orange-400"
+                className="text-brand-text"
               />
             )}
           </button>
-          <h4 className="text-lg font-bold text-gray-900 dark:text-white font-montserrat">
+          <h4 className="text-lg font-bold text-foreground font-montserrat">
             Parcel #{parcelIndex + 1}
           </h4>
           {parcel.weightKg && (
-            <span className="text-sm text-gray-600 dark:text-gray-400 ml-2">
+            <span className="text-sm text-muted-foreground ml-2">
               {parcel.weightKg}kg
             </span>
           )}
@@ -156,7 +156,7 @@ export default function ParcelCard({
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => onRemove(parcelIndex)}
-            className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors text-red-500 hover:text-red-600"
+            className="p-2 hover:bg-destructive-surface rounded-lg transition-colors text-destructive hover:text-destructive"
           >
             <Trash2 size={18} />
           </motion.button>
@@ -176,7 +176,7 @@ export default function ParcelCard({
           <div>
             <label
               htmlFor={`weight-${parcelIndex}`}
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              className="block text-sm font-medium text-muted-foreground mb-2"
             >
               Weight (kg) *
             </label>
@@ -193,18 +193,18 @@ export default function ParcelCard({
                 placeholder="e.g., 2.5"
                 aria-invalid={!!weightError}
                 aria-describedby={weightError ? `weight-${parcelIndex}-error` : undefined}
-                className={`w-full px-4 py-3 pr-10 rounded-lg border-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors ${
+                className={`w-full px-4 py-3 pr-10 rounded-lg border-2 bg-card dark:bg-surface text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors ${
                   weightError
-                    ? "border-red-500"
+                    ? "border-destructive"
                     : weightValid
-                      ? "border-green-500"
-                      : "border-gray-300 dark:border-gray-600"
+                      ? "border-success"
+                      : "border-border-strong"
                 }`}
               />
               {weightValid && (
                 <CheckCircle2
                   size={18}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-success"
                   aria-hidden="true"
                 />
               )}
@@ -213,7 +213,7 @@ export default function ParcelCard({
               <div
                 id={`weight-${parcelIndex}-error`}
                 role="alert"
-                className="flex items-center text-red-500 text-sm mt-2"
+                className="flex items-center text-destructive text-sm mt-2"
               >
                 <AlertCircle size={16} className="mr-2 shrink-0" />
                 {weightError}
@@ -223,7 +223,7 @@ export default function ParcelCard({
 
           {/* Dimensions */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            <label className="block text-sm font-medium text-muted-foreground mb-3">
               Dimensions (cm) - Length × Width × Height *
             </label>
             <div className="grid grid-cols-3 gap-3">
@@ -231,7 +231,7 @@ export default function ParcelCard({
               <div>
                 <label
                   htmlFor={`length-${parcelIndex}`}
-                  className="block text-xs text-gray-600 dark:text-gray-400 mb-1"
+                  className="block text-xs text-muted-foreground mb-1"
                 >
                   Length
                 </label>
@@ -249,18 +249,18 @@ export default function ParcelCard({
                     placeholder="0"
                     aria-invalid={!!lengthError}
                     aria-describedby={lengthError ? `dimensions-${parcelIndex}-error` : undefined}
-                    className={`w-full px-3 py-2 pr-8 rounded-lg border-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors text-sm ${
+                    className={`w-full px-3 py-2 pr-8 rounded-lg border-2 bg-card dark:bg-surface text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors text-sm ${
                       lengthError
-                        ? "border-red-500"
+                        ? "border-destructive"
                         : lengthValid
-                          ? "border-green-500"
-                          : "border-gray-300 dark:border-gray-600"
+                          ? "border-success"
+                          : "border-border-strong"
                     }`}
                   />
                   {lengthValid && (
                     <CheckCircle2
                       size={14}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-green-500"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-success"
                       aria-hidden="true"
                     />
                   )}
@@ -271,7 +271,7 @@ export default function ParcelCard({
               <div>
                 <label
                   htmlFor={`width-${parcelIndex}`}
-                  className="block text-xs text-gray-600 dark:text-gray-400 mb-1"
+                  className="block text-xs text-muted-foreground mb-1"
                 >
                   Width
                 </label>
@@ -289,18 +289,18 @@ export default function ParcelCard({
                     placeholder="0"
                     aria-invalid={!!widthError}
                     aria-describedby={widthError ? `dimensions-${parcelIndex}-error` : undefined}
-                    className={`w-full px-3 py-2 pr-8 rounded-lg border-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors text-sm ${
+                    className={`w-full px-3 py-2 pr-8 rounded-lg border-2 bg-card dark:bg-surface text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors text-sm ${
                       widthError
-                        ? "border-red-500"
+                        ? "border-destructive"
                         : widthValid
-                          ? "border-green-500"
-                          : "border-gray-300 dark:border-gray-600"
+                          ? "border-success"
+                          : "border-border-strong"
                     }`}
                   />
                   {widthValid && (
                     <CheckCircle2
                       size={14}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-green-500"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-success"
                       aria-hidden="true"
                     />
                   )}
@@ -311,7 +311,7 @@ export default function ParcelCard({
               <div>
                 <label
                   htmlFor={`height-${parcelIndex}`}
-                  className="block text-xs text-gray-600 dark:text-gray-400 mb-1"
+                  className="block text-xs text-muted-foreground mb-1"
                 >
                   Height
                 </label>
@@ -329,18 +329,18 @@ export default function ParcelCard({
                     placeholder="0"
                     aria-invalid={!!heightError}
                     aria-describedby={heightError ? `dimensions-${parcelIndex}-error` : undefined}
-                    className={`w-full px-3 py-2 pr-8 rounded-lg border-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors text-sm ${
+                    className={`w-full px-3 py-2 pr-8 rounded-lg border-2 bg-card dark:bg-surface text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors text-sm ${
                       heightError
-                        ? "border-red-500"
+                        ? "border-destructive"
                         : heightValid
-                          ? "border-green-500"
-                          : "border-gray-300 dark:border-gray-600"
+                          ? "border-success"
+                          : "border-border-strong"
                     }`}
                   />
                   {heightValid && (
                     <CheckCircle2
                       size={14}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-green-500"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-success"
                       aria-hidden="true"
                     />
                   )}
@@ -351,14 +351,14 @@ export default function ParcelCard({
               <div
                 id={`dimensions-${parcelIndex}-error`}
                 role="alert"
-                className="flex items-center text-red-500 text-sm mt-2"
+                className="flex items-center text-destructive text-sm mt-2"
               >
                 <AlertCircle size={16} className="mr-2 shrink-0" />
                 {lengthError || widthError || heightError}
               </div>
             )}
             {!lengthError && !widthError && !heightError && volumetric > 0 && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+              <p className="text-xs text-subtle-foreground dark:text-muted-foreground mt-2">
                 Volumetric weight: <span className="font-medium">{volumetric.toFixed(1)} kg</span>
                 {volumetric > (Number.parseFloat(parcel.weightKg) || 0) && (
                   <span className="ml-1">(may affect final pricing)</span>
@@ -368,26 +368,26 @@ export default function ParcelCard({
           </div>
 
           {/* Fragile Checkbox */}
-          <div className="flex items-center space-x-3 p-3 rounded-lg bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center space-x-3 p-3 rounded-lg bg-card dark:bg-surface/50 border border-border">
             <input
               type="checkbox"
               id={`fragile-${parcelIndex}`}
               checked={parcel.fragile || false}
               onChange={(e) => handleFragileChange(e.target.checked)}
-              className="w-5 h-5 text-orange-500 border-gray-300 dark:border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
+              className="w-5 h-5 text-brand-text border-border-strong rounded focus:ring-ring focus:ring-2"
             />
             <label
               htmlFor={`fragile-${parcelIndex}`}
-              className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-1 cursor-pointer"
+              className="text-sm font-medium text-muted-foreground flex-1 cursor-pointer"
             >
               Mark as fragile
             </label>
             <div className="group relative">
               <HelpCircle
                 size={16}
-                className="text-gray-400 cursor-help hover:text-gray-600 dark:hover:text-gray-300"
+                className="text-muted-foreground cursor-help hover:text-muted-foreground"
               />
-              <div className="absolute bottom-full right-0 transform translate-y-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none">
+              <div className="absolute bottom-full right-0 transform translate-y-2 px-3 py-2 bg-card text-foreground text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none">
                 Extra handling for delicate items (may incur charges)
               </div>
             </div>

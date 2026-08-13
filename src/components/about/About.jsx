@@ -35,7 +35,7 @@ const AnimatedCounter = ({ end, duration = 2, suffix = "" }) => {
   return (
     <span
       ref={countRef}
-      className="text-3xl md:text-4xl font-bold text-orange-500"
+      className="text-3xl md:text-4xl font-bold text-brand-text"
     >
       {count}
       {suffix}
@@ -50,7 +50,7 @@ const FloatingParticles = () => {
       {[...Array(20)].map((_, i) => (
         <motion.div
           key={i}
-          className="absolute w-2 h-2 bg-orange-500/20 rounded-full"
+          className="absolute w-2 h-2 bg-primary/20 rounded-full"
           initial={{
             x: Math.random() * window.innerWidth,
             y: Math.random() * window.innerHeight,
@@ -81,15 +81,15 @@ const ValueCard = ({ icon: Icon, title, description, delay }) => {
       transition={{ duration: 0.6, delay }}
       viewport={{ once: true }}
       whileHover={{ scale: 1.05, rotateY: 5 }}
-      className="bg-white p-6 rounded-2xl border border-gray-700 hover:border-orange-500/50 transition-all duration-300 group"
+      className="bg-card p-6 rounded-2xl border border-border hover:border-primary/50 transition-all duration-300 group"
     >
-      <div className="w-16 h-16 bg-orange-500/10 rounded-full flex items-center justify-center mb-4 group-hover:bg-orange-500/20 transition-colors">
-        <Icon className="w-8 h-8 text-orange-800 group-hover:scale-110 transition-transform" />
+      <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+        <Icon className="w-8 h-8 text-brand-text group-hover:scale-110 transition-transform" />
       </div>
-      <h3 className="text-xl font-bold text-black mb-2 group-hover:text-orange-500 transition-colors">
+      <h3 className="text-xl font-bold text-foreground mb-2 group-hover:text-brand-text transition-colors">
         {title}
       </h3>
-      <p className="text-gray-700 leading-relaxed">{description}</p>
+      <p className="text-muted-foreground leading-relaxed">{description}</p>
     </motion.div>
   );
 };
@@ -105,16 +105,16 @@ const ImageCard = ({ src, alt, caption, delay, className = "" }) => {
       whileHover={{ scale: 1.05 }}
       className={`relative group overflow-hidden rounded-2xl ${className}`}
     >
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent z-10" />
+      <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent z-10" />
       <img
         src={src || "/placeholder.svg"}
         alt={alt}
         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
       />
       <div className="absolute bottom-4 left-4 right-4 z-20">
-        <p className="text-white font-medium text-sm">{caption}</p>
+        <p className="text-foreground font-medium text-sm">{caption}</p>
       </div>
-      <div className="absolute inset-0 bg-orange-500/0 group-hover:bg-orange-500/10 transition-colors duration-300" />
+      <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/10 transition-colors duration-300" />
     </motion.div>
   );
 };
@@ -151,12 +151,12 @@ export default function About() {
   };
 
   return (
-    <section id="about" className="relative bg-black py-20 overflow-hidden">
+    <section id="about" className="relative bg-background py-20 overflow-hidden">
       {/* Floating Particles Background */}
       <FloatingParticles />
 
       {/* Background Gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-900/50 via-black to-gray-900/50" />
+      <div className="absolute inset-0 bg-gradient-to-br from-card/50 via-background to-card/50" />
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
@@ -168,19 +168,19 @@ export default function About() {
           className="text-center mb-20"
         >
           <motion.div variants={itemVariants}>
-            <span className="inline-block bg-orange-500/10 text-orange-500 px-4 py-2 rounded-full text-sm font-medium mb-4">
+            <span className="inline-block bg-primary/10 text-brand-text px-4 py-2 rounded-full text-sm font-medium mb-4">
               Our Story
             </span>
           </motion.div>
           <motion.h2
             variants={itemVariants}
-            className="text-4xl lg:text-6xl font-bold text-white mb-6"
+            className="text-4xl lg:text-6xl font-bold text-foreground mb-6"
           >
-            About <span className="text-orange-500">Drop 'n Roll</span>
+            About <span className="text-brand-text">Drop 'n Roll</span>
           </motion.h2>
           <motion.p
             variants={itemVariants}
-            className="text-xl text-gray-400 max-w-3xl mx-auto leading-relaxed"
+            className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed"
           >
             Born from a passion for connecting people and businesses through
             reliable, lightning-fast delivery solutions
@@ -195,21 +195,21 @@ export default function About() {
           viewport={{ once: true }}
           className="mb-20"
         >
-          <div className="bg-gradient-to-r from-gray-900/80 to-gray-800/80 backdrop-blur-sm rounded-3xl p-8 md:p-12 border border-gray-700">
+          <div className="bg-gradient-to-r from-card/80 to-surface/80 backdrop-blur-sm rounded-3xl p-8 md:p-12 border border-border">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
               <div>
-                <h3 className="text-3xl font-bold text-white mb-6">
+                <h3 className="text-3xl font-bold text-foreground mb-6">
                   From Vision to{" "}
-                  <span className="text-orange-500">Reality</span>
+                  <span className="text-brand-text">Reality</span>
                 </h3>
-                <p className="text-gray-300 text-lg leading-relaxed mb-6">
+                <p className="text-muted-foreground text-lg leading-relaxed mb-6">
                   What started as a simple idea between friends has evolved into
                   a revolutionary delivery platform. We saw the frustration of
                   unreliable deliveries, the anxiety of not knowing where your
                   package is, and the disconnect between businesses and their
                   customers.
                 </p>
-                <p className="text-gray-300 text-lg leading-relaxed">
+                <p className="text-muted-foreground text-lg leading-relaxed">
                   Today, Drop 'n Roll bridges that gap with cutting-edge
                   technology, a passionate team, and an unwavering commitment to
                   making every delivery feel personal, secure, and
@@ -217,7 +217,7 @@ export default function About() {
                 </p>
               </div>
               <div className="relative">
-                <div className="absolute inset-0 bg-orange-500/20 rounded-2xl blur-3xl" />
+                <div className="absolute inset-0 bg-primary/20 rounded-2xl blur-3xl" />
                 <img
                   src="/images/van-orange.png"
                   alt="Drop 'n Roll Fleet"
@@ -250,10 +250,10 @@ export default function About() {
                 transition={{ duration: 0.6, delay: index * 0.1 }}
                 viewport={{ once: true }}
                 whileHover={{ scale: 1.05 }}
-                className="text-center bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm p-6 rounded-2xl border border-gray-700 hover:border-orange-500/50 transition-all duration-300"
+                className="text-center bg-gradient-to-br from-surface/50 to-card/50 backdrop-blur-sm p-6 rounded-2xl border border-border hover:border-primary/50 transition-all duration-300"
               >
                 <AnimatedCounter end={stat.number} suffix={stat.suffix} />
-                <p className="text-gray-400 mt-2 font-medium">{stat.label}</p>
+                <p className="text-muted-foreground mt-2 font-medium">{stat.label}</p>
               </motion.div>
             ))}
           </div>
@@ -268,10 +268,10 @@ export default function About() {
           className="mb-20"
         >
           <div className="text-center mb-12">
-            <h3 className="text-3xl lg:text-4xl font-bold text-white mb-4">
-              Our <span className="text-orange-500">Values</span>
+            <h3 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
+              Our <span className="text-brand-text">Values</span>
             </h3>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               The principles that drive everything we do
             </p>
           </div>
@@ -307,10 +307,10 @@ export default function About() {
           className="mb-20"
         >
           <div className="text-center mb-12">
-            <h3 className="text-3xl lg:text-4xl font-bold text-white mb-4">
-              Meet Our <span className="text-orange-500">Team & Fleet</span>
+            <h3 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
+              Meet Our <span className="text-brand-text">Team & Fleet</span>
             </h3>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               The people and vehicles that make the magic happen
             </p>
           </div>
@@ -357,9 +357,9 @@ export default function About() {
           viewport={{ once: true }}
           className="text-center"
         >
-          <div className="bg-gradient-to-r from-orange-500/10 to-orange-600/10 backdrop-blur-sm rounded-3xl p-8 md:p-12 border border-orange-500/20">
-            <Quote className="w-12 h-12 text-orange-500 mx-auto mb-6" />
-            <blockquote className="text-2xl md:text-3xl font-bold text-white mb-6 leading-relaxed">
+          <div className="bg-gradient-to-r from-primary/10 to-primary-hover/10 backdrop-blur-sm rounded-3xl p-8 md:p-12 border border-primary/20">
+            <Quote className="w-12 h-12 text-brand-text mx-auto mb-6" />
+            <blockquote className="text-2xl md:text-3xl font-bold text-foreground mb-6 leading-relaxed">
               "Drop 'n Roll transformed our business. Same-day delivery went
               from impossible to effortless."
             </blockquote>
@@ -367,11 +367,11 @@ export default function About() {
               {[...Array(5)].map((_, i) => (
                 <Star
                   key={i}
-                  className="w-5 h-5 text-orange-500 fill-current"
+                  className="w-5 h-5 text-brand-text fill-current"
                 />
               ))}
             </div>
-            <cite className="text-gray-400 font-medium">
+            <cite className="text-muted-foreground font-medium">
               Sarah Johnson, CEO of LocalCraft Co.
             </cite>
           </div>

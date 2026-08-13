@@ -175,22 +175,22 @@ function StripeCheckoutForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-5">
-        <p className="text-sm text-slate-400 mb-1">Amount due</p>
-        <p className="text-3xl font-bold text-white">
+      <div className="bg-surface/50 border border-border rounded-xl p-5">
+        <p className="text-sm text-muted-foreground mb-1">Amount due</p>
+        <p className="text-3xl font-bold text-foreground">
           {currency} {parseFloat(amount).toFixed(2)}
         </p>
       </div>
 
-      <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-4">
-        <label className="block text-sm font-medium text-slate-300 mb-3">
+      <div className="bg-surface/50 border border-border rounded-xl p-4">
+        <label className="block text-sm font-medium text-muted-foreground mb-3">
           Card details
         </label>
         <CardElement options={CARD_STYLE} />
       </div>
 
       {cardError && (
-        <div className="flex items-start gap-2 bg-red-900/30 border border-red-700 rounded-lg p-3 text-red-300 text-sm">
+        <div className="flex items-start gap-2 bg-destructive-surface border border-destructive/30 rounded-lg p-3 text-destructive text-sm">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           {cardError}
         </div>
@@ -199,8 +199,8 @@ function StripeCheckoutForm({
       <button
         type="submit"
         disabled={!stripe || processing}
-        className="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600
-                   disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-semibold
+        className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover
+                   disabled:bg-surface-hover disabled:cursor-not-allowed text-primary-foreground font-semibold
                    rounded-xl py-4 px-6 transition-colors"
       >
         {processing ? (
@@ -215,7 +215,7 @@ function StripeCheckoutForm({
         )}
       </button>
 
-      <p className="flex items-center justify-center gap-2 text-xs text-slate-500">
+      <p className="flex items-center justify-center gap-2 text-xs text-subtle-foreground">
         <Shield className="w-4 h-4" /> Secured by Stripe
       </p>
     </form>
@@ -245,29 +245,29 @@ function GatewaySelectionScreen({
       {/* Header with progress indicator */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-slate-400">Payment Step</h3>
-          <span className="text-xs font-semibold text-orange-400">3 of 3</span>
+          <h3 className="text-sm font-medium text-muted-foreground">Payment Step</h3>
+          <span className="text-xs font-semibold text-brand-text">3 of 3</span>
         </div>
-        <h2 className="text-2xl font-bold text-white">Select Payment Method</h2>
-        <p className="text-sm text-slate-400">
+        <h2 className="text-2xl font-bold text-foreground">Select Payment Method</h2>
+        <p className="text-sm text-muted-foreground">
           Choose how you'd like to pay for your{" "}
           {isBulk ? "bulk upload" : "booking"}
         </p>
       </div>
 
       {/* Amount summary card */}
-      <div className="bg-gradient-to-br from-slate-700/50 to-slate-800/50 border border-slate-600 rounded-xl p-5">
-        <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">
+      <div className="bg-gradient-to-br from-surface-hover/50 to-surface/50 border border-border rounded-xl p-5">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
           Total Amount Due
         </p>
-        <p className="text-3xl font-bold text-white">
+        <p className="text-3xl font-bold text-foreground">
           {currency}
           {parseFloat(amount).toFixed(2)}
         </p>
         {bookingRef && (
-          <p className="text-xs text-slate-400 mt-3">
+          <p className="text-xs text-muted-foreground mt-3">
             Reference:{" "}
-            <span className="font-mono text-orange-300">{bookingRef}</span>
+            <span className="font-mono text-brand-text">{bookingRef}</span>
           </p>
         )}
       </div>
@@ -279,33 +279,33 @@ function GatewaySelectionScreen({
           onClick={() => setSelectedGateway("stripe")}
           className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
             selectedGateway === "stripe"
-              ? "border-orange-500 bg-orange-500/5 shadow-lg shadow-orange-500/20"
-              : "border-slate-600 bg-slate-700/30 hover:border-slate-500"
+              ? "border-primary bg-primary/5 shadow-lg shadow-primary/20"
+              : "border-border bg-surface/30 hover:border-border-strong"
           }`}
         >
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <CreditCard className="w-5 h-5 text-orange-400" />
-                <h3 className="font-semibold text-white">Pay with Card</h3>
+                <CreditCard className="w-5 h-5 text-brand-text" />
+                <h3 className="font-semibold text-foreground">Pay with Card</h3>
               </div>
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-muted-foreground">
                 Visa, Mastercard, American Express • Instant processing
               </p>
             </div>
             <div
               className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                 selectedGateway === "stripe"
-                  ? "border-orange-500 bg-orange-500"
-                  : "border-slate-500 bg-transparent"
+                  ? "border-primary bg-primary"
+                  : "border-border-strong bg-transparent"
               }`}
             >
               {selectedGateway === "stripe" && (
-                <div className="w-2 h-2 bg-white rounded-full" />
+                <div className="w-2 h-2 bg-card rounded-full" />
               )}
             </div>
           </div>
-          <div className="flex items-center gap-1 mt-3 text-xs text-slate-400">
+          <div className="flex items-center gap-1 mt-3 text-xs text-muted-foreground">
             <Zap className="w-3 h-3" />
             Powered by Stripe
           </div>
@@ -316,31 +316,31 @@ function GatewaySelectionScreen({
           onClick={() => setSelectedGateway("paypal")}
           className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
             selectedGateway === "paypal"
-              ? "border-blue-500 bg-blue-500/5 shadow-lg shadow-blue-500/20"
-              : "border-slate-600 bg-slate-700/30 hover:border-slate-500"
+              ? "border-info bg-info/5 shadow-lg shadow-info/20"
+              : "border-border bg-surface/30 hover:border-border-strong"
           }`}
         >
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center">
-                  <span className="text-xs font-bold text-white">P</span>
+                <div className="w-5 h-5 bg-info rounded-full flex items-center justify-center">
+                  <span className="text-xs font-bold text-foreground">P</span>
                 </div>
-                <h3 className="font-semibold text-white">Pay with PayPal</h3>
+                <h3 className="font-semibold text-foreground">Pay with PayPal</h3>
               </div>
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-muted-foreground">
                 PayPal balance, linked cards, or bank account
               </p>
             </div>
             <div
               className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                 selectedGateway === "paypal"
-                  ? "border-blue-500 bg-blue-500"
-                  : "border-slate-500 bg-transparent"
+                  ? "border-info bg-info"
+                  : "border-border-strong bg-transparent"
               }`}
             >
               {selectedGateway === "paypal" && (
-                <div className="w-2 h-2 bg-white rounded-full" />
+                <div className="w-2 h-2 bg-card rounded-full" />
               )}
             </div>
           </div>
@@ -348,8 +348,8 @@ function GatewaySelectionScreen({
       </div>
 
       {/* Security info */}
-      <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
-        <Lock className="w-3.5 h-3.5 text-green-500" />
+      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+        <Lock className="w-3.5 h-3.5 text-success" />
         <span>PCI DSS Level 1 Certified • 256-bit SSL Encryption</span>
       </div>
 
@@ -358,8 +358,8 @@ function GatewaySelectionScreen({
         <button
           onClick={handleProceed}
           disabled={loading}
-          className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-slate-600
-                     text-white font-semibold rounded-xl py-4 px-6 transition-colors
+          className="w-full bg-primary hover:bg-primary-hover disabled:bg-surface-hover
+                     text-primary-foreground font-semibold rounded-xl py-4 px-6 transition-colors
                      flex items-center justify-center gap-2"
         >
           {loading ? (
@@ -375,7 +375,7 @@ function GatewaySelectionScreen({
             </>
           )}
         </button>
-        <p className="text-center text-xs text-slate-500">
+        <p className="text-center text-xs text-subtle-foreground">
           Your payment information is secure and encrypted
         </p>
       </div>
@@ -391,22 +391,22 @@ function PayPalRedirectScreen({ approvalUrl, amount, currency }) {
   return (
     <div className="space-y-6 text-center">
       <div className="flex flex-col items-center gap-3 py-4">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
-        <p className="text-slate-300 font-medium">Redirecting to PayPal…</p>
-        <p className="text-slate-500 text-sm">
+        <Loader2 className="w-8 h-8 animate-spin text-info" />
+        <p className="text-muted-foreground font-medium">Redirecting to PayPal…</p>
+        <p className="text-subtle-foreground text-sm">
           You will be taken to PayPal to complete your payment securely.
         </p>
       </div>
 
-      <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-5">
-        <p className="text-sm text-slate-400 mb-1">Amount due</p>
-        <p className="text-3xl font-bold text-white">
+      <div className="bg-surface/50 border border-border rounded-xl p-5">
+        <p className="text-sm text-muted-foreground mb-1">Amount due</p>
+        <p className="text-3xl font-bold text-foreground">
           {currency} {parseFloat(amount).toFixed(2)}
         </p>
       </div>
 
       <div className="space-y-2">
-        <p className="text-xs text-slate-500">Not redirected automatically?</p>
+        <p className="text-xs text-subtle-foreground">Not redirected automatically?</p>
         <button
           onClick={() => { window.location.href = approvalUrl; }}
           className="w-full flex items-center justify-center gap-2 bg-[#0070ba] hover:bg-[#005ea6]
@@ -454,8 +454,8 @@ function PayPalCapturePage({ txId, token, onSuccess, onError }) {
 
   return (
     <div className="flex flex-col items-center gap-4 py-12">
-      <Loader2 className="w-10 h-10 animate-spin text-orange-400" />
-      <p className="text-slate-300">Confirming your payment…</p>
+      <Loader2 className="w-10 h-10 animate-spin text-brand-text" />
+      <p className="text-muted-foreground">Confirming your payment…</p>
     </div>
   );
 }
@@ -469,34 +469,34 @@ function SuccessScreen({ isBulk, guestEmail, tx }) {
   return (
     <div className="flex flex-col items-center gap-6 py-12 text-center max-w-md mx-auto">
       <div
-        className="w-20 h-20 bg-green-900/40 border-2 border-green-500 rounded-full
+        className="w-20 h-20 bg-success-surface border-2 border-success rounded-full
                       flex items-center justify-center"
       >
-        <CheckCircle className="w-10 h-10 text-green-400" />
+        <CheckCircle className="w-10 h-10 text-success" />
       </div>
       <div>
-        <h2 className="text-2xl font-bold text-white mb-2">
+        <h2 className="text-2xl font-bold text-foreground mb-2">
           Payment Successful!
         </h2>
 
         {guestEmail ? (
           <div className="space-y-2">
-            <p className="text-slate-400">
+            <p className="text-muted-foreground">
               Your booking has been confirmed. A confirmation email has been
               sent to:
             </p>
-            <p className="text-orange-400 font-semibold">{guestEmail}</p>
+            <p className="text-brand-text font-semibold">{guestEmail}</p>
             {trackingNumber && (
-              <div className="mt-4 p-3 bg-slate-700/50 rounded-lg border border-slate-600">
-                <p className="text-xs text-slate-400 mb-1">Tracking Number</p>
-                <p className="text-lg font-mono text-orange-400">
+              <div className="mt-4 p-3 bg-surface/50 rounded-lg border border-border">
+                <p className="text-xs text-muted-foreground mb-1">Tracking Number</p>
+                <p className="text-lg font-mono text-brand-text">
                   {trackingNumber}
                 </p>
               </div>
             )}
           </div>
         ) : (
-          <p className="text-slate-400">
+          <p className="text-muted-foreground">
             {isBulk
               ? "Your bookings have been confirmed and will be scheduled shortly."
               : "Your booking is confirmed. You'll receive a confirmation email."}
@@ -508,7 +508,7 @@ function SuccessScreen({ isBulk, guestEmail, tx }) {
         {!guestEmail && (
           <button
             onClick={() => navigate(isBulk ? "/bulk-upload" : "/bookings")}
-            className="bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-xl
+            className="bg-surface hover:bg-surface-hover text-foreground font-medium rounded-xl
                        px-6 py-3 transition-colors"
           >
             {isBulk ? "View Uploads" : "My Bookings"}
@@ -516,7 +516,7 @@ function SuccessScreen({ isBulk, guestEmail, tx }) {
         )}
         <button
           onClick={() => navigate("/")}
-          className="bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl
+          className="bg-primary hover:bg-primary-hover text-primary-foreground font-semibold rounded-xl
                      px-6 py-3 transition-colors"
         >
           Home
@@ -952,16 +952,16 @@ export default function PaymentPage() {
     return (
       <Layout>
         <div className="text-center py-8">
-          <AlertCircle className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-white mb-2">
+          <AlertCircle className="w-12 h-12 text-warning mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-foreground mb-2">
             Payment Cancelled
           </h2>
-          <p className="text-slate-400 mb-6">
+          <p className="text-muted-foreground mb-6">
             You cancelled the PayPal payment. No money has been taken.
           </p>
           <button
             onClick={() => navigate(-1)}
-            className="bg-orange-500 hover:bg-orange-600 text-white font-semibold
+            className="bg-primary hover:bg-primary-hover text-primary-foreground font-semibold
                        rounded-xl px-6 py-3 transition-colors"
           >
             Try Again
@@ -976,9 +976,9 @@ export default function PaymentPage() {
     return (
       <Layout>
         <div className="flex flex-col items-center gap-4 py-16">
-          <Loader2 className="w-10 h-10 animate-spin text-green-400" />
-          <p className="text-slate-300 font-medium">Confirming your booking…</p>
-          <p className="text-slate-500 text-sm">This takes just a moment</p>
+          <Loader2 className="w-10 h-10 animate-spin text-success" />
+          <p className="text-muted-foreground font-medium">Confirming your booking…</p>
+          <p className="text-subtle-foreground text-sm">This takes just a moment</p>
         </div>
       </Layout>
     );
@@ -989,8 +989,8 @@ export default function PaymentPage() {
     return (
       <Layout>
         <div className="flex flex-col items-center gap-4 py-16">
-          <Loader2 className="w-10 h-10 animate-spin text-orange-400" />
-          <p className="text-slate-400">Loading payment details…</p>
+          <Loader2 className="w-10 h-10 animate-spin text-brand-text" />
+          <p className="text-muted-foreground">Loading payment details…</p>
         </div>
       </Layout>
     );
@@ -1035,23 +1035,23 @@ export default function PaymentPage() {
         <Layout onBack={handleBackToBooking} backLoading={state.backNavigating}>
           <div className="space-y-4">
             <div className="text-center">
-              <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-              <h2 className="text-xl font-semibold text-white mb-2">
+              <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-foreground mb-2">
                 Payment Setup Failed
               </h2>
-              <p className="text-slate-400 mb-6">{state.error}</p>
+              <p className="text-muted-foreground mb-6">{state.error}</p>
             </div>
             <div className="flex gap-3">
               <button
                 onClick={handleRetry}
-                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold
+                className="flex-1 bg-primary hover:bg-primary-hover text-primary-foreground font-semibold
                            rounded-xl px-6 py-3 transition-colors"
               >
                 Try Again
               </button>
               <button
                 onClick={() => navigate(isBulk ? "/bulk-upload" : "/bookings")}
-                className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-semibold
+                className="flex-1 bg-surface hover:bg-surface-hover text-foreground font-semibold
                            rounded-xl px-6 py-3 transition-colors"
               >
                 Cancel
@@ -1071,17 +1071,17 @@ export default function PaymentPage() {
     return (
       <Layout>
         <div className="space-y-4 text-center">
-          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-white mb-2">
+          <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-foreground mb-2">
             Payment Details Unavailable
           </h2>
-          <p className="text-slate-400 mb-6">
+          <p className="text-muted-foreground mb-6">
             We couldn't load your payment details. Your booking is saved — no
             payment has been taken.
           </p>
           <button
             onClick={handleRetry}
-            className="bg-orange-500 hover:bg-orange-600 text-white font-semibold
+            className="bg-primary hover:bg-primary-hover text-primary-foreground font-semibold
                        rounded-xl px-6 py-3 transition-colors"
           >
             Try Again
@@ -1120,8 +1120,8 @@ export default function PaymentPage() {
     return (
       <Layout onBack={handleBackToBooking} backLoading={state.backNavigating}>
         <div className="flex flex-col items-center gap-4 py-16">
-          <Loader2 className="w-10 h-10 animate-spin text-orange-400" />
-          <p className="text-slate-400">
+          <Loader2 className="w-10 h-10 animate-spin text-brand-text" />
+          <p className="text-muted-foreground">
             Setting up{" "}
             {state.selectedGateway === "stripe" ? "Stripe" : "PayPal"} payment…
           </p>
@@ -1179,16 +1179,16 @@ export default function PaymentPage() {
   return (
     <Layout>
       <div className="space-y-4 text-center">
-        <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-white mb-2">
+        <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-foreground mb-2">
           Payment Setup Error
         </h2>
-        <p className="text-slate-400 mb-6">
+        <p className="text-muted-foreground mb-6">
           Unable to determine payment method. Please go back and try again.
         </p>
         <button
           onClick={handleRetry}
-          className="bg-orange-500 hover:bg-orange-600 text-white font-semibold
+          className="bg-primary hover:bg-primary-hover text-primary-foreground font-semibold
                      rounded-xl px-6 py-3 transition-colors"
         >
           Try Again
@@ -1218,13 +1218,13 @@ function Layout({
     }
   };
   return (
-    <div className="min-h-screen bg-slate-900 py-12 px-4">
+    <div className="min-h-screen bg-card py-12 px-4">
       <div className="max-w-lg mx-auto">
         {/* Guest context badge */}
         {guestEmail && (
-          <div className="mb-6 p-3 bg-slate-700/50 border border-slate-600 rounded-lg text-sm text-slate-300">
+          <div className="mb-6 p-3 bg-surface/50 border border-border rounded-lg text-sm text-muted-foreground">
             Paying as guest:{" "}
-            <span className="text-orange-400 font-semibold">{guestEmail}</span>
+            <span className="text-brand-text font-semibold">{guestEmail}</span>
           </div>
         )}
 
@@ -1236,9 +1236,9 @@ function Layout({
             disabled={backLoading}
             aria-label={onBack ? "Back to booking details" : "Go back"}
             title={onBack ? "Back to booking details" : "Go back"}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300
+            className="p-2 rounded-lg bg-surface hover:bg-surface text-muted-foreground
                        transition-colors disabled:opacity-60 disabled:cursor-wait
-                       focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+                       focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {backLoading ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -1247,12 +1247,12 @@ function Layout({
             )}
           </button>
           <div className="flex items-center gap-2">
-            <Package className="w-6 h-6 text-orange-400" />
+            <Package className="w-6 h-6 text-brand-text" />
             <div>
-              <span className="text-lg font-semibold text-white block">
+              <span className="text-lg font-semibold text-foreground block">
                 {heading}
               </span>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-subtle-foreground">
                 {isBulk ? "Bulk Upload" : "Booking"} Payment
               </p>
             </div>
@@ -1260,16 +1260,16 @@ function Layout({
         </div>
 
         {/* Main content card */}
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
+        <div className="bg-surface border border-border rounded-2xl p-6 shadow-xl">
           {children}
         </div>
 
         {/* Help text footer */}
         <div className="mt-6 text-center">
-          <p className="text-xs text-slate-500 mb-2">Need help?</p>
+          <p className="text-xs text-subtle-foreground mb-2">Need help?</p>
           <a
             href="mailto:support@dropnroll.com"
-            className="text-orange-400 hover:text-orange-300 text-xs font-medium transition-colors"
+            className="text-brand-text hover:text-brand-text text-xs font-medium transition-colors"
           >
             Contact our support team
           </a>
@@ -1282,12 +1282,12 @@ function Layout({
 function ErrorScreen({ message, navigate }) {
   return (
     <div className="text-center py-8">
-      <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-      <h2 className="text-xl font-semibold text-white mb-2">Payment Error</h2>
-      <p className="text-slate-400 mb-6">{message}</p>
+      <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+      <h2 className="text-xl font-semibold text-foreground mb-2">Payment Error</h2>
+      <p className="text-muted-foreground mb-6">{message}</p>
       <button
         onClick={() => navigate(-1)}
-        className="bg-slate-700 hover:bg-slate-600 text-white font-medium
+        className="bg-surface hover:bg-surface-hover text-foreground font-medium
                    rounded-xl px-6 py-3 transition-colors"
       >
         Go Back

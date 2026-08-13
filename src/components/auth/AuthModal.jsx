@@ -99,7 +99,7 @@ export default function AuthModal() {
               type="button"
               onClick={close}
               aria-label="Close"
-              className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+              className="absolute top-4 right-4 z-10 p-2 rounded-full bg-foreground/10 hover:bg-foreground/20 text-foreground transition-colors"
             >
               <X size={18} />
             </button>

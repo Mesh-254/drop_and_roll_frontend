@@ -260,13 +260,13 @@ export function QRScannerModal({ jobId, onClose, onScanSuccess }) {
   }, [scanMode, scanning, startCamera]);
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 bg-overlay flex items-center justify-center z-50 p-4">
+      <div className="bg-card w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+        <div className="flex items-center justify-between p-5 border-b border-border bg-gradient-to-r from-info-surface to-info-surface">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Scan QR Label</h2>
-            <p className="text-xs text-slate-600 mt-1">
+            <h2 className="text-xl font-bold text-foreground">Scan QR Label</h2>
+            <p className="text-xs text-muted-foreground mt-1">
               {scanMode === "camera"
                 ? detectionStatus || "Point camera at shipping label"
                 : "Upload a photo of the QR code"}
@@ -275,10 +275,10 @@ export function QRScannerModal({ jobId, onClose, onScanSuccess }) {
           <button
             onClick={onClose}
             disabled={loading}
-            className="p-2 hover:bg-white/50 rounded-lg transition-colors disabled:opacity-50"
+            className="p-2 hover:bg-foreground/20 rounded-lg transition-colors disabled:opacity-50"
             aria-label="Close scanner"
           >
-            <X className="h-5 w-5 text-slate-600" />
+            <X className="h-5 w-5 text-muted-foreground" />
           </button>
         </div>
 
@@ -286,11 +286,11 @@ export function QRScannerModal({ jobId, onClose, onScanSuccess }) {
         <div className="p-6 space-y-5">
           {/* QR Detected Success Message */}
           {qrData && (
-            <div className="p-4 bg-green-50 border-2 border-green-300 rounded-xl flex items-start gap-3 animate-pulse">
-              <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+            <div className="p-4 bg-success-surface border-2 border-success/30 rounded-xl flex items-start gap-3 animate-pulse">
+              <CheckCircle className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-bold text-green-900">QR Code Detected! ✓</p>
-                <p className="text-xs text-green-700 mt-1 break-all font-mono">
+                <p className="font-bold text-success">QR Code Detected! ✓</p>
+                <p className="text-xs text-success mt-1 break-all font-mono">
                   {qrData.substring(0, 50)}...
                 </p>
               </div>
@@ -299,11 +299,11 @@ export function QRScannerModal({ jobId, onClose, onScanSuccess }) {
 
           {/* Camera Error Message */}
           {cameraError && (
-            <div className="p-4 bg-red-50 border-2 border-red-300 rounded-xl flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="p-4 bg-destructive-surface border-2 border-destructive/30 rounded-xl flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-bold text-red-900">Camera Error</p>
-                <p className="text-sm text-red-700 mt-1">{cameraError}</p>
+                <p className="font-bold text-destructive">Camera Error</p>
+                <p className="text-sm text-destructive mt-1">{cameraError}</p>
               </div>
             </div>
           )}
@@ -312,7 +312,7 @@ export function QRScannerModal({ jobId, onClose, onScanSuccess }) {
           {scanMode === "camera" ? (
             <div className="space-y-4">
               {/* Video Stream Container */}
-              <div className="relative bg-black rounded-2xl overflow-hidden aspect-video border-4 border-slate-900">
+              <div className="relative bg-background rounded-2xl overflow-hidden aspect-video border-4 border-border">
                 <video
                   ref={videoRef}
                   className="w-full h-full object-cover"
@@ -325,22 +325,22 @@ export function QRScannerModal({ jobId, onClose, onScanSuccess }) {
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="relative w-48 h-48">
                       {/* Corner markers for visual scanning area */}
-                      <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-green-400"></div>
-                      <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-green-400"></div>
-                      <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-green-400"></div>
-                      <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-green-400"></div>
+                      <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-success"></div>
+                      <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-success"></div>
+                      <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-success"></div>
+                      <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-success"></div>
 
                       {/* Animated center scan line */}
-                      <div className="absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-green-400 to-transparent animate-pulse top-1/2 -translate-y-1/2"></div>
+                      <div className="absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-success to-transparent animate-pulse top-1/2 -translate-y-1/2"></div>
                     </div>
                   </div>
                 )}
 
                 {/* Loading state overlay */}
                 {!scanning && (
-                  <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-3">
-                    <Camera className="h-12 w-12 text-white/60" />
-                    <p className="text-white/70 font-medium text-sm">
+                  <div className="absolute inset-0 bg-overlay flex flex-col items-center justify-center gap-3">
+                    <Camera className="h-12 w-12 text-foreground/60" />
+                    <p className="text-foreground/70 font-medium text-sm">
                       Initializing camera...
                     </p>
                   </div>
@@ -355,8 +355,8 @@ export function QRScannerModal({ jobId, onClose, onScanSuccess }) {
                     disabled={loading}
                     className={`flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-semibold transition-all disabled:opacity-50 ${
                       torchOn
-                        ? "bg-yellow-500 text-white hover:bg-yellow-600 shadow-lg"
-                        : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                        ? "bg-warning text-warning-foreground hover:bg-warning shadow-lg"
+                        : "bg-surface-hover text-muted-foreground hover:bg-surface-hover"
                     }`}
                   >
                     <Flashlight className="h-4 w-4" />
@@ -367,7 +367,7 @@ export function QRScannerModal({ jobId, onClose, onScanSuccess }) {
                 <button
                   onClick={stopCamera}
                   disabled={loading}
-                  className="flex-1 py-3 px-4 bg-slate-200 text-slate-700 rounded-lg font-semibold hover:bg-slate-300 transition-colors disabled:opacity-50"
+                  className="flex-1 py-3 px-4 bg-surface-hover text-muted-foreground rounded-lg font-semibold hover:bg-surface-hover transition-colors disabled:opacity-50"
                 >
                   Stop
                 </button>
@@ -380,7 +380,7 @@ export function QRScannerModal({ jobId, onClose, onScanSuccess }) {
                   setScanMode("upload");
                 }}
                 disabled={loading}
-                className="w-full py-2.5 text-blue-600 hover:text-blue-700 font-semibold text-sm"
+                className="w-full py-2.5 text-info hover:text-info font-semibold text-sm"
               >
                 Can&apos;t scan? Upload photo instead
               </button>
@@ -389,7 +389,7 @@ export function QRScannerModal({ jobId, onClose, onScanSuccess }) {
             /* Upload Mode */
             <div className="space-y-4">
               {uploadedImage && (
-                <div className="bg-slate-100 rounded-xl p-3 flex justify-center">
+                <div className="bg-muted rounded-xl p-3 flex justify-center">
                   <img
                     src={uploadedImage}
                     alt="Uploaded QR"
@@ -401,7 +401,7 @@ export function QRScannerModal({ jobId, onClose, onScanSuccess }) {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-3 py-4 px-4 border-3 border-dashed border-blue-300 rounded-xl text-slate-700 hover:border-blue-400 hover:bg-blue-50 transition-all disabled:opacity-50 font-semibold"
+                className="w-full flex items-center justify-center gap-3 py-4 px-4 border-3 border-dashed border-info/30 rounded-xl text-muted-foreground hover:border-info hover:bg-info-surface transition-all disabled:opacity-50 font-semibold"
               >
                 <Upload className="h-5 w-5" />
                 Choose QR Photo
@@ -419,7 +419,7 @@ export function QRScannerModal({ jobId, onClose, onScanSuccess }) {
                   }, 100);
                 }}
                 disabled={loading}
-                className="w-full py-2.5 text-blue-600 hover:text-blue-700 font-semibold text-sm"
+                className="w-full py-2.5 text-info hover:text-info font-semibold text-sm"
               >
                 Back to camera
               </button>
@@ -437,11 +437,11 @@ export function QRScannerModal({ jobId, onClose, onScanSuccess }) {
         </div>
 
         {/* Footer Actions */}
-        <div className="border-t border-slate-200 p-5 bg-slate-50 flex gap-3">
+        <div className="border-t border-border p-5 bg-muted flex gap-3">
           {loading ? (
             <button
               disabled
-              className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-lg font-semibold"
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-info text-info-foreground rounded-lg font-semibold"
             >
               <Loader2 className="h-4 w-4 animate-spin" />
               Processing...
@@ -450,7 +450,7 @@ export function QRScannerModal({ jobId, onClose, onScanSuccess }) {
             <>
               <button
                 onClick={onClose}
-                className="flex-1 py-3 px-4 bg-white border-2 border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-50 transition-colors"
+                className="flex-1 py-3 px-4 bg-card border-2 border-border-strong text-muted-foreground rounded-lg font-semibold hover:bg-muted transition-colors"
               >
                 Cancel
               </button>
@@ -458,7 +458,7 @@ export function QRScannerModal({ jobId, onClose, onScanSuccess }) {
                 <button
                   onClick={() => handleQrDetected(qrData)}
                   disabled={loading}
-                  className="flex-1 py-3 px-4 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 shadow-md"
+                  className="flex-1 py-3 px-4 bg-success text-success-foreground rounded-lg font-semibold hover:bg-success transition-colors disabled:opacity-50 shadow-md"
                 >
                   Confirm Scan
                 </button>

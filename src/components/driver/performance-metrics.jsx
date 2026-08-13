@@ -10,18 +10,18 @@ export function PerformanceMetrics({ metrics = {} }) {
 
   // Determine star rating color based on rating value
   const getStarColor = () => {
-    if (averageRating >= 4.5) return "text-green-500";
-    if (averageRating >= 4) return "text-blue-500";
-    if (averageRating >= 3.5) return "text-orange-500";
-    return "text-red-500";
+    if (averageRating >= 4.5) return "text-success";
+    if (averageRating >= 4) return "text-info";
+    if (averageRating >= 3.5) return "text-brand-text";
+    return "text-destructive";
   };
 
   const starColor = getStarColor();
 
   return (
-    <div className="bg-gradient-to-br from-orange-50 to-orange-50/50 dark:from-slate-900 dark:to-slate-800/50 border border-orange-200/50 dark:border-orange-900/30 rounded-2xl p-6 md:p-8 shadow-sm backdrop-blur-sm">
+    <div className="bg-gradient-to-br from-brand-surface to-brand-surface/50 dark:from-card dark:to-surface/50 border border-primary/30 rounded-2xl p-6 md:p-8 shadow-sm backdrop-blur-sm">
       {/* Title */}
-      <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-6">
+      <h2 className="text-lg font-semibold text-foreground mb-6">
         Performance Metrics
       </h2>
 
@@ -31,10 +31,10 @@ export function PerformanceMetrics({ metrics = {} }) {
           {/* Big Star Icon */}
           <Star className={`w-12 h-12 ${starColor} fill-current`} />
         </div>
-        <div className="text-5xl md:text-6xl font-bold text-slate-900 dark:text-white mb-2">
+        <div className="text-5xl md:text-6xl font-bold text-foreground mb-2">
           {averageRating.toFixed(1)}
         </div>
-        <p className="text-sm text-slate-600 dark:text-slate-400">
+        <p className="text-sm text-muted-foreground">
           Average Rating
         </p>
       </div>
@@ -42,37 +42,37 @@ export function PerformanceMetrics({ metrics = {} }) {
       {/* Two Compact KPI Cards Side-by-Side */}
       <div className="grid grid-cols-1 gap-4">
         {/* Completion Rate */}
-        <div className="bg-white dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+        <div className="bg-card dark:bg-surface/50 rounded-xl p-4 border border-border">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Completion Rate
             </span>
-            <TrendingUp className="w-4 h-4 text-green-500" />
+            <TrendingUp className="w-4 h-4 text-success" />
           </div>
-          <div className="text-3xl font-bold text-slate-900 dark:text-white">
+          <div className="text-3xl font-bold text-foreground">
             {completionRate}%
           </div>
           {/* Simple progress bar */}
-          <div className="mt-3 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+          <div className="mt-3 h-2 bg-surface-hover dark:bg-surface rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-300"
+              className="h-full bg-gradient-to-r from-success to-success transition-all duration-300"
               style={{ width: `${completionRate}%` }}
             />
           </div>
         </div>
 
         {/* Jobs Completed This Month */}
-        {/* <div className="bg-white dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+        {/* <div className="bg-card dark:bg-surface/50 rounded-xl p-4 border border-border">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Deliveries
             </span>
-            <Package className="w-4 h-4 text-orange-500" />
+            <Package className="w-4 h-4 text-brand-text" />
           </div>
-          <div className="text-3xl font-bold text-slate-900 dark:text-white">
+          <div className="text-3xl font-bold text-foreground">
             {totalDeliveries}
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-500 mt-2">
+          <p className="text-xs text-subtle-foreground mt-2">
             Total completed
           </p>
         </div> */}

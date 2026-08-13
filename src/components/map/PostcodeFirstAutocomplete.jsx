@@ -113,35 +113,35 @@ function ConfirmAddressModal({ pending, onConfirm, onCancel }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-address-heading"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4"
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-sm rounded-xl bg-white dark:bg-gray-800 p-6 shadow-xl"
+        className="w-full max-w-sm rounded-xl bg-card dark:bg-surface p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <h3
           id="confirm-address-heading"
-          className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center justify-between gap-2"
+          className="text-lg font-semibold text-foreground mb-3 flex items-center justify-between gap-2"
         >
           <span className="flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-orange-500" />
+            <MapPin className="h-5 w-5 text-brand-text" />
             Is this correct?
           </span>
           <span
             data-testid="address-source-badge"
-            className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300"
+            className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-brand-surface text-brand-text"
           >
             {sourceLabel}
           </span>
         </h3>
-        <div className="rounded-lg bg-gray-50 dark:bg-gray-900 p-3 text-sm text-gray-700 dark:text-gray-300 mb-4">
+        <div className="rounded-lg bg-muted dark:bg-card p-3 text-sm text-muted-foreground mb-4">
           {detail.organisation_name && <p className="font-medium">{detail.organisation_name}</p>}
           {needsLine1 ? (
             <div className="mb-2">
               <label
                 htmlFor="confirm-address-line1"
-                className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1"
+                className="block text-xs font-medium text-subtle-foreground dark:text-muted-foreground mb-1"
               >
                 Address line 1 (house number and street) *
               </label>
@@ -152,7 +152,7 @@ function ConfirmAddressModal({ pending, onConfirm, onCancel }) {
                 onChange={(e) => setLine1Draft(e.target.value)}
                 placeholder="e.g. 12 Midsummer Boulevard"
                 autoFocus
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className="w-full px-3 py-2 border border-border-strong rounded-lg bg-card dark:bg-surface text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
           ) : (
@@ -170,7 +170,7 @@ function ConfirmAddressModal({ pending, onConfirm, onCancel }) {
         {!inServiceArea && (
           <div
             role="alert"
-            className="flex items-start gap-2 text-sm text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2 mb-4"
+            className="flex items-start gap-2 text-sm text-destructive bg-destructive-surface border border-destructive/30 rounded-lg px-3 py-2 mb-4"
           >
             <AlertCircle size={16} className="mt-0.5 shrink-0" />
             <span>
@@ -184,7 +184,7 @@ function ConfirmAddressModal({ pending, onConfirm, onCancel }) {
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium transition-colors"
+            className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg border border-border-strong text-muted-foreground dark:text-foreground hover:bg-muted dark:hover:bg-surface-hover text-sm font-medium transition-colors"
           >
             {inServiceArea ? "Cancel" : "Choose another"}
           </button>
@@ -193,7 +193,7 @@ function ConfirmAddressModal({ pending, onConfirm, onCancel }) {
             onClick={handleConfirm}
             autoFocus={inServiceArea && !needsLine1}
             disabled={!inServiceArea || !line1Ok}
-            className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
+            className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed text-primary-foreground text-sm font-medium transition-colors"
           >
             <CheckCircle2 className="h-4 w-4" />
             Yes, that's right
@@ -500,7 +500,7 @@ const PostcodeFirstAutocomplete = ({
 
   return (
     <div className="space-y-2 relative">
-      <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+      <label htmlFor={inputId} className="block text-sm font-medium text-muted-foreground">
         {label}
       </label>
 
@@ -527,17 +527,17 @@ const PostcodeFirstAutocomplete = ({
           onKeyDown={handleKeyDown}
           disabled={disabled}
           placeholder={placeholder || `Enter a postcode (e.g. MK9 1AA)`}
-          className={`w-full px-4 py-3 pr-10 border rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors disabled:opacity-50 ${
+          className={`w-full px-4 py-3 pr-10 border rounded-lg bg-card dark:bg-surface text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors disabled:opacity-50 ${
             areaWarning || validation
-              ? "border-red-500"
-              : "border-gray-300 dark:border-gray-600"
+              ? "border-destructive"
+              : "border-border-strong"
           }`}
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
           {isSearching ? (
-            <Loader2 className="h-4 w-4 text-orange-500 animate-spin" aria-hidden="true" />
+            <Loader2 className="h-4 w-4 text-brand-text animate-spin" aria-hidden="true" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-gray-400" aria-hidden="true" />
+            <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           )}
         </div>
       </div>
@@ -548,7 +548,7 @@ const PostcodeFirstAutocomplete = ({
               role="listbox"
               aria-label={`${label} suggestions`}
               onScroll={handleListScroll}
-              className="max-h-72 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 shadow-lg divide-y divide-gray-100 dark:divide-gray-700"
+              className="max-h-72 overflow-y-auto border border-border-strong rounded-lg bg-card dark:bg-surface shadow-lg divide-y divide-border"
             >
               {visibleSuggestions.map((hit, index) => (
                 <li
@@ -560,12 +560,12 @@ const PostcodeFirstAutocomplete = ({
                   onClick={() => handleSelectSuggestion(hit)}
                   className={`px-4 py-2.5 text-sm cursor-pointer flex items-start gap-2 ${
                     index === highlightedIndex
-                      ? "bg-orange-50 dark:bg-orange-900/30"
-                      : "hover:bg-gray-50 dark:hover:bg-gray-700"
+                      ? "bg-brand-surface"
+                      : "hover:bg-muted dark:hover:bg-surface-hover"
                   }`}
                 >
-                  <MapPin className="h-4 w-4 mt-0.5 text-gray-400 shrink-0" aria-hidden="true" />
-                  <span className="text-gray-800 dark:text-gray-200">
+                  <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" aria-hidden="true" />
+                  <span className="text-foreground">
                     {hit.suggestion || hit.line_1 || hit.address || "Address"}
                   </span>
                 </li>
@@ -577,7 +577,7 @@ const PostcodeFirstAutocomplete = ({
                     onClick={() =>
                       setVisibleCount((c) => Math.min(c + PAGE_SIZE, suggestions.length))
                     }
-                    className="text-xs font-medium text-orange-600 hover:text-orange-700"
+                    className="text-xs font-medium text-brand-text hover:text-brand-text"
                   >
                     Show more ({suggestions.length - visibleCount} more)
                   </button>
@@ -591,7 +591,7 @@ const PostcodeFirstAutocomplete = ({
             !isSearching &&
             queryIsPostcode &&
             suggestions.length === 0 && (
-              <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded-lg">
+              <div className="px-4 py-3 text-sm text-subtle-foreground dark:text-muted-foreground border border-border rounded-lg">
                 No matches for "{debouncedQuery}". Did you mean to include the full postcode (e.g. MK9 1AA)?
               </div>
             )}
@@ -602,7 +602,7 @@ const PostcodeFirstAutocomplete = ({
             !isSearching &&
             trimmedQuery.length >= 2 &&
             !queryIsPostcode && (
-              <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded-lg">
+              <div className="px-4 py-3 text-sm text-subtle-foreground dark:text-muted-foreground border border-border rounded-lg">
                 Address search works by postcode only — start typing a UK postcode (e.g. MK9 1AA
                 or OX1 2JD).
               </div>
@@ -612,18 +612,18 @@ const PostcodeFirstAutocomplete = ({
           on the Ideal Postcodes tier with a "pick another" hint — the old
           mode-gated condition swallowed exactly that message. */}
       {fallbackNotice && (
-        <p className="text-xs text-gray-500 dark:text-gray-400">{fallbackNotice}</p>
+        <p className="text-xs text-subtle-foreground dark:text-muted-foreground">{fallbackNotice}</p>
       )}
 
       {areaWarning && (
-        <div className="flex items-start gap-2 text-sm text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
+        <div className="flex items-start gap-2 text-sm text-destructive bg-destructive-surface border border-destructive/30 rounded-lg px-3 py-2">
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           <span>{areaWarning}</span>
         </div>
       )}
 
       {validation && (
-        <div className="flex items-center text-red-500 text-sm">
+        <div className="flex items-center text-destructive text-sm">
           <AlertCircle size={16} className="mr-2" />
           {validation}
         </div>

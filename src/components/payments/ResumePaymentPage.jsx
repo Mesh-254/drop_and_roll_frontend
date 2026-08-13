@@ -85,8 +85,8 @@ export default function ResumePaymentPage() {
   if (status.loading) {
     return (
       <Shell>
-        <Loader2 className="w-10 h-10 animate-spin text-orange-400 mx-auto" />
-        <p className="text-slate-400 text-center mt-4">Loading your booking…</p>
+        <Loader2 className="w-10 h-10 animate-spin text-brand-text mx-auto" />
+        <p className="text-muted-foreground text-center mt-4">Loading your booking…</p>
       </Shell>
     );
   }
@@ -94,11 +94,11 @@ export default function ResumePaymentPage() {
   if (status.error) {
     return (
       <Shell>
-        <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-white text-center mb-2">
+        <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-foreground text-center mb-2">
           Payment Link Problem
         </h2>
-        <p className="text-slate-400 text-center mb-6">{status.error}</p>
+        <p className="text-muted-foreground text-center mb-6">{status.error}</p>
         <CenteredButton onClick={() => navigate("/quote")}>
           Start a New Quote
         </CenteredButton>
@@ -111,15 +111,15 @@ export default function ResumePaymentPage() {
   if (state === "forbidden_owner") {
     return (
       <Shell>
-        <UserX className="w-12 h-12 text-red-400 mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-white text-center mb-2">
+        <UserX className="w-12 h-12 text-destructive mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-foreground text-center mb-2">
           This Booking Belongs to a Different Account
         </h2>
-        <p className="text-slate-400 text-center mb-2">
+        <p className="text-muted-foreground text-center mb-2">
           You're signed in as a different account than the one that created this
-          booking{ownerHint ? <>, which is registered to <span className="text-slate-200">{ownerHint}</span></> : null}.
+          booking{ownerHint ? <>, which is registered to <span className="text-foreground">{ownerHint}</span></> : null}.
         </p>
-        <p className="text-slate-400 text-center mb-6">
+        <p className="text-muted-foreground text-center mb-6">
           Sign in with that account to complete the payment.
         </p>
         <CenteredButton onClick={() => navigate(`/login?next=${encodeURIComponent(location.pathname)}`)}>
@@ -133,11 +133,11 @@ export default function ResumePaymentPage() {
     // Reached only if we returned here still unable to resolve ownership.
     return (
       <Shell>
-        <Lock className="w-12 h-12 text-orange-400 mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-white text-center mb-2">
+        <Lock className="w-12 h-12 text-brand-text mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-foreground text-center mb-2">
           Sign In to Continue
         </h2>
-        <p className="text-slate-400 text-center mb-6">
+        <p className="text-muted-foreground text-center mb-6">
           This booking is tied to a registered account. Please sign in to view
           and complete its payment.
         </p>
@@ -151,11 +151,11 @@ export default function ResumePaymentPage() {
   if (state === "completed") {
     return (
       <Shell>
-        <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-white text-center mb-2">
+        <CheckCircle className="w-12 h-12 text-success mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-foreground text-center mb-2">
           This Booking Is Already Paid
         </h2>
-        <p className="text-slate-400 text-center mb-6">
+        <p className="text-muted-foreground text-center mb-6">
           Nothing left to do — your booking is confirmed and in progress.
         </p>
         <CenteredButton onClick={() => navigate("/")}>Home</CenteredButton>
@@ -166,22 +166,22 @@ export default function ResumePaymentPage() {
   // expired or cancelled
   return (
     <Shell>
-      <Clock className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
-      <h2 className="text-xl font-semibold text-white text-center mb-2">
+      <Clock className="w-12 h-12 text-warning mx-auto mb-4" />
+      <h2 className="text-xl font-semibold text-foreground text-center mb-2">
         {state === "cancelled" ? "This Booking Was Cancelled" : "This Booking Has Expired"}
       </h2>
-      <p className="text-slate-400 text-center mb-2">
+      <p className="text-muted-foreground text-center mb-2">
         {state === "cancelled"
           ? "This booking was cancelled, so its payment link is no longer active."
           : "The payment window for this booking has closed, so it can no longer be paid at the original price."}
       </p>
       {pickup && dropoff && (
-        <p className="text-slate-500 text-sm text-center mb-6">
+        <p className="text-subtle-foreground text-sm text-center mb-6">
           {pickup} → {dropoff}
           {finalPrice ? ` · £${finalPrice}` : ""}
         </p>
       )}
-      <p className="text-slate-400 text-center mb-6">
+      <p className="text-muted-foreground text-center mb-6">
         You can get a fresh quote for the same route in under a minute.
       </p>
       <CenteredButton onClick={() => navigate("/quote")}>
@@ -193,8 +193,8 @@ export default function ResumePaymentPage() {
 
 function Shell({ children }) {
   return (
-    <div className="min-h-screen bg-slate-900 py-16 px-4">
-      <div className="max-w-lg mx-auto bg-slate-800 border border-slate-700 rounded-2xl p-8 shadow-xl">
+    <div className="min-h-screen bg-card py-16 px-4">
+      <div className="max-w-lg mx-auto bg-surface border border-border rounded-2xl p-8 shadow-xl">
         {children}
       </div>
     </div>
@@ -206,7 +206,7 @@ function CenteredButton({ onClick, children }) {
     <div className="text-center">
       <button
         onClick={onClick}
-        className="bg-orange-500 hover:bg-orange-600 text-white font-semibold
+        className="bg-primary hover:bg-primary-hover text-primary-foreground font-semibold
                    rounded-xl px-6 py-3 transition-colors"
       >
         {children}

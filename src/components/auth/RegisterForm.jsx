@@ -183,25 +183,25 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
       initial={{ opacity: 0, y: 20, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.35 }}
-      className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl shadow-2xl p-8 space-y-5"
+      className="backdrop-blur-xl bg-foreground/10 border border-foreground/20 rounded-3xl shadow-2xl p-8 space-y-5"
     >
       {/* Header */}
       <div className="text-center">
-        <div className="inline-flex items-center gap-2 mb-4 px-4 py-2 bg-orange-500/20 border border-orange-500/30 rounded-full">
-          <Zap size={16} className="text-orange-400" />
-          <span className="text-xs font-semibold text-orange-300 uppercase tracking-wider">
+        <div className="inline-flex items-center gap-2 mb-4 px-4 py-2 bg-primary/20 border border-primary/30 rounded-full">
+          <Zap size={16} className="text-brand-text" />
+          <span className="text-xs font-semibold text-brand-text uppercase tracking-wider">
             Drop 'N Roll
           </span>
         </div>
-        <h2 className="text-3xl font-bold text-white mb-1">Create account</h2>
-        <p className="text-gray-300 text-sm">Join Drop 'N Roll today</p>
+        <h2 className="text-3xl font-bold text-foreground mb-1">Create account</h2>
+        <p className="text-muted-foreground text-sm">Join Drop 'N Roll today</p>
       </div>
 
       {/* General error */}
       {errors.general && (
-        <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-          <p className="text-red-200 text-sm">{errors.general}</p>
+        <div className="bg-destructive/20 border border-destructive/50 rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+          <p className="text-destructive text-sm">{errors.general}</p>
         </div>
       )}
 
@@ -209,7 +209,7 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
         {/* First name */}
         <div>
           <div className="relative group">
-            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-400/60 group-focus-within:text-orange-400 w-5 h-5 transition-colors" />
+            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-text/60 group-focus-within:text-brand-text w-5 h-5 transition-colors" />
             <input
               ref={firstInputRef}
               type="text"
@@ -218,22 +218,22 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
               onChange={handleChange}
               placeholder="First name"
               autoComplete="given-name"
-              className={`w-full py-3 pl-12 pr-4 bg-white/10 border rounded-xl backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 transition-all duration-200 ${
+              className={`w-full py-3 pl-12 pr-4 bg-foreground/10 border rounded-xl backdrop-blur-sm text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 transition-all duration-200 ${
                 errors.firstName
-                  ? "border-red-500/50 focus:ring-red-500/50"
-                  : "border-white/20 focus:ring-orange-500/50 focus:border-orange-500/30"
+                  ? "border-destructive/50 focus:ring-destructive/50"
+                  : "border-foreground/20 focus:ring-ring/50 focus:border-primary/30"
               }`}
             />
           </div>
           {errors.firstName && (
-            <p className="text-red-400 text-sm mt-1 ml-4">{errors.firstName}</p>
+            <p className="text-destructive text-sm mt-1 ml-4">{errors.firstName}</p>
           )}
         </div>
 
         {/* Last name */}
         <div>
           <div className="relative group">
-            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-400/60 group-focus-within:text-orange-400 w-5 h-5 transition-colors" />
+            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-text/60 group-focus-within:text-brand-text w-5 h-5 transition-colors" />
             <input
               type="text"
               name="lastName"
@@ -241,22 +241,22 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
               onChange={handleChange}
               placeholder="Last name"
               autoComplete="family-name"
-              className={`w-full py-3 pl-12 pr-4 bg-white/10 border rounded-xl backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 transition-all duration-200 ${
+              className={`w-full py-3 pl-12 pr-4 bg-foreground/10 border rounded-xl backdrop-blur-sm text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 transition-all duration-200 ${
                 errors.lastName
-                  ? "border-red-500/50 focus:ring-red-500/50"
-                  : "border-white/20 focus:ring-orange-500/50 focus:border-orange-500/30"
+                  ? "border-destructive/50 focus:ring-destructive/50"
+                  : "border-foreground/20 focus:ring-ring/50 focus:border-primary/30"
               }`}
             />
           </div>
           {errors.lastName && (
-            <p className="text-red-400 text-sm mt-1 ml-4">{errors.lastName}</p>
+            <p className="text-destructive text-sm mt-1 ml-4">{errors.lastName}</p>
           )}
         </div>
 
         {/* Email */}
         <div>
           <div className="relative group">
-            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-400/60 group-focus-within:text-orange-400 w-5 h-5 transition-colors" />
+            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-text/60 group-focus-within:text-brand-text w-5 h-5 transition-colors" />
             <input
               type="email"
               name="email"
@@ -264,22 +264,22 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
               onChange={handleChange}
               placeholder="Email address"
               autoComplete="email"
-              className={`w-full py-3 pl-12 pr-4 bg-white/10 border rounded-xl backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 transition-all duration-200 ${
+              className={`w-full py-3 pl-12 pr-4 bg-foreground/10 border rounded-xl backdrop-blur-sm text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 transition-all duration-200 ${
                 errors.email
-                  ? "border-red-500/50 focus:ring-red-500/50"
-                  : "border-white/20 focus:ring-orange-500/50 focus:border-orange-500/30"
+                  ? "border-destructive/50 focus:ring-destructive/50"
+                  : "border-foreground/20 focus:ring-ring/50 focus:border-primary/30"
               }`}
             />
           </div>
           {errors.email && (
-            <p className="text-red-400 text-sm mt-1 ml-4">{errors.email}</p>
+            <p className="text-destructive text-sm mt-1 ml-4">{errors.email}</p>
           )}
         </div>
 
         {/* Password */}
         <div>
           <div className="relative group">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-400/60 group-focus-within:text-orange-400 w-5 h-5 transition-colors" />
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-text/60 group-focus-within:text-brand-text w-5 h-5 transition-colors" />
             <input
               type={showPassword ? "text" : "password"}
               name="password"
@@ -287,23 +287,23 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
               onChange={handleChange}
               placeholder="Password"
               autoComplete="new-password"
-              className={`w-full py-3 pl-12 pr-12 bg-white/10 border rounded-xl backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 transition-all duration-200 ${
+              className={`w-full py-3 pl-12 pr-12 bg-foreground/10 border rounded-xl backdrop-blur-sm text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 transition-all duration-200 ${
                 errors.password
-                  ? "border-red-500/50 focus:ring-red-500/50"
-                  : "border-white/20 focus:ring-orange-500/50 focus:border-orange-500/30"
+                  ? "border-destructive/50 focus:ring-destructive/50"
+                  : "border-foreground/20 focus:ring-ring/50 focus:border-primary/30"
               }`}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-400 transition-colors"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-brand-text transition-colors"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
           </div>
           {errors.password && (
-            <p className="text-red-400 text-sm mt-1 ml-4">{errors.password}</p>
+            <p className="text-destructive text-sm mt-1 ml-4">{errors.password}</p>
           )}
           {formData.password && (
             <div className="mt-1 ml-4">
@@ -314,17 +314,17 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
                     className={`h-1 flex-1 rounded-full transition-colors ${
                       passwordStrength === "weak"
                         ? tier === "weak"
-                          ? "bg-red-500"
-                          : "bg-white/20"
+                          ? "bg-destructive"
+                          : "bg-foreground/20"
                         : passwordStrength === "medium"
                         ? tier !== "strong"
-                          ? "bg-yellow-400"
-                          : "bg-white/20"
-                        : "bg-green-500"
+                          ? "bg-warning"
+                          : "bg-foreground/20"
+                        : "bg-success"
                     }`}
                   />
                 ))}
-                <span className="text-xs text-gray-400 ml-1 capitalize">
+                <span className="text-xs text-muted-foreground ml-1 capitalize">
                   {passwordStrength}
                 </span>
               </div>
@@ -335,7 +335,7 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
         {/* Confirm password */}
         <div>
           <div className="relative group">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-orange-400/60 group-focus-within:text-orange-400 w-5 h-5 transition-colors" />
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-text/60 group-focus-within:text-brand-text w-5 h-5 transition-colors" />
             <input
               type={showConfirmPassword ? "text" : "password"}
               name="confirmPassword"
@@ -343,28 +343,28 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
               onChange={handleChange}
               placeholder="Confirm password"
               autoComplete="new-password"
-              className={`w-full py-3 pl-12 pr-12 bg-white/10 border rounded-xl backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 transition-all duration-200 ${
+              className={`w-full py-3 pl-12 pr-12 bg-foreground/10 border rounded-xl backdrop-blur-sm text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 transition-all duration-200 ${
                 errors.confirmPassword
-                  ? "border-red-500/50 focus:ring-red-500/50"
+                  ? "border-destructive/50 focus:ring-destructive/50"
                   : passwordsMatch
-                  ? "border-green-500/50 focus:ring-green-500/50"
-                  : "border-white/20 focus:ring-orange-500/50 focus:border-orange-500/30"
+                  ? "border-success/50 focus:ring-success/50"
+                  : "border-foreground/20 focus:ring-ring/50 focus:border-primary/30"
               }`}
             />
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-400 transition-colors"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-brand-text transition-colors"
               aria-label={showConfirmPassword ? "Hide password" : "Show password"}
             >
               {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
           </div>
           {errors.confirmPassword && (
-            <p className="text-red-400 text-sm mt-1 ml-4">{errors.confirmPassword}</p>
+            <p className="text-destructive text-sm mt-1 ml-4">{errors.confirmPassword}</p>
           )}
           {passwordsMatch && (
-            <div className="flex items-center gap-2 text-green-400 text-sm mt-1 ml-4">
+            <div className="flex items-center gap-2 text-success text-sm mt-1 ml-4">
               <Check size={14} /> Passwords match
             </div>
           )}
@@ -384,7 +384,7 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
           disabled={isLoading}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          className="w-full py-3 mt-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-orange-500/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full py-3 mt-2 bg-gradient-to-r from-primary to-primary-hover text-primary-foreground font-semibold rounded-xl hover:shadow-lg hover:shadow-primary/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {isLoading ? (
             <>
@@ -400,10 +400,10 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
         {/* Divider */}
         <div className="relative my-1">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-white/10" />
+            <div className="w-full border-t border-foreground/10" />
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-3 bg-slate-900/80 text-gray-400">or sign up with</span>
+            <span className="px-3 bg-card/80 text-muted-foreground">or sign up with</span>
           </div>
         </div>
 
@@ -422,20 +422,20 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
       </form>
 
       {/* Switch to login */}
-      <p className="text-center text-gray-400 text-sm">
+      <p className="text-center text-muted-foreground text-sm">
         Already have an account?{" "}
         {onSwitchToLogin ? (
           <button
             type="button"
             onClick={onSwitchToLogin}
-            className="text-orange-400 hover:text-orange-300 font-semibold transition-colors"
+            className="text-brand-text hover:text-brand-text font-semibold transition-colors"
           >
             Sign in
           </button>
         ) : (
           <Link
             to="/login"
-            className="text-orange-400 hover:text-orange-300 font-semibold transition-colors"
+            className="text-brand-text hover:text-brand-text font-semibold transition-colors"
           >
             Sign in
           </Link>
@@ -443,11 +443,11 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
       </p>
 
       {/* Terms */}
-      <p className="text-center text-gray-500 text-xs leading-relaxed">
+      <p className="text-center text-subtle-foreground text-xs leading-relaxed">
         By creating an account, you agree to Drop 'N Roll's{" "}
-        <span className="text-orange-400 cursor-pointer">Terms of Service</span>{" "}
+        <span className="text-brand-text cursor-pointer">Terms of Service</span>{" "}
         and{" "}
-        <span className="text-orange-400 cursor-pointer">Privacy Policy</span>
+        <span className="text-brand-text cursor-pointer">Privacy Policy</span>
       </p>
     </motion.div>
   );

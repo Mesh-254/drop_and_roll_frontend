@@ -83,8 +83,8 @@ export function bulkMoneyLine(upload = {}) {
 
 /** Tailwind classes per tone, kept beside the rule that produces the tone. */
 export const MONEY_TONE_CLASS = {
-  paid: "text-green-400",
-  owed: "text-amber-400",
-  neutral: "text-slate-300",
-  void: "text-slate-500 line-through",
+  paid: "text-success",
+  owed: "text-warning",
+  neutral: "text-muted-foreground",
+  void: "text-subtle-foreground line-through",
 };

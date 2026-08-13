@@ -105,9 +105,9 @@ export function OfflineStatusBar() {
         <div className="relative">
           <button
             onClick={() => setShowDurationMenu((s) => !s)}
-            className="text-xs text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white flex items-center gap-1 min-h-[44px] px-2"
+            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 min-h-[44px] px-2"
           >
-            <Wifi className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+            <Wifi className="h-3.5 w-3.5 text-success" />
             Work Offline
             <ChevronDown className="h-3 w-3" />
           </button>
@@ -124,10 +124,10 @@ export function OfflineStatusBar() {
       <div
         className={`w-full px-4 py-2 flex flex-wrap items-center gap-3 text-sm ${
           manualActive
-            ? "bg-amber-50 border border-amber-200 text-amber-900 dark:bg-amber-950/50 dark:border-amber-800/60 dark:text-amber-100"
+            ? "bg-warning-surface border border-warning/30 text-warning"
             : !isConnected
-            ? "bg-red-50 border border-red-200 text-red-900 dark:bg-red-950/50 dark:border-red-800/60 dark:text-red-100"
-            : "bg-blue-50 border border-blue-200 text-blue-900 dark:bg-blue-950/50 dark:border-blue-800/60 dark:text-blue-100"
+            ? "bg-destructive-surface border border-destructive/30 text-destructive"
+            : "bg-info-surface border border-info/30 text-info"
         }`}
       >
         {manualActive ? (
@@ -150,13 +150,13 @@ export function OfflineStatusBar() {
           </>
         ) : (
           <>
-            <Wifi className="h-4 w-4 shrink-0 text-green-600 dark:text-green-400" />
+            <Wifi className="h-4 w-4 shrink-0 text-success" />
             <span>Online{lastSyncedAt ? ` — last synced ${new Date(lastSyncedAt).toLocaleTimeString()}` : ""}</span>
           </>
         )}
 
         {pendingCount > 0 && (
-          <span className="px-2 py-0.5 rounded-full bg-white/70 dark:bg-white/10 text-xs font-semibold">
+          <span className="px-2 py-0.5 rounded-full bg-surface text-xs font-semibold">
             {pendingCount} waiting to sync
           </span>
         )}
@@ -164,7 +164,7 @@ export function OfflineStatusBar() {
         {permanentFailures.length > 0 && (
           <button
             onClick={() => setShowFailuresPanel((s) => !s)}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-200 text-xs font-semibold"
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive-surface text-destructive text-xs font-semibold"
           >
             <AlertTriangle className="h-3 w-3" />
             {permanentFailures.length} need attention
@@ -187,25 +187,25 @@ export function OfflineStatusBar() {
       </div>
 
       {showFailuresPanel && permanentFailures.length > 0 && (
-        <div className="w-full border border-t-0 border-red-200 bg-red-50 dark:border-red-800/60 dark:bg-red-950/50 px-4 py-3 text-sm">
-          <p className="font-semibold text-red-900 dark:text-red-100 mb-2">
+        <div className="w-full border border-t-0 border-destructive/30 bg-destructive-surface px-4 py-3 text-sm">
+          <p className="font-semibold text-destructive mb-2">
             These actions couldn't be applied and won't retry automatically:
           </p>
           <ul className="space-y-2">
             {permanentFailures.map((action) => (
               <li
                 key={action.localId}
-                className="flex items-center justify-between gap-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-md px-3 py-2 border border-red-100 dark:border-red-900/60"
+                className="flex items-center justify-between gap-3 bg-card dark:bg-surface text-foreground rounded-md px-3 py-2 border border-destructive/30"
               >
                 <div>
                   <span className="font-medium">{action.type.replace("_", " ")}</span>
                   {" — booking "}
                   <span className="font-mono text-xs">{String(action.bookingId).slice(0, 8)}</span>
-                  <p className="text-xs text-red-700 dark:text-red-300 mt-0.5">{action.lastError}</p>
+                  <p className="text-xs text-destructive mt-0.5">{action.lastError}</p>
                 </div>
                 <button
                   onClick={() => handleDiscardFailure(action.localId)}
-                  className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
+                  className="text-destructive hover:text-destructive"
                   title="Discard — the server's state is authoritative"
                 >
                   <X className="h-4 w-4" />
@@ -231,14 +231,14 @@ function DurationMenu({ onSelect, onClose }) {
   return (
     <div
       data-duration-menu
-      className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 rounded-lg shadow-lg dark:shadow-black/40 ring-1 ring-black/5 dark:ring-white/10 py-1 w-40"
+      className="absolute right-0 top-full mt-1 z-50 bg-card dark:bg-surface border border-border text-foreground rounded-lg shadow-lg shadow-black/40 ring-1 ring-border-strong/5 dark:ring-border-strong/10 py-1 w-40"
     >
-      <p className="px-3 py-1 text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide">Work Offline for</p>
+      <p className="px-3 py-1 text-xs text-muted-foreground dark:text-subtle-foreground uppercase tracking-wide">Work Offline for</p>
       {[30, 60, 90].map((minutes) => (
         <button
           key={minutes}
           onClick={() => onSelect(minutes)}
-          className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+          className="w-full text-left px-3 py-2 text-sm text-muted-foreground dark:text-foreground hover:bg-muted dark:hover:bg-surface-hover"
         >
           {minutes} minutes
         </button>

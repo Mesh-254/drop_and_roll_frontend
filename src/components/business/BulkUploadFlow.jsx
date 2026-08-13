@@ -359,18 +359,18 @@ export default function BulkUploadFlow({
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden max-w-2xl w-full mx-auto">
+    <div className="bg-card dark:bg-surface rounded-2xl shadow-2xl overflow-hidden max-w-2xl w-full mx-auto">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+      <div className="flex items-center justify-between px-6 py-5 border-b border-border">
+        <h2 className="text-2xl font-bold text-foreground">
           Bulk Upload
         </h2>
         <button
           onClick={handleClose}
-          className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          className="p-2 rounded-full hover:bg-muted dark:hover:bg-surface-hover transition-colors"
           aria-label="Close"
         >
-          <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+          <X className="h-5 w-5 text-subtle-foreground dark:text-muted-foreground" />
         </button>
       </div>
 
@@ -387,7 +387,7 @@ export default function BulkUploadFlow({
           they absorb whatever slack is left rather than demanding a fixed size.
           The row now fits by construction at every width instead of by
           arithmetic that happened to hold until a fifth step was added. */}
-      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="px-6 py-4 border-b border-border">
         <div className="flex items-start" role="list" aria-label="Upload progress">
           {STEPS.map((step, idx) => (
             <React.Fragment key={idx}>
@@ -401,10 +401,10 @@ export default function BulkUploadFlow({
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
                     idx < currentStep
-                      ? "bg-green-500 text-white"
+                      ? "bg-success text-foreground"
                       : idx === currentStep
-                        ? "bg-orange-500 text-white"
-                        : "bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300"
+                        ? "bg-primary text-foreground"
+                        : "bg-surface-hover text-muted-foreground"
                   }`}
                 >
                   {idx < currentStep ? "✓" : idx + 1}
@@ -412,7 +412,7 @@ export default function BulkUploadFlow({
                 {/* Hidden below sm, where five labels cannot fit however they
                     are arranged. The circles still carry the position, and the
                     step's own heading names it on screen. */}
-                <span className="hidden sm:block text-[11px] leading-tight text-center font-medium text-gray-600 dark:text-gray-300">
+                <span className="hidden sm:block text-[11px] leading-tight text-center font-medium text-muted-foreground">
                   {step.label}
                 </span>
               </div>
@@ -420,7 +420,7 @@ export default function BulkUploadFlow({
                 <div
                   aria-hidden="true"
                   className={`flex-1 h-0.5 mt-4 mx-1 sm:mx-1.5 transition-colors ${
-                    idx < currentStep ? "bg-green-500" : "bg-gray-200 dark:bg-gray-600"
+                    idx < currentStep ? "bg-success" : "bg-surface-hover"
                   }`}
                 />
               )}
@@ -443,10 +443,10 @@ export default function BulkUploadFlow({
               className="space-y-6"
             >
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                <h3 className="text-lg font-semibold text-foreground mb-1">
                   Upload your CSV file
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-subtle-foreground dark:text-muted-foreground">
                   Download our template to see the required format.
                 </p>
               </div>
@@ -470,9 +470,8 @@ export default function BulkUploadFlow({
                 <button
                   onClick={handleDownloadTemplate}
                   className="flex items-center gap-2 px-4 py-2 text-sm font-medium
-                             text-gray-700 dark:text-gray-300 border border-gray-300
-                             dark:border-gray-600 rounded-lg hover:bg-gray-50
-                             dark:hover:bg-gray-700 transition-colors"
+                             text-muted-foreground border border-border-strong rounded-lg hover:bg-muted
+                             dark:hover:bg-surface-hover transition-colors"
                 >
                   <Download className="h-4 w-4" /> Template
                 </button>
@@ -480,8 +479,8 @@ export default function BulkUploadFlow({
                   onClick={nextStep}
                   disabled={!selectedFile || isValidating}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm
-                             font-semibold text-white bg-orange-500 hover:bg-orange-600
-                             disabled:bg-gray-300 dark:disabled:bg-gray-600 rounded-lg
+                             font-semibold text-primary-foreground bg-primary hover:bg-primary-hover
+                             disabled:bg-surface-hover rounded-lg
                              transition-colors disabled:cursor-not-allowed"
                 >
                   {isValidating ? (
@@ -510,47 +509,47 @@ export default function BulkUploadFlow({
               className="space-y-6"
             >
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                <h3 className="text-lg font-semibold text-foreground mb-1">
                   Batch details
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-subtle-foreground dark:text-muted-foreground">
                   Give your batch a name so you can find it later.
                 </p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Batch name <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
+                    Batch name <span className="text-destructive">*</span>
                   </label>
                   <input
                     {...register("batchName")}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600
-                               rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                               focus:outline-none focus:ring-2 focus:ring-orange-500 transition"
+                    className="w-full px-3 py-2 border border-border-strong
+                               rounded-lg bg-card dark:bg-surface-hover text-foreground
+                               focus:outline-none focus:ring-2 focus:ring-ring transition"
                     placeholder="e.g. March Week 2 Deliveries"
                   />
                   {formErrors.batchName && (
-                    <p className="mt-1 text-xs text-red-500">
+                    <p className="mt-1 text-xs text-destructive">
                       {formErrors.batchName.message}
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     Notes (optional)
                   </label>
                   <textarea
                     {...register("notes")}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600
-                               rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                               focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none transition"
+                    className="w-full px-3 py-2 border border-border-strong
+                               rounded-lg bg-card dark:bg-surface-hover text-foreground
+                               focus:outline-none focus:ring-2 focus:ring-ring resize-none transition"
                     placeholder="Any special instructions…"
                   />
                   {formErrors.notes && (
-                    <p className="mt-1 text-xs text-red-500">
+                    <p className="mt-1 text-xs text-destructive">
                       {formErrors.notes.message}
                     </p>
                   )}
@@ -563,9 +562,8 @@ export default function BulkUploadFlow({
                 <button
                   onClick={prevStep}
                   className="flex items-center gap-2 px-4 py-2 text-sm font-medium
-                             text-gray-700 dark:text-gray-300 border border-gray-300
-                             dark:border-gray-600 rounded-lg hover:bg-gray-50
-                             dark:hover:bg-gray-700 transition-colors"
+                             text-muted-foreground border border-border-strong rounded-lg hover:bg-muted
+                             dark:hover:bg-surface-hover transition-colors"
                 >
                   <ArrowLeft className="h-4 w-4" /> Back
                 </button>
@@ -573,8 +571,8 @@ export default function BulkUploadFlow({
                   onClick={handleStep1Continue}
                   disabled={isValidating}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm
-                             font-semibold text-white bg-orange-500 hover:bg-orange-600
-                             disabled:bg-gray-300 dark:disabled:bg-gray-600 rounded-lg
+                             font-semibold text-primary-foreground bg-primary hover:bg-primary-hover
+                             disabled:bg-surface-hover rounded-lg
                              transition-colors disabled:cursor-not-allowed"
                 >
                   Validate & Continue <ArrowRight className="h-4 w-4" />
@@ -594,10 +592,10 @@ export default function BulkUploadFlow({
               className="space-y-6"
             >
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                <h3 className="text-lg font-semibold text-foreground mb-1">
                   Review & Confirm
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-subtle-foreground dark:text-muted-foreground">
                   Check your upload details before submitting.
                 </p>
               </div>
@@ -615,13 +613,13 @@ export default function BulkUploadFlow({
                     <ReviewRow
                       label="Rows with errors"
                       value={validationResult.error_count}
-                      valueClass="text-red-500"
+                      valueClass="text-destructive"
                     />
                   )}
                   <ReviewRow
                     label="Estimated total"
                     value={`£${formatTotal(validationResult)}`}
-                    valueClass="text-orange-400 font-bold"
+                    valueClass="text-brand-text font-bold"
                   />
                 </div>
               )}
@@ -646,9 +644,8 @@ export default function BulkUploadFlow({
                 <button
                   onClick={prevStep}
                   className="flex items-center gap-2 px-4 py-2 text-sm font-medium
-                             text-gray-700 dark:text-gray-300 border border-gray-300
-                             dark:border-gray-600 rounded-lg hover:bg-gray-50
-                             dark:hover:bg-gray-700 transition-colors"
+                             text-muted-foreground border border-border-strong rounded-lg hover:bg-muted
+                             dark:hover:bg-surface-hover transition-colors"
                 >
                   <ArrowLeft className="h-4 w-4" /> Back
                 </button>
@@ -656,8 +653,8 @@ export default function BulkUploadFlow({
                   onClick={handleStep2Submit}
                   disabled={isUploading || confirmIncomplete}
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm
-                             font-semibold text-white bg-orange-500 hover:bg-orange-600
-                             disabled:bg-gray-300 dark:disabled:bg-gray-600 rounded-lg
+                             font-semibold text-primary-foreground bg-primary hover:bg-primary-hover
+                             disabled:bg-surface-hover rounded-lg
                              transition-colors disabled:cursor-not-allowed"
                 >
                   {isUploading ? (
@@ -685,10 +682,10 @@ export default function BulkUploadFlow({
               className="space-y-6"
             >
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                <h3 className="text-lg font-semibold text-foreground mb-1">
                   Processing your batch
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-subtle-foreground dark:text-muted-foreground">
                   {isProcessing
                     ? "Please wait while we process your bookings…"
                     : isPaymentPending
@@ -717,10 +714,10 @@ export default function BulkUploadFlow({
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="flex items-center gap-3 p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg"
+                  className="flex items-center gap-3 p-4 bg-primary/10 border border-primary/30 rounded-lg"
                 >
-                  <Loader2 className="h-5 w-5 animate-spin text-orange-400 flex-shrink-0" />
-                  <p className="text-sm text-orange-300 font-medium">
+                  <Loader2 className="h-5 w-5 animate-spin text-brand-text flex-shrink-0" />
+                  <p className="text-sm text-brand-text font-medium">
                     Preparing your payment — redirecting shortly…
                   </p>
                 </motion.div>
@@ -737,16 +734,16 @@ export default function BulkUploadFlow({
                 <motion.div
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="space-y-3 p-4 bg-green-500/10 border border-green-500/30 rounded-xl"
+                  className="space-y-3 p-4 bg-success/10 border border-success/30 rounded-xl"
                 >
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-400 flex-shrink-0" />
-                    <p className="text-sm font-semibold text-green-300">
+                    <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0" />
+                    <p className="text-sm font-semibold text-success">
                       Bookings created successfully!
                     </p>
                   </div>
                   {latestUpload?.success_count && (
-                    <p className="text-sm text-green-200/80">
+                    <p className="text-sm text-success/80">
                       {latestUpload.success_count} booking
                       {latestUpload.success_count !== 1 ? "s" : ""} ready for
                       payment (£
@@ -755,8 +752,8 @@ export default function BulkUploadFlow({
                   )}
                   <button
                     onClick={manualContinueToPayment}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-orange-500
-                               hover:bg-orange-600 text-white text-sm font-semibold rounded-lg
+                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-primary
+                               hover:bg-primary-hover text-primary-foreground text-sm font-semibold rounded-lg
                                transition-colors"
                   >
                     Continue to Payment <ArrowRight className="h-4 w-4" />
@@ -769,15 +766,15 @@ export default function BulkUploadFlow({
                 <motion.div
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-4 bg-blue-900/20 border border-blue-500/30 rounded-xl space-y-3"
+                  className="p-4 bg-info-surface border border-info/30 rounded-xl space-y-3"
                 >
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-blue-400" />
-                    <p className="text-sm font-semibold text-blue-300">
+                    <CheckCircle2 className="h-5 w-5 text-info" />
+                    <p className="text-sm font-semibold text-info">
                       Invoice Raised
                     </p>
                   </div>
-                  <p className="text-sm text-blue-200/80">
+                  <p className="text-sm text-info/80">
                     Your invoice for{" "}
                     <strong>£{formatTotal(latestUpload)}</strong> has been
                     created. You will receive a confirmation email shortly.
@@ -786,8 +783,8 @@ export default function BulkUploadFlow({
                   {latestUpload?.receivable_id && (
                     <button
                       onClick={manualViewInvoice}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-600
-                                 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg
+                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-info
+                                 hover:bg-info text-info-foreground text-sm font-semibold rounded-lg
                                  transition-colors mt-2"
                     >
                       View Invoice <ArrowRight className="h-4 w-4" />
@@ -798,9 +795,9 @@ export default function BulkUploadFlow({
                       handleClose();
                       navigate("/billing");
                     }}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 border border-blue-500/40
-                               text-blue-300 text-sm font-medium rounded-lg
-                               transition-colors hover:bg-blue-500/10"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 border border-info/40
+                               text-info text-sm font-medium rounded-lg
+                               transition-colors hover:bg-info/10"
                   >
                     View Billing &amp; Invoices{" "}
                     <ArrowRight className="h-4 w-4" />
@@ -813,10 +810,10 @@ export default function BulkUploadFlow({
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="flex items-center gap-3 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg"
+                  className="flex items-center gap-3 p-4 bg-info/10 border border-info/30 rounded-lg"
                 >
-                  <Loader2 className="h-5 w-5 animate-spin text-blue-400 flex-shrink-0" />
-                  <p className="text-sm text-blue-300">
+                  <Loader2 className="h-5 w-5 animate-spin text-info flex-shrink-0" />
+                  <p className="text-sm text-info">
                     Generating your invoice — this takes a moment…
                   </p>
                 </motion.div>
@@ -834,8 +831,8 @@ export default function BulkUploadFlow({
               {isFailed && (
                 <button
                   onClick={handleRetry}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-orange-500
-                             hover:bg-orange-600 text-white text-sm font-semibold rounded-lg
+                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-primary
+                             hover:bg-primary-hover text-primary-foreground text-sm font-semibold rounded-lg
                              transition-colors"
                 >
                   Retry Upload <ArrowRight className="h-4 w-4" />
@@ -845,8 +842,8 @@ export default function BulkUploadFlow({
               <div className="flex justify-end">
                 <button
                   onClick={handleClose}
-                  className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400
-                             hover:text-gray-900 dark:hover:text-white transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-muted-foreground
+                             hover:text-foreground transition-colors"
                 >
                   Close
                 </button>
@@ -869,7 +866,7 @@ export default function BulkUploadFlow({
                   "you can close this page" true rather than a promise.
 
                   `surface` is passed rather than inferred. This modal is
-                  `bg-white dark:bg-gray-800` and the review step's palette has
+                  `bg-card dark:bg-surface` and the review step's palette has
                   to match whichever of those is actually painted. It used to
                   hardcode the dark half, which on a light-mode machine put
                   white text on the white card -- the step that lists which rows
@@ -903,15 +900,15 @@ function ErrorBanner({ error }) {
     <motion.div
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"
+      className="flex items-start gap-3 p-4 bg-destructive-surface border border-destructive/30 rounded-lg"
     >
-      <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+      <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
       <div className="flex-1">
-        <p className="text-sm text-red-700 dark:text-red-400">{msg}</p>
+        <p className="text-sm text-destructive">{msg}</p>
         {payUrl && (
           <a
             href={payUrl}
-            className="inline-block mt-2 px-4 py-2 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-lg"
+            className="inline-block mt-2 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:bg-primary-hover rounded-lg"
           >
             Pay outstanding invoices
           </a>
@@ -924,11 +921,11 @@ function ErrorBanner({ error }) {
 function ReviewRow({
   label,
   value,
-  valueClass = "text-gray-900 dark:text-white",
+  valueClass = "text-foreground",
 }) {
   return (
-    <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
-      <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
+    <div className="flex justify-between items-center py-2 border-b border-border last:border-0">
+      <span className="text-sm text-subtle-foreground dark:text-muted-foreground">{label}</span>
       <span className={`text-sm font-medium ${valueClass}`}>
         {value ?? "—"}
       </span>

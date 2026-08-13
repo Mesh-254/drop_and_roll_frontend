@@ -44,7 +44,7 @@ export default function CheckEmail() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-muted to-muted dark:from-card dark:to-surface flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -54,7 +54,7 @@ export default function CheckEmail() {
         <motion.button
           whileHover={{ x: -2 }}
           onClick={() => navigate("/forgot-password")}
-          className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 mb-8 transition-colors"
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-8 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
@@ -63,22 +63,22 @@ export default function CheckEmail() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 text-center"
+          className="bg-card dark:bg-surface rounded-2xl shadow-xl border border-border p-8 text-center"
         >
-          <div className="w-16 h-16 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Mail className="w-8 h-8 text-orange-600 dark:text-orange-400" />
+          <div className="w-16 h-16 bg-brand-surface rounded-full flex items-center justify-center mx-auto mb-6">
+            <Mail className="w-8 h-8 text-brand-text" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+          <h1 className="text-2xl font-bold text-foreground mb-4">
             Check Your Email
           </h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-2">
+          <p className="text-muted-foreground mb-2">
             We've sent a password reset link to
           </p>
-          <p className="font-medium text-orange-600 dark:text-orange-400 mb-6">
+          <p className="font-medium text-brand-text mb-6">
             {email}
           </p>
-          <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
-            <p className="text-blue-700 dark:text-blue-300 text-sm">
+          <div className="bg-info-surface border border-info/30 rounded-lg p-4 mb-6">
+            <p className="text-info text-sm">
               Check your inbox (including spam/junk folder) for the reset link.
               It expires in 1 hour.
             </p>
@@ -87,7 +87,7 @@ export default function CheckEmail() {
             whileHover={{ scale: countdown === 0 ? 1.02 : 1 }}
             onClick={handleResend}
             disabled={isResending || countdown > 0}
-            className="w-full  text-gray-900 dark:text-white py-3 px-4 border rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full  text-foreground py-3 px-4 border rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isResending ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -104,11 +104,11 @@ export default function CheckEmail() {
             )}
           </motion.button>
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-muted-foreground">
               Didn't receive it? Check spam or{" "}
               <button
                 onClick={() => navigate("/login")}
-                className="text-orange-600 hover:text-orange-700 font-medium"
+                className="text-brand-text hover:text-brand-text font-medium"
               >
                 return to login
               </button>

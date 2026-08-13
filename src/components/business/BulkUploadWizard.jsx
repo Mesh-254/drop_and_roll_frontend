@@ -92,22 +92,22 @@ export default function BulkUploadWizard({ onSuccess = () => {}, onClose = () =>
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="fixed top-4 right-4 max-w-md bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900/50 rounded-lg p-4 shadow-lg z-40"
+          className="fixed top-4 right-4 max-w-md bg-warning-surface border border-warning/30 rounded-lg p-4 shadow-lg z-40"
         >
           <div className="flex gap-3">
-            <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+            <AlertCircle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="font-semibold text-yellow-800 dark:text-yellow-300 text-sm">
+              <p className="font-semibold text-warning text-sm">
                 Business Profile Required
               </p>
-              <p className="text-sm text-yellow-700 dark:text-yellow-300/80 mt-1">
+              <p className="text-sm text-warning dark:text-warning/80 mt-1">
                 {uploadError}
               </p>
               <motion.button
                 onClick={() => setShowProfileModal(true)}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="mt-3 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium text-sm transition flex items-center gap-2"
+                className="mt-3 px-4 py-2 bg-warning hover:bg-warning text-warning-foreground rounded-lg font-medium text-sm transition flex items-center gap-2"
               >
                 Set Up Business Profile
               </motion.button>

@@ -63,23 +63,23 @@ function ProofOfDeliveryView({ proofData, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
+      className="fixed inset-0 bg-overlay flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-2xl p-5 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+        className="bg-card rounded-t-3xl sm:rounded-2xl p-5 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+          <h2 className="text-xl font-bold text-foreground">
             Proof of Delivery
           </h2>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            className="p-2 rounded-xl hover:bg-muted dark:hover:bg-surface transition"
             aria-label="Close"
           >
-            <X className="h-5 w-5 text-slate-600 dark:text-slate-300" />
+            <X className="h-5 w-5 text-muted-foreground" />
           </button>
         </div>
 
@@ -88,10 +88,10 @@ function ProofOfDeliveryView({ proofData, onClose }) {
             {pods.map((pod, index) => (
               <div
                 key={pod.id || index}
-                className="rounded-2xl border border-slate-200 dark:border-slate-700 p-4"
+                className="rounded-2xl border border-border p-4"
               >
                 {pods.length > 1 && (
-                  <h3 className="font-bold text-slate-900 dark:text-white mb-3">
+                  <h3 className="font-bold text-foreground mb-3">
                     Proof #{index + 1}
                   </h3>
                 )}
@@ -99,32 +99,32 @@ function ProofOfDeliveryView({ proofData, onClose }) {
                   <img
                     src={pod.photo}
                     alt={`Proof of delivery ${index + 1}`}
-                    className="w-full max-h-96 object-contain rounded-xl bg-slate-50 dark:bg-slate-800 mb-4"
+                    className="w-full max-h-96 object-contain rounded-xl bg-muted dark:bg-surface mb-4"
                   />
                 )}
                 {pod.notes && (
-                  <p className="text-sm text-slate-900 dark:text-slate-100 whitespace-pre-wrap bg-slate-50 dark:bg-slate-800 rounded-xl p-3 mb-3">
+                  <p className="text-sm text-foreground whitespace-pre-wrap bg-muted dark:bg-surface rounded-xl p-3 mb-3">
                     {pod.notes}
                   </p>
                 )}
                 <div className="grid sm:grid-cols-2 gap-3 text-xs">
                   {pod.location?.lat != null && pod.location?.lng != null && (
-                    <div className="rounded-xl bg-slate-50 dark:bg-slate-800 p-3">
-                      <p className="font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
+                    <div className="rounded-xl bg-muted dark:bg-surface p-3">
+                      <p className="font-semibold text-subtle-foreground dark:text-muted-foreground uppercase tracking-wide mb-1">
                         Location
                       </p>
-                      <p className="font-mono text-slate-900 dark:text-white">
+                      <p className="font-mono text-foreground">
                         {Number(pod.location.lat).toFixed(6)},{" "}
                         {Number(pod.location.lng).toFixed(6)}
                       </p>
                     </div>
                   )}
                   {pod.created_at && (
-                    <div className="rounded-xl bg-slate-50 dark:bg-slate-800 p-3">
-                      <p className="font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">
+                    <div className="rounded-xl bg-muted dark:bg-surface p-3">
+                      <p className="font-semibold text-subtle-foreground dark:text-muted-foreground uppercase tracking-wide mb-1">
                         Submitted
                       </p>
-                      <p className="text-slate-900 dark:text-white">
+                      <p className="text-foreground">
                         {new Date(pod.created_at).toLocaleString()}
                       </p>
                     </div>
@@ -135,8 +135,8 @@ function ProofOfDeliveryView({ proofData, onClose }) {
           </div>
         ) : (
           <div className="text-center py-10">
-            <ImageIcon className="h-12 w-12 text-slate-300 dark:text-slate-700 mx-auto mb-3" />
-            <p className="text-slate-600 dark:text-slate-400 font-medium">
+            <ImageIcon className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+            <p className="text-muted-foreground font-medium">
               No proof details available
             </p>
           </div>
@@ -178,13 +178,13 @@ const STATUS_LABEL = {
 };
 
 const STATUS_BADGE = {
-  assigned: "bg-blue-100 text-blue-700 border-blue-200",
-  picked_up: "bg-amber-100 text-amber-700 border-amber-200",
+  assigned: "bg-info-surface text-info border-info/30",
+  picked_up: "bg-warning-surface text-warning border-warning/30",
   at_hub: "bg-purple-100 text-purple-700 border-purple-200",
-  in_transit: "bg-indigo-100 text-indigo-700 border-indigo-200",
-  delivered: "bg-green-100 text-green-700 border-green-200",
-  cancelled: "bg-red-100 text-red-700 border-red-200",
-  failed: "bg-red-100 text-red-700 border-red-200",
+  in_transit: "bg-info-surface text-info border-info/30",
+  delivered: "bg-success-surface text-success border-success/30",
+  cancelled: "bg-destructive-surface text-destructive border-destructive/30",
+  failed: "bg-destructive-surface text-destructive border-destructive/30",
 };
 
 const ACTION_LABEL = {
@@ -197,13 +197,13 @@ const ACTION_LABEL = {
 /** One labelled value in the reference / manifest grids. */
 function Fact({ icon: Icon, label, value, mono = false }) {
   return (
-    <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/60 p-3.5">
-      <p className="text-[11px] uppercase tracking-wide font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mb-1.5">
+    <div className="rounded-2xl bg-muted dark:bg-surface/60 p-3.5">
+      <p className="text-[11px] uppercase tracking-wide font-semibold text-subtle-foreground dark:text-muted-foreground flex items-center gap-1.5 mb-1.5">
         <Icon className="h-3.5 w-3.5" />
         {label}
       </p>
       <p
-        className={`text-sm font-semibold text-slate-900 dark:text-white break-words ${
+        className={`text-sm font-semibold text-foreground break-words ${
           mono ? "font-mono" : ""
         }`}
       >
@@ -238,52 +238,52 @@ function AddressBlock({
       className={`rounded-2xl p-4 border-2 transition ${
         active
           ? isDelivery
-            ? "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-900/15"
-            : "border-sky-500 bg-sky-50/60 dark:bg-sky-900/15"
-          : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+            ? "border-success bg-success-surface"
+            : "border-info bg-info-surface"
+          : "border-border bg-card"
       }`}
     >
       <div className="flex items-center justify-between gap-2 mb-3">
         <span
           className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide ${
             isDelivery
-              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
-              : "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200"
+              ? "bg-success-surface text-success"
+              : "bg-info-surface text-info"
           }`}
         >
           <MapPin className="h-3 w-3" />
           {isDelivery ? "Delivery" : "Collection"}
         </span>
         {active && (
-          <span className="text-[11px] font-bold uppercase tracking-wide text-orange-600 dark:text-orange-400">
+          <span className="text-[11px] font-bold uppercase tracking-wide text-brand-text">
             You are here
           </span>
         )}
       </div>
 
-      <p className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+      <p className="text-xl font-extrabold tracking-tight text-foreground">
         {postcode || "No postcode"}
       </p>
-      <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5 leading-snug">
+      <p className="text-sm text-muted-foreground mt-0.5 leading-snug">
         {rest || "Address unavailable"}
       </p>
 
       <div className="mt-3 space-y-1.5 text-sm">
         {name && (
-          <p className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
-            <User className="h-4 w-4 text-slate-400 flex-shrink-0" />
+          <p className="flex items-center gap-2 text-muted-foreground dark:text-foreground">
+            <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             {name}
           </p>
         )}
         {email && (
-          <p className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs break-all">
+          <p className="flex items-center gap-2 text-subtle-foreground dark:text-muted-foreground text-xs break-all">
             <Mail className="h-4 w-4 flex-shrink-0" />
             {email}
           </p>
         )}
         {scheduledAt && (
-          <p className="flex items-center gap-2 text-slate-700 dark:text-slate-200">
-            <Calendar className="h-4 w-4 text-slate-400 flex-shrink-0" />
+          <p className="flex items-center gap-2 text-muted-foreground dark:text-foreground">
+            <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             {new Date(scheduledAt).toLocaleString()}
           </p>
         )}
@@ -292,7 +292,7 @@ function AddressBlock({
       {phone && (
         <a
           href={`tel:${phone.replace(/[^\d+]/g, "")}`}
-          className="mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm active:scale-95 transition"
+          className="mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-success hover:bg-success text-success-foreground font-semibold text-sm active:scale-95 transition"
         >
           <Phone className="h-4 w-4" />
           {phone}
@@ -550,10 +550,10 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950">
+      <div className="flex items-center justify-center min-h-screen bg-muted dark:bg-background">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-11 w-11 border-4 border-slate-200 dark:border-slate-700 border-t-orange-600 mx-auto mb-4" />
-          <p className="text-slate-600 dark:text-slate-400 font-medium">
+          <div className="animate-spin rounded-full h-11 w-11 border-4 border-border border-t-orange-600 mx-auto mb-4" />
+          <p className="text-muted-foreground font-medium">
             Loading job details...
           </p>
         </div>
@@ -563,18 +563,18 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
 
   if (!data) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950 px-6">
+      <div className="flex items-center justify-center min-h-screen bg-muted dark:bg-background px-6">
         <div className="text-center">
-          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
+          <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <h3 className="text-lg font-bold text-foreground mb-2">
             Job not found
           </h3>
-          <p className="text-slate-600 dark:text-slate-400 mb-6">
+          <p className="text-muted-foreground mb-6">
             The requested job could not be loaded.
           </p>
           <button
             onClick={onBack}
-            className="px-6 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold"
+            className="px-6 py-2.5 rounded-xl bg-card text-foreground font-semibold"
           >
             Back to jobs
           </button>
@@ -589,25 +589,25 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
     quote?.service_type?.routing_bucket === "same_day";
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-28">
+    <div className="min-h-screen bg-muted dark:bg-background pb-28">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-slate-200 dark:border-slate-800">
+      <div className="sticky top-0 z-20 bg-card/95 backdrop-blur border-b border-border">
         <div className="max-w-3xl mx-auto px-4 py-3">
           <div className="flex items-center gap-3">
             <button
               onClick={onBack}
-              className="p-2 -ml-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              className="p-2 -ml-2 rounded-xl hover:bg-muted dark:hover:bg-surface transition"
               aria-label="Back to jobs"
             >
-              <ChevronLeft className="h-5 w-5 text-slate-700 dark:text-slate-200" />
+              <ChevronLeft className="h-5 w-5 text-muted-foreground dark:text-foreground" />
             </button>
             <div className="min-w-0 flex-1">
-              <h1 className="text-lg font-bold text-slate-900 dark:text-white truncate">
+              <h1 className="text-lg font-bold text-foreground truncate">
                 {stopContext?.job_number != null
                   ? `Job ${stopContext.job_number}`
                   : data.tracking_number || "Job details"}
               </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-mono truncate">
+              <p className="text-xs text-subtle-foreground dark:text-muted-foreground font-mono truncate">
                 {data.tracking_number}
               </p>
             </div>
@@ -618,8 +618,8 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
               <span
                 className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide ${
                   isDeliveryLeg
-                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
-                    : "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200"
+                    ? "bg-success-surface text-success"
+                    : "bg-info-surface text-info"
                 }`}
               >
                 {isDeliveryLeg ? "Delivery" : "Collection"}
@@ -628,20 +628,20 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
             <span
               className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-bold uppercase tracking-wide ${
                 STATUS_BADGE[data.status] ||
-                "bg-slate-100 text-slate-700 border-slate-200"
+                "bg-muted text-muted-foreground border-border"
               }`}
             >
               {STATUS_LABEL[data.status] || data.status}
               {immutable && <Lock className="h-3 w-3" />}
             </span>
             {isSameDay && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-brand-surface text-brand-text">
                 <Zap className="h-3 w-3" />
                 Same Day
               </span>
             )}
             {isUrgentPickup(data.scheduled_pickup_at) && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide bg-destructive-surface text-destructive">
                 <AlertCircle className="h-3 w-3" />
                 Urgent
               </span>
@@ -652,13 +652,13 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
 
       <div className="max-w-3xl mx-auto px-4 py-4 space-y-4">
         {immutable && (
-          <div className="rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 flex items-start gap-3">
-            <Lock className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+          <div className="rounded-2xl bg-destructive-surface border border-destructive/30 p-4 flex items-start gap-3">
+            <Lock className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-bold text-red-900 dark:text-red-200">
+              <h3 className="font-bold text-destructive">
                 Job locked
               </h3>
-              <p className="text-sm text-red-700 dark:text-red-300 mt-0.5">
+              <p className="text-sm text-destructive mt-0.5">
                 {immutableReason ||
                   "This job has been delivered with proof submitted and cannot be modified."}
               </p>
@@ -667,13 +667,13 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
         )}
 
         {blockedReason && (
-          <div className="rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 flex items-start gap-3">
-            <ShieldAlert className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="rounded-2xl bg-warning-surface border border-warning/30 p-4 flex items-start gap-3">
+            <ShieldAlert className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-bold text-amber-900 dark:text-amber-200">
+              <h3 className="font-bold text-warning">
                 Not yet available
               </h3>
-              <p className="text-sm text-amber-700 dark:text-amber-300 mt-0.5">
+              <p className="text-sm text-warning mt-0.5">
                 {blockedReason}
               </p>
             </div>
@@ -682,7 +682,7 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
 
         {/* THE ROUTE — both ends, current stop marked. */}
         <section>
-          <h2 className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2 px-1">
+          <h2 className="text-xs font-bold uppercase tracking-wide text-subtle-foreground dark:text-muted-foreground mb-2 px-1">
             Route
           </h2>
           <div className="space-y-2">
@@ -695,7 +695,7 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
               active={!!stopContext && !isDeliveryLeg}
             />
             <div className="flex justify-center">
-              <div className="h-5 w-0.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
+              <div className="h-5 w-0.5 bg-surface-hover dark:bg-surface rounded-full" />
             </div>
             <AddressBlock
               kind="delivery"
@@ -711,10 +711,10 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
 
         {/* THE PARCELS */}
         <section>
-          <h2 className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2 px-1">
+          <h2 className="text-xs font-bold uppercase tracking-wide text-subtle-foreground dark:text-muted-foreground mb-2 px-1">
             Shipment
           </h2>
-          <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4">
+          <div className="rounded-2xl bg-card border border-border p-4">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
               <Fact icon={Package} label="Parcels" value={parcels} />
               <Fact
@@ -747,30 +747,30 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
             </div>
 
             {quote?.fragile && (
-              <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 px-3.5 py-2.5 rounded-xl">
+              <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-destructive bg-destructive-surface px-3.5 py-2.5 rounded-xl">
                 <AlertTriangle className="h-4 w-4 flex-shrink-0" />
                 Fragile — handle with care
               </div>
             )}
 
             {data.notes && (
-              <div className="mt-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 p-3.5">
-                <p className="text-[11px] uppercase tracking-wide font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mb-1.5">
+              <div className="mt-3 rounded-xl bg-muted dark:bg-surface/60 p-3.5">
+                <p className="text-[11px] uppercase tracking-wide font-semibold text-subtle-foreground dark:text-muted-foreground flex items-center gap-1.5 mb-1.5">
                   <StickyNote className="h-3.5 w-3.5" />
                   Notes
                 </p>
-                <p className="text-sm text-slate-900 dark:text-white whitespace-pre-wrap">
+                <p className="text-sm text-foreground whitespace-pre-wrap">
                   {data.notes}
                 </p>
               </div>
             )}
 
             {data.routing_note && (
-              <div className="mt-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 p-3.5">
-                <p className="text-[11px] uppercase tracking-wide font-semibold text-blue-700 dark:text-blue-300 mb-1.5">
+              <div className="mt-3 rounded-xl bg-info-surface p-3.5">
+                <p className="text-[11px] uppercase tracking-wide font-semibold text-info mb-1.5">
                   Routing note
                 </p>
-                <p className="text-sm text-blue-900 dark:text-blue-100">
+                <p className="text-sm text-info">
                   {data.routing_note}
                 </p>
               </div>
@@ -781,14 +781,14 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
         {/* PROOF OF DELIVERY */}
         {data.status === "delivered" && (
           <section>
-            <h2 className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2 px-1">
+            <h2 className="text-xs font-bold uppercase tracking-wide text-subtle-foreground dark:text-muted-foreground mb-2 px-1">
               Proof of delivery
             </h2>
-            <div className="rounded-2xl bg-white dark:bg-slate-900 border border-green-200 dark:border-green-800 p-4">
+            <div className="rounded-2xl bg-card border border-success/30 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3 min-w-0">
-                  <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                  <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
+                  <p className="text-sm font-semibold text-foreground">
                     {hasProof
                       ? "Proof submitted"
                       : "Submission required to complete this delivery"}
@@ -797,7 +797,7 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
                 {hasProof && proofData && (
                   <button
                     onClick={() => setShowProofViewModal(true)}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold text-sm flex-shrink-0 active:scale-95 transition"
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-muted dark:bg-surface text-foreground font-semibold text-sm flex-shrink-0 active:scale-95 transition"
                   >
                     <FileText className="h-4 w-4" />
                     View
@@ -807,7 +807,7 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
               {!hasProof && !immutable && (
                 <button
                   onClick={() => setShowProofModal(true)}
-                  className="mt-3 w-full px-6 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold active:scale-95 transition"
+                  className="mt-3 w-full px-6 py-3 rounded-xl bg-success hover:bg-success text-success-foreground font-bold active:scale-95 transition"
                 >
                   Submit proof of delivery
                 </button>
@@ -820,12 +820,12 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
       {/* Action bar — pinned, so the thing the driver came here to do is always
           within thumb reach however far they have scrolled. */}
       {!immutable && (nextStatus || data.status === "assigned") && (
-        <div className="fixed bottom-0 inset-x-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-t border-slate-200 dark:border-slate-800">
+        <div className="fixed bottom-0 inset-x-0 z-20 bg-card/95 backdrop-blur border-t border-border">
           <div className="max-w-3xl mx-auto px-4 py-3 flex items-stretch gap-2">
             {data.status === "assigned" && !blockedReason && (
               <button
                 onClick={() => setShowQRScanner(true)}
-                className="flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-sm active:scale-95 transition"
+                className="flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-card text-foreground font-bold text-sm active:scale-95 transition"
               >
                 <Camera className="h-5 w-5" />
                 Scan
@@ -834,14 +834,14 @@ export function JobDetailPage({ jobId, onBack, stopContext = null }) {
             {nextStatus && (
               <button
                 onClick={() => handleStatusUpdate(nextStatus)}
-                className="flex-1 px-4 py-3.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold active:scale-95 transition"
+                className="flex-1 px-4 py-3.5 rounded-xl bg-primary-hover hover:bg-primary-hover text-primary-foreground font-bold active:scale-95 transition"
               >
                 {ACTION_LABEL[nextStatus] || "Update status"}
               </button>
             )}
             <button
               onClick={() => setShowFailureModal(true)}
-              className="flex items-center justify-center w-14 rounded-xl bg-amber-500 hover:bg-amber-600 text-white active:scale-95 transition"
+              className="flex items-center justify-center w-14 rounded-xl bg-warning hover:bg-warning text-warning-foreground active:scale-95 transition"
               aria-label="Report an issue"
               title="Report an issue"
             >

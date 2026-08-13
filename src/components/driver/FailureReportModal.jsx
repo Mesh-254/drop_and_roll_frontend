@@ -121,30 +121,30 @@ export function FailureReportModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-overlay flex items-center justify-center z-50 p-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            className="bg-card rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="sticky top-0 bg-gradient-to-r from-slate-900 to-slate-800 text-white p-6 flex items-center justify-between border-b border-slate-700">
+            <div className="sticky top-0 bg-gradient-to-r from-card to-surface text-foreground p-6 flex items-center justify-between border-b border-border">
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${failureType === "pickup" ? "bg-amber-500/20" : "bg-orange-500/20"}`}>
-                  <AlertTriangle className={`w-5 h-5 ${failureType === "pickup" ? "text-amber-500" : "text-orange-500"}`} />
+                <div className={`p-2 rounded-lg ${failureType === "pickup" ? "bg-warning/20" : "bg-primary/20"}`}>
+                  <AlertTriangle className={`w-5 h-5 ${failureType === "pickup" ? "text-warning" : "text-brand-text"}`} />
                 </div>
                 <div>
                   <h2 className="text-xl font-bold">{modalTitle}</h2>
-                  <p className="text-sm text-slate-400 mt-1">{jobTitle}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{jobTitle}</p>
                 </div>
               </div>
               <button
                 onClick={onClose}
                 disabled={isSubmitting}
-                className="p-2 hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+                className="p-2 hover:bg-surface rounded-lg transition-colors disabled:opacity-50"
                 aria-label="Close modal"
               >
                 <X className="w-5 h-5" />
@@ -155,15 +155,15 @@ export function FailureReportModal({
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               {/* Reason Dropdown - Dynamic based on failure type */}
               <div>
-                <label htmlFor="reason" className="block text-sm font-semibold text-slate-900 mb-2">
-                  Failure Reason * <span className="text-xs text-slate-600">({failureType === "pickup" ? "Pickup" : "Delivery"})</span>
+                <label htmlFor="reason" className="block text-sm font-semibold text-foreground mb-2">
+                  Failure Reason * <span className="text-xs text-muted-foreground">({failureType === "pickup" ? "Pickup" : "Delivery"})</span>
                 </label>
                 <select
                   id="reason"
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   disabled={isSubmitting}
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white text-slate-900 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2.5 border border-border-strong rounded-lg bg-card text-foreground focus:border-primary focus:ring-2 focus:ring-ring/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value="">Select a reason...</option>
                   {failureReasons.map((opt) => (
@@ -176,7 +176,7 @@ export function FailureReportModal({
 
               {/* Notes Textarea */}
               <div>
-                <label htmlFor="notes" className="block text-sm font-semibold text-slate-900 mb-2">
+                <label htmlFor="notes" className="block text-sm font-semibold text-foreground mb-2">
                   Notes *
                 </label>
                 <textarea
@@ -186,20 +186,20 @@ export function FailureReportModal({
                   disabled={isSubmitting}
                   placeholder="Explain what happened and any relevant details..."
                   rows={4}
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-white text-slate-900 placeholder-slate-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed resize-none"
+                  className="w-full px-4 py-2.5 border border-border-strong rounded-lg bg-card text-foreground placeholder-subtle-foreground focus:border-primary focus:ring-2 focus:ring-ring/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed resize-none"
                 />
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-subtle-foreground mt-1">
                   {notes.length}/500 characters
                 </p>
               </div>
 
               {/* Return to Hub Toggle */}
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200">
+              <div className="flex items-center justify-between p-4 bg-muted rounded-lg border border-border">
                 <div>
-                  <label htmlFor="return-to-hub" className="text-sm font-semibold text-slate-900">
+                  <label htmlFor="return-to-hub" className="text-sm font-semibold text-foreground">
                     Return to Hub
                   </label>
-                  <p className="text-xs text-slate-600 mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     Are you returning this delivery to the hub?
                   </p>
                 </div>
@@ -210,8 +210,8 @@ export function FailureReportModal({
                     disabled={isSubmitting}
                     className={`px-4 py-2 rounded-lg font-semibold transition-all disabled:opacity-50 ${
                       returnToHub
-                        ? "bg-orange-500 text-white shadow-lg"
-                        : "bg-white text-slate-900 border border-slate-300 hover:border-slate-400"
+                        ? "bg-primary text-foreground shadow-lg"
+                        : "bg-card text-foreground border border-border-strong hover:border-border-strong"
                     }`}
                   >
                     Yes
@@ -222,8 +222,8 @@ export function FailureReportModal({
                     disabled={isSubmitting}
                     className={`px-4 py-2 rounded-lg font-semibold transition-all disabled:opacity-50 ${
                       !returnToHub
-                        ? "bg-orange-500 text-white shadow-lg"
-                        : "bg-white text-slate-900 border border-slate-300 hover:border-slate-400"
+                        ? "bg-primary text-foreground shadow-lg"
+                        : "bg-card text-foreground border border-border-strong hover:border-border-strong"
                     }`}
                   >
                     No
@@ -232,26 +232,26 @@ export function FailureReportModal({
               </div>
 
               {/* Info Banner - Context-aware message */}
-              <div className={`p-4 rounded-lg border ${failureType === "pickup" ? "bg-amber-50 border-amber-200" : "bg-blue-50 border-blue-200"}`}>
-                <p className={`text-sm ${failureType === "pickup" ? "text-amber-900" : "text-blue-900"}`}>
+              <div className={`p-4 rounded-lg border ${failureType === "pickup" ? "bg-warning-surface border-warning/30" : "bg-info-surface border-info/30"}`}>
+                <p className={`text-sm ${failureType === "pickup" ? "text-warning" : "text-info"}`}>
                   <span className="font-semibold">Note:</span> {contextMessage}
                 </p>
               </div>
 
               {/* Actions */}
-              <div className="flex gap-3 pt-4 border-t border-slate-200">
+              <div className="flex gap-3 pt-4 border-t border-border">
                 <button
                   type="button"
                   onClick={onClose}
                   disabled={isSubmitting}
-                  className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg text-slate-900 font-semibold hover:bg-slate-50 transition-all disabled:opacity-50"
+                  className="flex-1 px-4 py-2.5 border border-border-strong rounded-lg text-foreground font-semibold hover:bg-muted transition-all disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting || !reason.trim() || !notes.trim()}
-                  className="flex-1 px-4 py-2.5 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg font-semibold hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? (
                     <>

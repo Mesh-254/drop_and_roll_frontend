@@ -75,16 +75,16 @@ const ContactInfo = ({ formData, onUpdate, validation, isAuthenticated }) => {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-        <User className="h-5 w-5 text-orange-500 mr-2" />
+      <h3 className="text-lg font-semibold text-foreground flex items-center">
+        <User className="h-5 w-5 text-brand-text mr-2" />
         Contact Information
       </h3>
-      <p className="text-sm text-gray-600 dark:text-gray-400">
+      <p className="text-sm text-muted-foreground">
         We'll use your email to send you booking updates and confirmations.
       </p>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <label className="block text-sm font-medium text-muted-foreground mb-2">
           Email Address *
         </label>
         <input
@@ -92,10 +92,10 @@ const ContactInfo = ({ formData, onUpdate, validation, isAuthenticated }) => {
           value={formData.guestEmail || ""}
           onChange={(e) => onUpdate({ guestEmail: e.target.value })}
           placeholder="Enter your email address"
-          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+          className="w-full px-4 py-3 border border-border-strong rounded-lg bg-card dark:bg-surface text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors"
         />
         {validation.guestEmail && (
-          <div className="flex items-center text-red-500 text-sm mt-2">
+          <div className="flex items-center text-destructive text-sm mt-2">
             <AlertCircle size={16} className="mr-2" />
             {validation.guestEmail}
           </div>
@@ -129,18 +129,18 @@ const PriceBreakdown = ({ quote, requoteState }) => {
   ].filter(([label]) => label);
 
   return (
-    <div className="mt-3 border-t border-gray-200 dark:border-gray-700 pt-3 space-y-1 text-sm">
+    <div className="mt-3 border-t border-border pt-3 space-y-1 text-sm">
       {rows.map(([label, value]) => (
-        <div key={label} className="flex justify-between text-gray-600 dark:text-gray-400">
+        <div key={label} className="flex justify-between text-muted-foreground">
           <span>{label}</span>
           <span>£{Number(value || 0).toFixed(2)}</span>
         </div>
       ))}
-      <div className="flex justify-between font-semibold text-gray-900 dark:text-white pt-1">
+      <div className="flex justify-between font-semibold text-foreground pt-1">
         <span>Total</span>
         <span className="flex items-center gap-2">
           {requoteState === "pending" && (
-            <Loader2 size={14} className="animate-spin text-orange-500" />
+            <Loader2 size={14} className="animate-spin text-brand-text" />
           )}
           £{quote?.final_price ? Number.parseFloat(quote.final_price).toFixed(2) : "0.00"}
         </span>
@@ -465,12 +465,12 @@ export default function BookingModalEnhanced({
     isSubmitting || hasParcelErrors || requoteState !== "idle";
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-y-auto animate-in zoom-in-95 duration-300">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 bg-orange-500 text-white rounded-t-2xl">
+    <div className="fixed inset-0 bg-overlay flex items-center justify-center z-50 p-4">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-y-auto animate-in zoom-in-95 duration-300">
+        <div className="flex items-center justify-between p-6 border-b border-border bg-primary text-primary-foreground rounded-t-2xl">
           <div>
             <h2 className="text-2xl font-bold">Complete Your Booking</h2>
-            <p className="text-orange-100 text-sm">
+            <p className="text-brand-text text-sm">
               Total: GBP{" "}
               {activeQuote?.final_price
                 ? Number.parseFloat(activeQuote.final_price).toFixed(2)
@@ -479,7 +479,7 @@ export default function BookingModalEnhanced({
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-orange-600 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-orange-300"
+            className="p-2 hover:bg-primary-hover rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
             aria-label="Close modal"
           >
             <X size={24} />
@@ -492,8 +492,8 @@ export default function BookingModalEnhanced({
               role="status"
               className={`flex items-start gap-2 rounded-lg p-3 text-sm border ${
                 resumeStatus === "stale"
-                  ? "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300"
-                  : "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300"
+                  ? "bg-warning-surface border-warning/30 text-warning"
+                  : "bg-info-surface border-info/30 text-info"
               }`}
             >
               {resumeStatus === "checking" ? (
@@ -514,41 +514,41 @@ export default function BookingModalEnhanced({
             </div>
           )}
 
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center">
-              <Package className="h-5 w-5 text-orange-500 mr-2" />
+          <div className="bg-muted dark:bg-surface rounded-lg p-4">
+            <h3 className="text-lg font-semibold text-foreground mb-3 flex items-center">
+              <Package className="h-5 w-5 text-brand-text mr-2" />
               Booking Summary
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="text-gray-600 dark:text-gray-400">
+                <span className="text-muted-foreground">
                   Service:
                 </span>
-                <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                <span className="ml-2 font-medium text-foreground">
                   {activeQuote?.service_type?.name || quote.service_type?.name || "—"}
                 </span>
               </div>
               <div>
-                <span className="text-gray-600 dark:text-gray-400">
+                <span className="text-muted-foreground">
                   Shipment:
                 </span>
-                <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                <span className="ml-2 font-medium text-foreground">
                   {activeQuote?.shipping_type?.name || quote.shipping_type?.name || "—"}
                 </span>
               </div>
               <div>
-                <span className="text-gray-600 dark:text-gray-400">
+                <span className="text-muted-foreground">
                   Parcels:
                 </span>
-                <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                <span className="ml-2 font-medium text-foreground">
                   {parcels.length}
                 </span>
               </div>
               <div>
-                <span className="text-gray-600 dark:text-gray-400">
+                <span className="text-muted-foreground">
                   Total weight:
                 </span>
-                <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                <span className="ml-2 font-medium text-foreground">
                   {totalWeight.toFixed(1)}kg
                 </span>
               </div>
@@ -560,13 +560,13 @@ export default function BookingModalEnhanced({
                     return (
                       <span
                         key={p.id ?? i}
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-xs text-gray-700 dark:text-gray-300"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-card dark:bg-surface-hover border border-border dark:border-border-strong text-xs text-muted-foreground"
                       >
-                        <Package size={12} className="text-orange-500" />
+                        <Package size={12} className="text-brand-text" />
                         {Number.parseFloat(p.weightKg ?? p.weight_kg) || 0}kg ·{" "}
                         {d.length || "?"}×{d.width || "?"}×{d.height || "?"}cm
                         {p.fragile && (
-                          <Shield size={12} className="text-amber-500" aria-label="Fragile" />
+                          <Shield size={12} className="text-warning" aria-label="Fragile" />
                         )}
                       </span>
                     );
@@ -575,7 +575,7 @@ export default function BookingModalEnhanced({
               )}
 
               {fragileCount > 0 && (
-                <div className="md:col-span-2 text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                <div className="md:col-span-2 text-warning flex items-center gap-1.5">
                   <Shield size={14} />
                   {fragileCount} fragile {fragileCount === 1 ? "item" : "items"} — handled with
                   extra care
@@ -584,12 +584,12 @@ export default function BookingModalEnhanced({
 
               <div className="md:col-span-2">
                 <div className="flex items-start space-x-2">
-                  <MapPin className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <MapPin className="h-4 w-4 text-success mt-0.5 flex-shrink-0" />
                   <div>
-                    <span className="text-gray-600 dark:text-gray-400">
+                    <span className="text-muted-foreground">
                       From:
                     </span>
-                    <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                    <span className="ml-2 font-medium text-foreground">
                       {formatAddress(formData.pickupAddress)}
                     </span>
                   </div>
@@ -597,12 +597,12 @@ export default function BookingModalEnhanced({
               </div>
               <div className="md:col-span-2">
                 <div className="flex items-start space-x-2">
-                  <MapPin className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                  <MapPin className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
                   <div>
-                    <span className="text-gray-600 dark:text-gray-400">
+                    <span className="text-muted-foreground">
                       To:
                     </span>
-                    <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                    <span className="ml-2 font-medium text-foreground">
                       {formatAddress(formData.dropoffAddress)}
                     </span>
                   </div>
@@ -611,8 +611,8 @@ export default function BookingModalEnhanced({
 
               {formData.promoCode && (
                 <div className="md:col-span-2">
-                  <span className="text-gray-600 dark:text-gray-400">Promo code:</span>
-                  <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                  <span className="text-muted-foreground">Promo code:</span>
+                  <span className="ml-2 font-medium text-foreground">
                     {formData.promoCode}
                   </span>
                 </div>
@@ -630,7 +630,7 @@ export default function BookingModalEnhanced({
           />
 
           {requoteState === "error" && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300 flex items-center gap-2">
+            <div className="bg-destructive-surface border border-destructive/30 rounded-lg p-3 text-sm text-destructive flex items-center gap-2">
               <AlertCircle size={16} />
               {requoteError}
               <button
@@ -651,12 +651,12 @@ export default function BookingModalEnhanced({
           />
 
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h3 className="text-lg font-semibold text-foreground">
               Additional Options
             </h3>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-muted-foreground mb-2">
                 Promo Code
               </label>
               <input
@@ -664,12 +664,12 @@ export default function BookingModalEnhanced({
                 value={formData.promoCode}
                 onChange={(e) => updateFormData({ promoCode: e.target.value })}
                 placeholder="Enter promo code (optional)"
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                className="w-full px-4 py-3 border border-border-strong rounded-lg bg-card dark:bg-surface text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-muted-foreground mb-2">
                 Special Instructions
               </label>
               <textarea
@@ -677,16 +677,16 @@ export default function BookingModalEnhanced({
                 onChange={(e) => updateFormData({ notes: e.target.value })}
                 placeholder="Any special instructions for pickup or delivery (optional)"
                 rows={3}
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors resize-none"
+                className="w-full px-4 py-3 border border-border-strong rounded-lg bg-card dark:bg-surface text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors resize-none"
               />
             </div>
           </div>
 
           {submitError && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <div className="bg-destructive-surface border border-destructive/30 rounded-lg p-4">
               <div className="flex items-center">
-                <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
-                <span className="text-red-700 dark:text-red-300">
+                <AlertCircle className="h-5 w-5 text-destructive mr-2" />
+                <span className="text-destructive">
                   {submitError}
                 </span>
               </div>
@@ -694,28 +694,28 @@ export default function BookingModalEnhanced({
           )}
         </div>
 
-        <div className="flex justify-between items-center p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-b-2xl">
+        <div className="flex justify-between items-center p-6 border-t border-border bg-muted dark:bg-surface rounded-b-2xl">
           <div className="flex items-center gap-3">
             {typeof onBack === "function" && (
               <button
                 onClick={handleBack}
                 disabled={isSubmitting}
-                className="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
+                className="flex items-center px-4 py-2 text-muted-foreground hover:text-foreground border border-border-strong rounded-lg hover:bg-muted dark:hover:bg-surface-hover transition-colors focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
               >
                 <ChevronLeft size={16} className="mr-1" />
                 Back
               </button>
             )}
-            <div className="text-sm text-gray-600 dark:text-gray-400">
+            <div className="text-sm text-muted-foreground">
               Total:{" "}
-              <span className="font-bold text-gray-900 dark:text-white">
+              <span className="font-bold text-foreground">
                 GBP{" "}
                 {activeQuote?.final_price
                   ? Number.parseFloat(activeQuote.final_price).toFixed(2)
                   : "0.00"}
               </span>
               {requoteState === "pending" && (
-                <span className="ml-2 text-orange-500">updating…</span>
+                <span className="ml-2 text-brand-text">updating…</span>
               )}
             </div>
           </div>
@@ -724,7 +724,7 @@ export default function BookingModalEnhanced({
             <button
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
+              className="px-4 py-2 text-muted-foreground hover:text-foreground border border-border-strong rounded-lg hover:bg-muted dark:hover:bg-surface-hover transition-colors focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
             >
               Cancel
             </button>
@@ -732,10 +732,10 @@ export default function BookingModalEnhanced({
             <button
               onClick={handleSubmit}
               disabled={proceedBlocked}
-              className={`flex items-center px-6 py-3 text-white font-bold rounded-lg transition-all transform focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+              className={`flex items-center px-6 py-3 text-primary-foreground font-bold rounded-lg transition-all transform focus:outline-none focus:ring-2 focus:ring-ring ${
                 proceedBlocked && !isSubmitting
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-orange-500 hover:bg-orange-600 hover:scale-105"
+                  ? "bg-surface-hover cursor-not-allowed"
+                  : "bg-primary hover:bg-primary-hover hover:scale-105"
               } ${isSubmitting ? "opacity-75 cursor-not-allowed" : ""}`}
             >
               {isSubmitting ? (

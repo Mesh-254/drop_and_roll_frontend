@@ -149,7 +149,7 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+        className="fixed inset-0 bg-overlay backdrop-blur-sm z-50"
       />
 
       {/* Modal container */}
@@ -160,14 +160,14 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
         className="fixed inset-0 flex items-center justify-center z-50 p-4"
       >
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="bg-card dark:bg-surface rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
           {/* Header — sticky */}
-          <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-between items-center">
+          <div className="sticky top-0 bg-card dark:bg-surface border-b border-border px-6 py-4 flex justify-between items-center">
             <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              <h2 className="text-xl font-bold text-foreground">
                 Set Up Your Business Profile
               </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-muted-foreground">
                 Step {step} of 3
               </p>
             </div>
@@ -175,7 +175,7 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
             <button
               onClick={onClose}
               disabled={loading}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-50"
+              className="p-2 hover:bg-muted dark:hover:bg-surface-hover rounded-lg transition text-muted-foreground hover:text-foreground disabled:opacity-50"
             >
               <X className="w-5 h-5" />
             </button>
@@ -194,8 +194,8 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
                   className="space-y-6"
                 >
                   <div>
-                    <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                      Company Name <span className="text-red-500">*</span>
+                    <label className="block text-sm font-semibold text-foreground mb-2">
+                      Company Name <span className="text-destructive">*</span>
                     </label>
                     <input
                       type="text"
@@ -203,14 +203,14 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
                       value={formData.company_name}
                       onChange={handleChange}
                       placeholder="e.g., Acme Logistics Ltd"
-                      className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                      className="w-full px-4 py-2.5 border border-border-strong rounded-lg bg-card dark:bg-surface-hover text-foreground placeholder-subtle-foreground focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
                     />
                   </div>
 
                   {/* Registration Number & VAT Number in grid */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                      <label className="block text-sm font-semibold text-foreground mb-2">
                         Registration Number
                       </label>
                       <input
@@ -219,12 +219,12 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
                         value={formData.company_reg_number}
                         onChange={handleChange}
                         placeholder="e.g., 12345678"
-                        className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                        className="w-full px-4 py-2.5 border border-border-strong rounded-lg bg-card dark:bg-surface-hover text-foreground placeholder-subtle-foreground focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                      <label className="block text-sm font-semibold text-foreground mb-2">
                         VAT Number
                       </label>
                       <input
@@ -233,14 +233,14 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
                         value={formData.vat_number}
                         onChange={handleChange}
                         placeholder="e.g., GB123456789"
-                        className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                        className="w-full px-4 py-2.5 border border-border-strong rounded-lg bg-card dark:bg-surface-hover text-foreground placeholder-subtle-foreground focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
                       />
                     </div>
                   </div>
 
                   {/* Business Address */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                    <label className="block text-sm font-semibold text-foreground mb-2">
                       Business Address
                     </label>
                     <textarea
@@ -249,7 +249,7 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
                       onChange={handleChange}
                       placeholder="Full business address"
                       rows={3}
-                      className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none transition-all"
+                      className="w-full px-4 py-2.5 border border-border-strong rounded-lg bg-card dark:bg-surface-hover text-foreground placeholder-subtle-foreground focus:ring-2 focus:ring-ring focus:border-transparent resize-none transition-all"
                     />
                   </div>
                 </motion.div>
@@ -265,8 +265,8 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
                   className="space-y-6"
                 >
                   <div>
-                    <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                      Contact Person Name <span className="text-red-500">*</span>
+                    <label className="block text-sm font-semibold text-foreground mb-2">
+                      Contact Person Name <span className="text-destructive">*</span>
                     </label>
                     <input
                       type="text"
@@ -274,13 +274,13 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
                       value={formData.contact_person}
                       onChange={handleChange}
                       placeholder="Full name"
-                      className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                      className="w-full px-4 py-2.5 border border-border-strong rounded-lg bg-card dark:bg-surface-hover text-foreground placeholder-subtle-foreground focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                      Email Address <span className="text-red-500">*</span>
+                    <label className="block text-sm font-semibold text-foreground mb-2">
+                      Email Address <span className="text-destructive">*</span>
                     </label>
                     <input
                       type="email"
@@ -288,12 +288,12 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
                       value={formData.contact_email}
                       onChange={handleChange}
                       placeholder="contact@company.com"
-                      className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                      className="w-full px-4 py-2.5 border border-border-strong rounded-lg bg-card dark:bg-surface-hover text-foreground placeholder-subtle-foreground focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                    <label className="block text-sm font-semibold text-foreground mb-2">
                       Phone Number
                     </label>
                     <input
@@ -302,7 +302,7 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
                       value={formData.contact_phone}
                       onChange={handleChange}
                       placeholder="+44 (0)20 7946 0958"
-                      className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                      className="w-full px-4 py-2.5 border border-border-strong rounded-lg bg-card dark:bg-surface-hover text-foreground placeholder-subtle-foreground focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
                     />
                   </div>
                 </motion.div>
@@ -318,8 +318,8 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
                   className="space-y-6"
                 >
                   {/* Info banner */}
-                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900/50 rounded-lg">
-                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                  <div className="p-4 bg-info-surface border border-info/30 rounded-lg">
+                    <p className="text-sm text-info">
                       <strong>NET Terms</strong> allows you to pay by invoice (7, 30, or 60 days) instead of paying upfront after each upload. Until your request is approved, your account operates prepaid.
                     </p>
                   </div>
@@ -332,9 +332,9 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
                         name="net_terms_requested"
                         checked={formData.net_terms_requested}
                         onChange={handleChange}
-                        className="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-orange-500 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-orange-500/50 transition-all"
+                        className="w-5 h-5 rounded border-border-strong text-brand-text bg-card dark:bg-surface-hover focus:ring-2 focus:ring-ring/50 transition-all"
                       />
-                      <span className="text-gray-900 dark:text-white font-medium">
+                      <span className="text-foreground font-medium">
                         I would like to request NET payment terms
                       </span>
                     </label>
@@ -347,21 +347,21 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
                     >
-                      <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                      <label className="block text-sm font-semibold text-foreground mb-2">
                         Package
                       </label>
                       <select
                         name="requested_package"
                         value={formData.requested_package}
                         onChange={handleChange}
-                        className="w-full mb-4 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                        className="w-full mb-4 px-4 py-2.5 border border-border-strong rounded-lg bg-card dark:bg-surface-hover text-foreground focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
                       >
                         <option value="starter">Starter — £5,000 credit / NET 7</option>
                         <option value="pro">Pro — £25,000 credit / NET 30</option>
                         <option value="enterprise">Enterprise — £100,000 credit / NET 60</option>
                       </select>
-                      <label className="block text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                        Please explain your NET terms requirement <span className="text-red-500">*</span>
+                      <label className="block text-sm font-semibold text-foreground mb-2">
+                        Please explain your NET terms requirement <span className="text-destructive">*</span>
                       </label>
                       <textarea
                         name="net_terms_justification"
@@ -369,14 +369,14 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
                         onChange={handleChange}
                         placeholder="E.g., We handle large volume shipments and need flexible payment terms..."
                         rows={4}
-                        className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none transition-all"
+                        className="w-full px-4 py-2.5 border border-border-strong rounded-lg bg-card dark:bg-surface-hover text-foreground placeholder-subtle-foreground focus:ring-2 focus:ring-ring focus:border-transparent resize-none transition-all"
                       />
                     </motion.div>
                   )}
 
                   {/* Approval notice */}
-                  <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900/50 rounded-lg">
-                    <p className="text-sm text-green-700 dark:text-green-300">
+                  <div className="p-4 bg-success-surface border border-success/30 rounded-lg">
+                    <p className="text-sm text-success">
                       ✅ Your profile will be submitted for admin approval. You&apos;ll receive an email once approved.
                     </p>
                   </div>
@@ -389,16 +389,16 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 rounded-lg p-4 flex gap-3"
+                className="mt-6 bg-destructive-surface border border-destructive/30 rounded-lg p-4 flex gap-3"
               >
-                <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+                <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-destructive">{error}</p>
               </motion.div>
             )}
           </div>
 
           {/* Footer with navigation buttons */}
-          <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-4 bg-gray-50 dark:bg-gray-900 flex justify-between gap-4">
+          <div className="border-t border-border px-6 py-4 bg-muted dark:bg-card flex justify-between gap-4">
             {/* Back button */}
             <motion.button
               onClick={handlePrevStep}
@@ -407,8 +407,8 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
               whileTap={step > 1 && !loading ? { scale: 0.95 } : {}}
               className={`px-6 py-2.5 rounded-lg font-medium transition ${
                 step === 1 || loading
-                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-500 cursor-not-allowed'
-                  : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'
+                  ? 'bg-surface-hover text-subtle-foreground cursor-not-allowed'
+                  : 'bg-surface-hover text-foreground hover:bg-surface-hover'
               }`}
             >
               Back
@@ -421,7 +421,7 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
                 disabled={loading}
                 whileHover={!loading ? { scale: 1.05 } : {}}
                 whileTap={!loading ? { scale: 0.95 } : {}}
-                className="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-primary-foreground rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                 Next
@@ -432,7 +432,7 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
                 disabled={loading}
                 whileHover={!loading ? { scale: 1.05 } : {}}
                 whileTap={!loading ? { scale: 0.95 } : {}}
-                className="px-6 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-6 py-2.5 bg-success hover:bg-success text-success-foreground rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                 {loading ? 'Creating Profile...' : 'Create Profile'}
