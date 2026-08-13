@@ -206,7 +206,7 @@ export default function Header() {
           </div>
 
           {isMobileMenuOpen && (
-            <div className="md:hidden bg-black/95 backdrop-blur-md border-t border-primary/20 transition-all duration-300">
+            <div className="md:hidden bg-background/95 backdrop-blur-md border-t border-primary/20 transition-all duration-300">
               <div className="px-2 pt-2 pb-3 space-y-1">
                 {navItems.map((item) => (
                   <NavLink

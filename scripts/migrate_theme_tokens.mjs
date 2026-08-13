@@ -347,7 +347,16 @@ export const ALLOW_LIST = [
   "from-purple-500",
   "to-purple-500/5",
   "to-pink-500",
+  "hover:bg-purple-600",
 ];
+
+// NOTE ON WHY THE DECORATIVE GRADIENT STOPS ARE NOT LISTED HERE.
+// `from-orange-500` and `to-red-500` are decorative on a service card and
+// load-bearing in the brand gradient — being decorative is a property of the
+// whole class STRING (two different hues in it), not of any one class. Adding
+// them to this list stopped the brand gradient mapping anywhere, and three tests
+// caught it. They are exempted structurally instead, by isDecorativeGradient, and
+// reported in the `exempt` bucket rather than as unmapped.
 
 /** Colour utilities we know about, for deciding what counts as "unmapped". */
 const COLOUR_CLASS_RE =
@@ -390,7 +399,9 @@ function rebuild({ variants, base, opacity }) {
 export function migrateClassString(value, context = {}) {
   const onColor = context.onColor ?? ON_COLOR_BACKGROUND_RE.test(value);
   const onBrandLiteral = BRAND_LITERAL_BACKGROUND_RE.test(value);
+  const decorativeGradient = isDecorativeGradient(value);
   const unmapped = [];
+  const exempt = [];
   let changed = 0;
 
   // Split on whitespace but KEEP it, so the output diff is minimal.
@@ -410,6 +421,13 @@ export function migrateClassString(value, context = {}) {
         return rebuild({ variants, base: "bg-overlay", opacity: "" });
       }
       unmapped.push(piece);
+      return piece;
+    }
+
+    // A stop in a multi-hue decorative gradient: the hues are the design, so
+    // they stay literal rather than being flattened through the role table.
+    if (decorativeGradient && /^(?:from|via|to)-/.test(base)) {
+      exempt.push(piece);
       return piece;
     }
 
@@ -446,7 +464,12 @@ export function migrateClassString(value, context = {}) {
     return piece;
   });
 
-  return { value: collapseRedundantDarkVariants(out.join("")), changed, unmapped };
+  return {
+    value: collapseRedundantDarkVariants(out.join("")),
+    changed,
+    unmapped,
+    exempt,
+  };
 }
 
 /**
@@ -498,6 +521,30 @@ const HYPHENLESS_UTILITIES = new Set([
 ]);
 
 /**
+ * Is this a DECORATIVE multi-hue gradient rather than the brand gradient?
+ *
+ * The test is whether the gradient's stops come from different colour families.
+ * `from-orange-500 to-orange-600` is the brand gradient and should become
+ * from-primary/to-primary-hover. `from-blue-500 to-cyan-500` is an illustration
+ * on a marketing card: the two hues ARE the design, and mapping both through the
+ * role table collapsed it to `from-info to-info` — a flat fill. It also asserted
+ * something false, that a blue-cyan service card means "info".
+ *
+ * Found by reviewing the diff: three of the four service-card gradients in
+ * Services.jsx had flattened, and the fourth survived only because purple and
+ * pink happen to be allow-listed.
+ */
+function isDecorativeGradient(value) {
+  const families = new Set();
+  for (const m of value.matchAll(
+    /(?:^|\s)(?:[\w-]+:)*(?:from|via|to)-([a-z]+)-\d{2,3}(?:\/\d{1,3})?(?=\s|$)/g,
+  )) {
+    families.add(m[1]);
+  }
+  return families.size > 1;
+}
+
+/**
  * Does this string look like a class list rather than prose?
  *
  * This gate is what makes it safe to run the migration over EVERY string literal
@@ -534,11 +581,13 @@ function looksLikeClassList(text) {
 export function migrateSource(source) {
   let changed = 0;
   const unmapped = [];
+  const exempt = [];
 
   const apply = (text, context) => {
     const result = migrateClassString(text, context);
     changed += result.changed;
     unmapped.push(...result.unmapped);
+    exempt.push(...result.exempt);
     return result.value;
   };
 
@@ -589,7 +638,7 @@ export function migrateSource(source) {
     return `${quote}${apply(body)}${quote}`;
   });
 
-  return { source: out, changed, unmapped };
+  return { source: out, changed, unmapped, exempt };
 }
 
 // ── CLI ─────────────────────────────────────────────────────────────────────
@@ -612,11 +661,13 @@ export function run({ paths, write }) {
 
   let totalChanged = 0;
   const allUnmapped = [];
+  let totalExempt = 0;
   let touched = 0;
 
   for (const file of files) {
     const before = readFileSync(file, "utf8");
-    const { source, changed, unmapped } = migrateSource(before);
+    const { source, changed, unmapped, exempt } = migrateSource(before);
+    totalExempt += exempt.length;
     if (changed > 0) {
       touched += 1;
       totalChanged += changed;
@@ -629,7 +680,12 @@ export function run({ paths, write }) {
     }
   }
 
-  return { files: touched, changed: totalChanged, unmapped: allUnmapped };
+  return {
+    files: touched,
+    changed: totalChanged,
+    unmapped: allUnmapped,
+    exempt: totalExempt,
+  };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
@@ -643,7 +699,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   const result = run({ paths, write });
   console.log(
-    `${write ? "REWROTE" : "DRY RUN"}  files: ${result.files}  classes: ${result.changed}`,
+    `${write ? "REWROTE" : "DRY RUN"}  files: ${result.files}  classes: ${result.changed}` +
+      (result.exempt ? `  (${result.exempt} decorative-gradient stops left literal)` : ""),
   );
 
   if (result.unmapped.length) {

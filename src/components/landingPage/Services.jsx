@@ -20,8 +20,8 @@ const services = [
     ],
     price: "£12.99",
     color: "from-orange-500 to-red-500",
-    bgColor: "bg-orange-50 dark:bg-orange-900/10",
-    borderColor: "border-orange-300 dark:border-orange-700",
+    bgColor: "bg-brand-surface",
+    borderColor: "border-primary/30",
   },
   {
     id: 2,
@@ -37,8 +37,8 @@ const services = [
     ],
     price: "£6.99",
     color: "from-blue-500 to-cyan-500",
-    bgColor: "bg-blue-50 dark:bg-blue-900/10",
-    borderColor: "border-blue-300 dark:border-blue-700",
+    bgColor: "bg-info-surface",
+    borderColor: "border-info/30",
   },
   {
     id: 3,
@@ -71,8 +71,8 @@ const services = [
     ],
     price: "£14.99",
     color: "from-green-500 to-emerald-500",
-    bgColor: "bg-green-50 dark:bg-green-900/10",
-    borderColor: "border-green-300 dark:border-green-700",
+    bgColor: "bg-success-surface",
+    borderColor: "border-success/30",
   },
 ];
 

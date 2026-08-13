@@ -286,3 +286,37 @@ describe("migrateSource: class lists outside className", () => {
     expect(migrateSource(src).source).toBe(src);
   });
 });
+
+describe("decorative gradients", () => {
+  // REGRESSION. from-blue-500 to-cyan-500 became "from-info to-info": a flat
+  // fill, and a false claim that a blue-cyan service card means "info".
+  it("leaves a multi-hue decorative gradient literal", () => {
+    const result = migrateClassString("from-blue-500 to-cyan-500");
+    expect(result.value).toBe("from-blue-500 to-cyan-500");
+    // `exempt`, not `unmapped`: these are deliberately literal by a structural
+    // rule, not a gap in the table waiting for a human. The audit ignores exempt
+    // and fails on unmapped, so the distinction is what keeps it at zero.
+    expect(result.exempt).toEqual(
+      expect.arrayContaining(["from-blue-500", "to-cyan-500"]),
+    );
+    expect(result.unmapped).toEqual([]);
+  });
+
+  it("leaves an orange-to-red decorative gradient literal", () => {
+    expect(migrateClassString("from-orange-500 to-red-500").value).toBe(
+      "from-orange-500 to-red-500",
+    );
+  });
+
+  it("still maps the single-family brand gradient", () => {
+    expect(
+      migrateClassString("bg-gradient-to-r from-orange-500 to-orange-600").value,
+    ).toBe("bg-gradient-to-r from-primary to-primary-hover");
+  });
+
+  it("still maps a single-family neutral gradient", () => {
+    expect(migrateClassString("from-gray-900 via-gray-900 to-black").value).toBe(
+      "from-card via-card to-background",
+    );
+  });
+});
