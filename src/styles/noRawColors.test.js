@@ -1,3 +1,4 @@
+/* global __dirname */
 /**
  * The theme audit, as a gate test.
  *

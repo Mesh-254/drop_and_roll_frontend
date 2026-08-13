@@ -1,3 +1,4 @@
+/* global __dirname */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { LIGHT_TOKENS, DARK_TOKENS } from "./tokens";
