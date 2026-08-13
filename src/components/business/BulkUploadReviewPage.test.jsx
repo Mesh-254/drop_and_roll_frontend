@@ -521,3 +521,23 @@ test("there is no corrections entry point on this screen", async () => {
   expect(screen.queryByRole("button", { name: /corrections/i })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /fix and re-upload/i })).not.toBeInTheDocument();
 });
+
+// ── layout under the fixed header ────────────────────────────────────────────
+
+describe("layout under the fixed header", () => {
+  it("gives the standalone page enough top padding to clear the 80px header", async () => {
+    const { container } = setup();
+    await screen.findByRole("heading", { name: /march week 2/i });
+    const root = container.firstChild;
+    expect(root.className).toMatch(/\bpt-24\b/);
+  });
+
+  it("does not add page padding when embedded", async () => {
+    BulkUploadApi.getUpload.mockResolvedValue({ ...UPLOAD, id: "abc" });
+    const { container } = render(
+      <BulkUploadReviewPage uploadId="abc" embedded surface="dark" />
+    );
+    await screen.findByRole("heading", { name: /march week 2/i });
+    expect(container.firstChild.className).not.toMatch(/\bpt-24\b/);
+  });
+});

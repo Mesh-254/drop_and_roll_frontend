@@ -320,7 +320,12 @@ export default function BulkUploadReviewPage({
   return (
     <div
       className={
-        embedded ? "space-y-6" : "max-w-3xl mx-auto p-4 sm:p-6 space-y-6"
+        embedded
+          ? "space-y-6"
+          : // The site Header is `fixed top-0` at h-20 (80px), so a page whose
+            // title sits at the very top renders behind it. pt-24 matches the
+            // pattern InvoiceDetailPage already established for this case.
+            "max-w-3xl mx-auto px-4 sm:px-6 pt-24 pb-10 space-y-6"
       }
     >
       <header className="space-y-4">
