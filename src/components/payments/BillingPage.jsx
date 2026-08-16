@@ -89,10 +89,10 @@ function InvoiceRow({ invoice, onPay, onDownload, onView }) {
       className="group bg-surface border border-border hover:border-border rounded-xl p-5 transition-all duration-150 cursor-pointer"
       onClick={() => onView(invoice.id)}
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         {/* Left: invoice info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 mb-1">
+          <div className="flex flex-wrap items-center gap-3 mb-1">
             <span className="font-mono text-base font-bold text-foreground">
               {invoice.invoice_number}
             </span>
@@ -123,7 +123,7 @@ function InvoiceRow({ invoice, onPay, onDownload, onView }) {
         </div>
 
         {/* Right: amounts + actions */}
-        <div className="flex items-center gap-4 shrink-0">
+        <div className="flex items-center justify-between gap-4 shrink-0">
           <div className="text-right">
             <div className="text-lg font-bold text-foreground">
               {invoice.currency} {parseFloat(invoice.amount).toFixed(2)}
@@ -302,7 +302,7 @@ export default function BillingPage() {
         {/* Stats row — server-computed over the whole ledger, so these do not
             move when the active tab or page changes. */}
         {!loading && (
-          <div className="grid grid-cols-3 gap-4 mb-8" data-testid="billing-summary">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8" data-testid="billing-summary">
             <div className="bg-surface border border-border rounded-xl p-4">
               <p className="text-xs text-subtle-foreground uppercase tracking-wider mb-1">
                 Total Invoiced

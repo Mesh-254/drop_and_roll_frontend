@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { bookingApi } from "../../api/BookingApi";
+import TrackParcelModal from "../track/TrackParcelModal";
 import dayjs from "dayjs";
 
 // MODERN DESIGN UPGRADE: Premium dark-mode booking history with tabs, cards, filters
@@ -39,6 +40,13 @@ export default function BookingHistory() {
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [isDownloadingInvoice, setIsDownloadingInvoice] = useState(false);
+  // Inline "Copied!" feedback for the tracking number field in the Booking
+  // Details modal, replacing the old alert() popup.
+  const [trackingCopied, setTrackingCopied] = useState(false);
+  // "Track Now" opens the shared tracking modal prefilled with this booking's
+  // tracking number, instead of the old dead /tracking?track= link.
+  const [showTrackModal, setShowTrackModal] = useState(false);
+  const [trackNumberToShow, setTrackNumberToShow] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [filters, setFilters] = useState({
     dateFrom: "",
@@ -464,7 +472,7 @@ export default function BookingHistory() {
                               <div className="flex items-center gap-2">
                                 <Clock size={16} />
                                 <span>
-                                  {dayjs(booking.scheduled_pickup_at).format(
+                                  {dayjs(booking.created_at).format(
                                     "MMM D, YYYY h:mm A"
                                   )}
                                 </span>
@@ -486,6 +494,7 @@ export default function BookingHistory() {
                               onClick={() => {
                                 setSelectedBooking(booking);
                                 setShowDetailsModal(true);
+                                setTrackingCopied(false);
                               }}
                               className="flex-1 sm:flex-none bg-primary hover:bg-primary-hover text-primary-foreground px-6 py-2 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
                             >
@@ -588,17 +597,31 @@ export default function BookingHistory() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowDetailsModal(false)}
-              className="fixed inset-0 bg-overlay z-50 flex items-center justify-center p-4"
+              // Mobile fix: the overlay itself must scroll. `100vh` on mobile
+              // browsers doesn't match the real visible viewport (address
+              // bar/toolbar), so a purely `items-center` overlay with no
+              // scroll of its own can clip the modal above/below the visible
+              // screen with no way to reach the rest of it.
+              className="fixed inset-0 bg-overlay z-50 overflow-y-auto"
             >
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                onClick={(e) => e.stopPropagation()}
-                className="bg-gradient-to-br from-card to-background border-2 border-primary/30 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-              >
+              <div className="min-h-full flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  onClick={(e) => e.stopPropagation()}
+                  // max-h-[85dvh] (dynamic viewport height) overrides the vh
+                  // value on browsers that support it, keeping the modal
+                  // within the real visible area on mobile. min-w-0 is
+                  // required because this is a flex item: flex items default
+                  // to min-width:auto, so without it the card refuses to
+                  // shrink below its content's natural width and gets pushed
+                  // off-screen on narrow phones instead of respecting
+                  // max-w-2xl/w-full.
+                  className="bg-gradient-to-br from-card to-background border-2 border-primary/30 rounded-2xl max-w-2xl w-full min-w-0 my-8 max-h-[85vh] max-h-[85dvh] overflow-y-auto overflow-x-hidden"
+                >
                 {/* Modal Header */}
-                <div className="sticky top-0 bg-gradient-to-r from-card to-background border-b border-border px-6 py-6 flex items-center justify-between">
+                <div className="sticky top-0 bg-gradient-to-r from-card to-background border-b border-border px-4 py-4 sm:px-6 sm:py-6 flex items-center justify-between">
                   <div>
                     <h2 className="text-2xl font-bold text-foreground">
                       Booking #{selectedBooking.id.slice(0, 8)}
@@ -620,7 +643,7 @@ export default function BookingHistory() {
                 </div>
 
                 {/* Modal Content */}
-                <div className="p-6 space-y-6">
+                <div className="p-4 sm:p-6 space-y-6">
                   {/* Status */}
                   <div className="flex items-center gap-3">
                     <h3 className="text-muted-foreground text-sm uppercase tracking-wider">Status</h3>
@@ -642,8 +665,8 @@ export default function BookingHistory() {
                       <p className="text-muted-foreground text-sm uppercase tracking-wider mb-2">
                         Tracking Number
                       </p>
-                      <div className="flex items-center justify-between">
-                        <p className="text-lg font-bold text-foreground font-mono">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-lg font-bold text-foreground font-mono break-all">
                           {selectedBooking.tracking_number}
                         </p>
                         <button
@@ -651,11 +674,16 @@ export default function BookingHistory() {
                             navigator.clipboard.writeText(
                               selectedBooking.tracking_number
                             );
-                            alert("Tracking number copied!");
+                            setTrackingCopied(true);
+                            setTimeout(() => setTrackingCopied(false), 2000);
                           }}
-                          className="text-brand-text hover:text-brand-text text-sm font-bold"
+                          className={`text-sm font-bold transition-colors ${
+                            trackingCopied
+                              ? "text-success"
+                              : "text-brand-text hover:text-brand-text"
+                          }`}
                         >
-                          Copy
+                          {trackingCopied ? "Copied!" : "Copy"}
                         </button>
                       </div>
                     </div>
@@ -700,19 +728,8 @@ export default function BookingHistory() {
                     </div>
                   </div>
 
-                  {/* Dates and Price */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-surface/30 border border-border/30 rounded-lg p-4">
-                      <p className="text-muted-foreground text-xs uppercase tracking-wider mb-2">
-                        Scheduled Pickup
-                      </p>
-                      <p className="text-foreground font-semibold">
-                        {dayjs(selectedBooking.scheduled_pickup_at).format(
-                          "MMM D, h:mm A"
-                        )}
-                      </p>
-                    </div>
-
+                  {/* Price and Distance */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="bg-surface/30 border border-border/30 rounded-lg p-4">
                       <p className="text-muted-foreground text-xs uppercase tracking-wider mb-2">
                         Price
@@ -727,7 +744,9 @@ export default function BookingHistory() {
                         Distance
                       </p>
                       <p className="text-foreground font-semibold">
-                        {selectedBooking.distance_km?.toFixed(1) || "—"} km
+                        {selectedBooking.quote?.distance_km != null
+                          ? `${Number(selectedBooking.quote.distance_km).toFixed(1)} km`
+                          : "—"}
                       </p>
                     </div>
                   </div>
@@ -769,8 +788,8 @@ export default function BookingHistory() {
                         whileTap={{ scale: 0.95 }}
                         onClick={() => {
                           setShowDetailsModal(false);
-                          // TODO: Open track modal with tracking number
-                          navigate(`/tracking?track=${selectedBooking.tracking_number}`);
+                          setTrackNumberToShow(selectedBooking.tracking_number);
+                          setShowTrackModal(true);
                         }}
                         className="flex-1 px-4 py-3 border-2 border-primary/30 text-brand-text font-bold rounded-lg hover:border-primary/60 transition-all"
                       >
@@ -779,10 +798,17 @@ export default function BookingHistory() {
                     )}
                   </div>
                 </div>
-              </motion.div>
+                </motion.div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
+
+        <TrackParcelModal
+          isOpen={showTrackModal}
+          onClose={() => setShowTrackModal(false)}
+          initialTrackingNumber={trackNumberToShow}
+        />
       </div>
     </div>
   );

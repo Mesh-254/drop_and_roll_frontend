@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { bookingApi } from "../../api/BookingApi"; // ← make sure this is imported
+import TrackParcelModal from "../track/TrackParcelModal";
 import {
   User,
   Package,
@@ -31,6 +32,9 @@ export default function ProfileDropdown() {
   const dropdownRef = useRef(null);
   const [bookingsCount, setBookingsCount] = useState(0);
   const [memberSince, setMemberSince] = useState("—");
+  // "Track Delivery" used to navigate("/"), which isn't tracking anything —
+  // it now opens the same tracking modal used elsewhere in the app.
+  const [showTrackModal, setShowTrackModal] = useState(false);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -99,7 +103,7 @@ export default function ProfileDropdown() {
       label: "My Bookings",
       submenu: [
         { label: "Booking History", icon: FileText, action: () => navigate("/history") },
-        { label: "Track Delivery", icon: MapPin, action: () => navigate("/") },
+        { label: "Track Delivery", icon: MapPin, action: () => setShowTrackModal(true) },
         { label: "Billing & Invoices", icon: Receipt, action: () => navigate("/billing") },
       ],
     },
@@ -305,6 +309,11 @@ export default function ProfileDropdown() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <TrackParcelModal
+        isOpen={showTrackModal}
+        onClose={() => setShowTrackModal(false)}
+      />
     </div>
   );
 }

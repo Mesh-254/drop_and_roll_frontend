@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -18,26 +19,45 @@ import {
 import { bookingApi } from "../../api/BookingApi";
 
 // MODERN DESIGN UPGRADE: Premium dark-mode tracking experience with animated status badges
-export default function TrackParcelModal({ isOpen, onClose }) {
-  const [trackingNumber, setTrackingNumber] = useState("");
+export default function TrackParcelModal({ isOpen, onClose, initialTrackingNumber = "" }) {
+  const [trackingNumber, setTrackingNumber] = useState(initialTrackingNumber);
   const [trackingData, setTrackingData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  // Tracks whether a lookup has actually been attempted, as distinct from the
+  // input simply having text in it. Without this, the "not found" state below
+  // was keying off `trackingNumber` being non-empty, so it appeared the moment
+  // any value (including a freshly pasted one) landed in the box, before the
+  // API was ever called.
+  const [hasSearched, setHasSearched] = useState(false);
+  const inputRef = useRef(null);
 
-  const handleTrack = async (e) => {
-    e.preventDefault();
-    if (!trackingNumber.trim()) {
+  const handleTrack = async (e, numberOverride) => {
+    e?.preventDefault();
+    // Fall back to the input's live DOM value: some paste flows (autofill
+    // suggestion bars, certain extensions) set the field's value without
+    // firing the input/change event React listens to, leaving `trackingNumber`
+    // stuck at "" even though the box visibly shows the pasted number.
+    const stateValue = (numberOverride ?? trackingNumber ?? "").trim();
+    const domValue = (inputRef.current?.value ?? "").trim();
+    const numberToTrack = stateValue || domValue;
+    if (!numberToTrack) {
       setError("Please enter a tracking number");
       return;
+    }
+    // Keep state in sync if we had to recover the value from the DOM.
+    if (!stateValue && domValue) {
+      setTrackingNumber(domValue);
     }
 
     setLoading(true);
     setError("");
     setTrackingData(null);
+    setHasSearched(true);
 
     try {
-      const result = await bookingApi.trackBooking(trackingNumber);
+      const result = await bookingApi.trackBooking(numberToTrack);
       if (!result.success) {
         throw new Error(result.message || "Tracking failed");
       }
@@ -61,6 +81,17 @@ export default function TrackParcelModal({ isOpen, onClose }) {
       setLoading(false);
     }
   };
+
+  // When opened with a tracking number already known (e.g. from a booking's
+  // "Track Now" button), prefill it and search immediately instead of making
+  // the user retype it.
+  useEffect(() => {
+    if (isOpen && initialTrackingNumber) {
+      setTrackingNumber(initialTrackingNumber);
+      handleTrack(null, initialTrackingNumber);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialTrackingNumber]);
 
   const getStatusIcon = (status, completed) => {
     if (completed) {
@@ -123,18 +154,35 @@ export default function TrackParcelModal({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  return (
+  // Rendered via portal so a blurred/transformed ancestor (e.g. the site
+  // header once it's in its "solid" scrolled state, which applies
+  // backdrop-blur) can't hijack this modal's `fixed` positioning and squash
+  // it into a small embedded box instead of a full-screen overlay.
+  return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 bg-overlay backdrop-blur-md z-50 flex items-center justify-center p-4">
+      {/* Mobile fix: the overlay itself must scroll. `100vh` on mobile
+          browsers doesn't match the real visible viewport (address
+          bar/toolbar), so a purely `items-center` overlay with no scroll of
+          its own can clip the modal above/below the visible screen with no
+          way to reach the rest of it. */}
+      <div className="fixed inset-0 bg-overlay backdrop-blur-md z-50 overflow-y-auto">
+      <div className="min-h-full flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ duration: 0.3 }}
-          className="bg-gradient-to-br from-card via-background to-card border border-primary/20 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl shadow-primary/10"
+          // max-h-[85dvh] (dynamic viewport height) overrides the vh value
+          // on browsers that support it, keeping the modal within the real
+          // visible area on mobile. min-w-0 is required because this is a
+          // flex item: flex items default to min-width:auto, so without it
+          // the card refuses to shrink below its content's natural width
+          // and gets pushed off-screen on narrow phones instead of
+          // respecting max-w-4xl/w-full.
+          className="bg-gradient-to-br from-card via-background to-card border border-primary/20 rounded-3xl w-full max-w-4xl min-w-0 my-8 max-h-[85vh] max-h-[85dvh] overflow-y-auto overflow-x-hidden shadow-2xl shadow-primary/10"
         >
           {/* Header */}
-          <div className="sticky top-0 flex items-center justify-between p-6 sm:p-8 border-b border-border bg-gradient-to-r from-card to-background z-20">
+          <div className="sticky top-0 flex items-center justify-between p-4 sm:p-8 border-b border-border bg-gradient-to-r from-card to-background z-20">
             <h2 className="text-2xl font-bold text-foreground flex items-center gap-3">
               <motion.div
                 animate={{ rotate: 360 }}
@@ -155,16 +203,31 @@ export default function TrackParcelModal({ isOpen, onClose }) {
           </div>
 
           {/* Content */}
-          <div className="p-6 sm:p-8">
+          <div className="p-4 sm:p-8">
             {/* Tracking Form */}
             <form onSubmit={handleTrack} className="mb-8">
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="flex-1">
                   <input
+                    ref={inputRef}
                     type="text"
                     placeholder="Enter tracking number (e.g., BK-ABC123)"
                     value={trackingNumber}
-                    onChange={(e) => setTrackingNumber(e.target.value)}
+                    onChange={(e) => {
+                      setTrackingNumber(e.target.value);
+                      setHasSearched(false);
+                    }}
+                    onPaste={(e) => {
+                      // Explicitly read the clipboard instead of waiting on the
+                      // browser to fire a normal input event — some paste paths
+                      // (autofill bars, certain extensions) skip it.
+                      const pasted = e.clipboardData?.getData("text");
+                      if (pasted) {
+                        e.preventDefault();
+                        setTrackingNumber(pasted.trim());
+                        setHasSearched(false);
+                      }
+                    }}
                     className="w-full px-4 py-4 bg-card/50 border border-border hover:border-primary/30 rounded-xl text-foreground placeholder-subtle-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/20 transition-all duration-300"
                   />
                 </div>
@@ -229,8 +292,8 @@ export default function TrackParcelModal({ isOpen, onClose }) {
                       >
                         {getStatusIcon(trackingData.status, false)}
                       </motion.div>
-                      <h3 className="text-2xl font-bold text-foreground mb-3 flex items-center gap-3 justify-center">
-                        <span>Tracking #{trackingData.id}</span>
+                      <h3 className="text-2xl font-bold text-foreground mb-3 flex flex-wrap items-center gap-3 justify-center">
+                        <span className="break-all">Tracking #{trackingData.id}</span>
                         <motion.button
                           whileHover={{ scale: 1.1 }}
                           onClick={copyToClipboard}
@@ -412,7 +475,7 @@ export default function TrackParcelModal({ isOpen, onClose }) {
               )}
 
               {/* Empty State */}
-              {!trackingData && !loading && trackingNumber && (
+              {hasSearched && !trackingData && !loading && trackingNumber && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -445,6 +508,8 @@ export default function TrackParcelModal({ isOpen, onClose }) {
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
+      </div>
+    </AnimatePresence>,
+    document.body
   );
 }
