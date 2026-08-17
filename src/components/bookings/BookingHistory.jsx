@@ -74,6 +74,27 @@ export default function BookingHistory() {
     }
   }, [isAuthenticated]);
 
+  // Prevent body scroll and add ESC-to-close while the details modal is open
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") setShowDetailsModal(false);
+    };
+
+    if (showDetailsModal) {
+      // lock scroll
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      window.addEventListener("keydown", onKey);
+
+      return () => {
+        document.body.style.overflow = prevOverflow || "";
+        window.removeEventListener("keydown", onKey);
+      };
+    }
+
+    return () => {};
+  }, [showDetailsModal]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -597,33 +618,24 @@ export default function BookingHistory() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowDetailsModal(false)}
-              // Mobile fix: the overlay itself must scroll. `100vh` on mobile
-              // browsers doesn't match the real visible viewport (address
-              // bar/toolbar), so a purely `items-center` overlay with no
-              // scroll of its own can clip the modal above/below the visible
-              // screen with no way to reach the rest of it.
-              className="fixed inset-0 bg-overlay z-50 overflow-y-auto"
+              role="presentation"
+              aria-hidden={false}
+              className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-overlay p-2 sm:items-center sm:p-4 touch-action-manipulation"
             >
-              <div className="min-h-full flex items-center justify-center p-4">
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  onClick={(e) => e.stopPropagation()}
-                  // max-h-[85dvh] (dynamic viewport height) overrides the vh
-                  // value on browsers that support it, keeping the modal
-                  // within the real visible area on mobile. min-w-0 is
-                  // required because this is a flex item: flex items default
-                  // to min-width:auto, so without it the card refuses to
-                  // shrink below its content's natural width and gets pushed
-                  // off-screen on narrow phones instead of respecting
-                  // max-w-2xl/w-full.
-                  className="bg-gradient-to-br from-card to-background border-2 border-primary/30 rounded-2xl max-w-2xl w-full min-w-0 my-8 max-h-[85vh] max-h-[85dvh] overflow-y-auto overflow-x-hidden"
-                >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.18 }}
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                className="my-2 w-full max-w-full sm:max-w-2xl min-w-0 overflow-y-auto rounded-xl border-2 border-primary/30 bg-gradient-to-br from-card to-background shadow-2xl sm:my-4 sm:rounded-2xl max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)]"
+              >
                 {/* Modal Header */}
-                <div className="sticky top-0 bg-gradient-to-r from-card to-background border-b border-border px-4 py-4 sm:px-6 sm:py-6 flex items-center justify-between">
+                <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-border bg-gradient-to-r from-card to-background px-4 py-4 sm:items-center sm:px-6 sm:py-6">
                   <div>
-                    <h2 className="text-2xl font-bold text-foreground">
+                    <h2 className="text-lg font-bold text-foreground sm:text-2xl">
                       Booking #{selectedBooking.id.slice(0, 8)}
                     </h2>
                     <p className="text-sm text-muted-foreground mt-1">
@@ -633,17 +645,18 @@ export default function BookingHistory() {
                     </p>
                   </div>
                   <motion.button
-                    whileHover={{ scale: 1.1 }}
+                    whileHover={{ scale: 1.08 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setShowDetailsModal(false)}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Close details"
+                    className="text-muted-foreground hover:text-foreground transition-colors p-3 hover:bg-surface rounded-lg touch-action-manipulation"
                   >
                     <X size={24} />
                   </motion.button>
                 </div>
 
                 {/* Modal Content */}
-                <div className="p-4 sm:p-6 space-y-6">
+                <div className="space-y-5 p-4 sm:space-y-6 sm:p-6">
                   {/* Status */}
                   <div className="flex items-center gap-3">
                     <h3 className="text-muted-foreground text-sm uppercase tracking-wider">Status</h3>
@@ -798,8 +811,7 @@ export default function BookingHistory() {
                     )}
                   </div>
                 </div>
-                </motion.div>
-              </div>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>

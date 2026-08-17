@@ -93,6 +93,25 @@ export default function TrackParcelModal({ isOpen, onClose, initialTrackingNumbe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialTrackingNumber]);
 
+  // Lock body scroll and enable ESC-to-close while modal open
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+
+    if (isOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      window.addEventListener("keydown", onKey);
+
+      return () => {
+        document.body.style.overflow = prev || "";
+        window.removeEventListener("keydown", onKey);
+      };
+    }
+    return () => {};
+  }, [isOpen, onClose]);
+
   const getStatusIcon = (status, completed) => {
     if (completed) {
       return <CheckCircle className="text-success" size={24} />;
@@ -160,30 +179,24 @@ export default function TrackParcelModal({ isOpen, onClose, initialTrackingNumbe
   // it into a small embedded box instead of a full-screen overlay.
   return createPortal(
     <AnimatePresence>
-      {/* Mobile fix: the overlay itself must scroll. `100vh` on mobile
-          browsers doesn't match the real visible viewport (address
-          bar/toolbar), so a purely `items-center` overlay with no scroll of
-          its own can clip the modal above/below the visible screen with no
-          way to reach the rest of it. */}
-      <div className="fixed inset-0 bg-overlay backdrop-blur-md z-50 overflow-y-auto">
-      <div className="min-h-full flex items-center justify-center p-4">
+      <div
+        onClick={onClose}
+        role="presentation"
+        className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-overlay p-2 backdrop-blur-md sm:items-center sm:p-4 touch-action-manipulation"
+      >
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          transition={{ duration: 0.3 }}
-          // max-h-[85dvh] (dynamic viewport height) overrides the vh value
-          // on browsers that support it, keeping the modal within the real
-          // visible area on mobile. min-w-0 is required because this is a
-          // flex item: flex items default to min-width:auto, so without it
-          // the card refuses to shrink below its content's natural width
-          // and gets pushed off-screen on narrow phones instead of
-          // respecting max-w-4xl/w-full.
-          className="bg-gradient-to-br from-card via-background to-card border border-primary/20 rounded-3xl w-full max-w-4xl min-w-0 my-8 max-h-[85vh] max-h-[85dvh] overflow-y-auto overflow-x-hidden shadow-2xl shadow-primary/10"
+          transition={{ duration: 0.28 }}
+          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+          className="my-2 w-full max-w-full sm:max-w-4xl overflow-y-auto rounded-2xl border border-primary/20 bg-gradient-to-br from-card via-background to-card shadow-2xl shadow-primary/10 sm:my-4 sm:rounded-3xl max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)]"
         >
           {/* Header */}
-          <div className="sticky top-0 flex items-center justify-between p-4 sm:p-8 border-b border-border bg-gradient-to-r from-card to-background z-20">
-            <h2 className="text-2xl font-bold text-foreground flex items-center gap-3">
+          <div className="sticky top-0 z-20 flex items-start justify-between gap-3 border-b border-border bg-gradient-to-r from-card to-background p-4 sm:items-center sm:p-8">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-foreground sm:gap-3 sm:text-2xl">
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
@@ -193,10 +206,11 @@ export default function TrackParcelModal({ isOpen, onClose, initialTrackingNumbe
               Track Your Parcel
             </h2>
             <motion.button
-              whileHover={{ scale: 1.1 }}
+              whileHover={{ scale: 1.08 }}
               whileTap={{ scale: 0.95 }}
               onClick={onClose}
-              className="text-muted-foreground hover:text-foreground transition-colors p-2 hover:bg-surface rounded-lg"
+              aria-label="Close tracking modal"
+              className="text-muted-foreground hover:text-foreground transition-colors p-3 hover:bg-surface rounded-lg touch-action-manipulation"
             >
               <X size={24} />
             </motion.button>
@@ -407,7 +421,7 @@ export default function TrackParcelModal({ isOpen, onClose, initialTrackingNumbe
 
                             {/* Step Content */}
                             <div className="flex-1 py-2">
-                              <div className="flex items-center justify-between mb-2">
+                              <div className="mb-2 flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between">
                                 <h5
                                   className={`font-bold text-base ${
                                     event.completed
@@ -507,7 +521,6 @@ export default function TrackParcelModal({ isOpen, onClose, initialTrackingNumbe
             </AnimatePresence>
           </div>
         </motion.div>
-      </div>
       </div>
     </AnimatePresence>,
     document.body

@@ -49,6 +49,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { driverApi } from "../../api/driver-api";
+import { openDirections } from "../../lib/map-links";
 import { ProofOfDelivery } from "./proof-of-delivery";
 import { QRScannerModal } from "./QRScannerModal";
 import { FailureReportModal } from "./FailureReportModal";
@@ -261,8 +262,44 @@ function AddressBlock({
         )}
       </div>
 
+      {/* Postcode clickable in AddressBlock as well. */}
       <p className="text-xl font-extrabold tracking-tight text-foreground">
-        {postcode || "No postcode"}
+        {postcode ? (
+          <span
+            role="link"
+            tabIndex={0}
+            onClick={(e) => {
+              e.preventDefault();
+              try {
+                const lat = address?.latitude ?? address?.lat ?? address?.location?.lat ?? null;
+                const lng = address?.longitude ?? address?.lng ?? address?.location?.lng ?? null;
+                openDirections({ postcode, lat, lng, label: postcode });
+              } catch (err) {
+                const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(postcode)}`;
+                window.open(url, "_blank", "noopener,noreferrer");
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                  const lat = address?.latitude ?? address?.lat ?? address?.location?.lat ?? null;
+                  const lng = address?.longitude ?? address?.lng ?? address?.location?.lng ?? null;
+                  openDirections({ postcode, lat, lng, label: postcode });
+                } catch (err) {
+                  const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(postcode)}`;
+                  window.open(url, "_blank", "noopener,noreferrer");
+                }
+              }
+            }}
+            className="underline-offset-2 hover:underline cursor-pointer"
+          >
+            {postcode}
+          </span>
+        ) : (
+          "No postcode"
+        )}
       </p>
       <p className="text-sm text-muted-foreground mt-0.5 leading-snug">
         {rest || "Address unavailable"}

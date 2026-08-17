@@ -30,11 +30,13 @@ import { ActiveJobsOverviewCard } from "./active-jobs-overview-card";
 // import (and the render/fetch/state below) to restore. getEarnings() is left
 // intact in driver-api.js for that re-enablement.
 import { DeliveryStatusUpdates } from "./delivery-status-updates";
+import RouteOverviewMap from "./route-overview-map";
+import { buildRoutePoints } from "../../lib/route-points";
 import { JobDetailPage } from "./job-detail-page";
 import { OfflineStatusBar } from "./offline/OfflineStatusBar";
 import * as syncEngine from "../../offline/syncEngine";
 import driverApi from "../../api/driver-api";
-import { publishJobStatus } from "../../lib/driver-events";
+import { publishJobStatus, subscribeJobStatus } from "../../lib/driver-events";
 
 export default function DriverDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -64,6 +66,8 @@ export default function DriverDashboard() {
     failedJobs: 0,
     completionRate: 0,
   });
+  // Route overview points (array of {lat,lng,label,postcode}) for lightweight map
+  const [routePoints, setRoutePoints] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState(() => {
@@ -332,6 +336,34 @@ export default function DriverDashboard() {
     };
   }, [profile?.driver_profile]);
 
+  // Single source of truth for "remaining jobs" — same endpoint, same
+  // filtering, as the My Jobs list. Used on mount, on any job-status
+  // change, on reconnect, and by the 60s route poll below.
+  //
+  // The poll used to build map points from driverApi.getCurrentRoute()
+  // (`/live-tracking/current-route/`) instead. That endpoint is booking-level,
+  // not stop-level: for a same-day booking whose PICKUP leg is already done
+  // but whose DELIVERY leg is still open, the booking itself is still
+  // "in_transit" so it still passes that endpoint's status filter — and our
+  // point-extraction fell back to the booking's `pickup_address` (that
+  // endpoint has no `stop_address` to say which leg is actually open),
+  // silently resurrecting an already-completed pickup stop onto the map
+  // every time the poll ticked. getAssignedJobs()'s `ordered_bookings` is
+  // built per-STOP server-side (RouteStopService.driver_stops(), which drops
+  // a stop the moment it's closed) and is exactly what the My Jobs list
+  // renders, so routing everything through it keeps the map showing exactly
+  // — and only — the jobs currently listed, in the same order.
+  const refreshRemainingJobs = useCallback(async () => {
+    try {
+      const jbsResp = await driverApi.getAssignedJobs(1, 10, "all");
+      const jobsData = jbsResp.ordered_bookings || (Array.isArray(jbsResp) ? jbsResp : []);
+      setJobs(jobsData);
+      setRoutePoints(buildRoutePoints(jobsData));
+    } catch (err) {
+      console.warn("[DriverDashboard] Failed to refresh jobs:", err);
+    }
+  }, []);
+
   const stopRoutePoll = useCallback(() => {
     if (routePollIntervalRef.current) {
       clearInterval(routePollIntervalRef.current);
@@ -380,6 +412,11 @@ export default function DriverDashboard() {
             manualEnabled,
           });
 
+          // Refresh the map/job-list from the stop-level endpoint — see the
+          // comment on refreshRemainingJobs() for why this poll must not
+          // build points from `route`/`result.data.bookings` directly.
+          refreshRemainingJobs();
+
           if (hasActiveRoute && !currentlyTracking && !manualEnabled) {
             console.log(
               "[DriverDashboard] Auto-starting tracking due to active route",
@@ -408,6 +445,27 @@ export default function DriverDashboard() {
     // once on mount; the interval body always reads fresh state via the refs above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keep the job list / map in sync the moment a delivery is completed
+  // (or any other status change lands), instead of waiting up to 60s for
+  // the next route poll. See lib/driver-events.js: this is a notification,
+  // not a data channel, so we re-read the real endpoint rather than trying
+  // to patch the changed job in place.
+  useEffect(() => {
+    const unsubscribe = subscribeJobStatus(() => {
+      refreshRemainingJobs();
+    });
+    return unsubscribe;
+  }, [refreshRemainingJobs]);
+
+  // Coming back online can mean status changes happened server-side (or via
+  // this driver's own offline queue flushing — see offline/syncEngine.js)
+  // while this tab had no connection. Re-read the jobs list so the map
+  // doesn't sit showing a pre-offline snapshot until the next 60s poll.
+  useEffect(() => {
+    window.addEventListener("online", refreshRemainingJobs);
+    return () => window.removeEventListener("online", refreshRemainingJobs);
+  }, [refreshRemainingJobs]);
 
   const startTracking = async () => {
     if (isTracking) return;
@@ -549,6 +607,22 @@ export default function DriverDashboard() {
         jbsResp.ordered_bookings || (Array.isArray(jbsResp) ? jbsResp : []);
       setJobs(jobsData); // Set to array of jobs
 
+      // Build lightweight route points from the assigned jobs payload — this
+      // is the same "remaining jobs" list rendered in the My Jobs tab, run
+      // through the shared filter so completed/cancelled/failed stops never
+      // reach the map.
+      try {
+        const points = buildRoutePoints(jobsData);
+        // Always set (even for <2 points / empty): an empty or single-point
+        // result means "no remaining stops to show", and RouteOverviewMap
+        // already renders its own empty state for that case. Leaving stale
+        // points in place here was part of why a reload could show jobs
+        // that had since been completed.
+        setRoutePoints(points);
+      } catch (err) {
+        console.warn("[DriverDashboard] Could not extract route points from jobs:", err);
+      }
+
       // Earnings response handling removed — earnings feature disabled for now.
 
       // Handle ratings response
@@ -610,6 +684,10 @@ export default function DriverDashboard() {
     }
   }, [navigate]);
 
+  // Lightweight re-read of just the remaining-jobs list, used to keep the
+  // job list and the map in sync with a status change the driver (or the
+  // socket) just reported — without re-running the full fetchData() fan-out
+  // (profile/ratings/metrics/documents) for what is really a one-field change.
   // Add document upload handler
   const handleDocumentUpload = async (docType, event) => {
     const file = event.target.files[0];
@@ -710,15 +788,9 @@ export default function DriverDashboard() {
   };
 
   const renderMapTab = () => {
-    if (typeof window === "undefined" || !window.google) {
-      return (
-        <div className="bg-card border border-border rounded-lg p-6 h-96 flex items-center justify-center">
-          <p className="text-muted-foreground">
-            Google Maps not loaded. Check your API key in index.html
-          </p>
-        </div>
-      );
-    }
+    // Use a free Leaflet/OpenStreetMap overview for the driver map tab. When
+    // google is available the admin map still uses it elsewhere, but drivers
+    // don't need a billed JS API for a quick route overview.
 
     return (
       <div className="space-y-6 max-w-none">
@@ -797,6 +869,12 @@ export default function DriverDashboard() {
           )}
         </div>
 
+        {/* Lightweight route overview map (Leaflet + OSM) */}
+        <div>
+          <h3 className="text-sm font-semibold text-muted-foreground mb-2">Route overview</h3>
+          <RouteOverviewMap points={routePoints} height="clamp(360px, 55vh, 560px)" />
+          <p className="text-xs text-muted-foreground mt-2">Quick visual check of the planned stops — tap any postcode in the job list to open directions.</p>
+        </div>
       </div>
     );
   };

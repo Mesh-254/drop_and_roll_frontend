@@ -53,6 +53,7 @@ import { QRScannerModal } from "./QRScannerModal";
 import { ProofOfDelivery } from "./proof-of-delivery";
 import { FailureReportModal } from "./FailureReportModal";
 import { publishJobStatus, subscribeJobStatus } from "../../lib/driver-events";
+import { openDirections } from "../../lib/map-links";
 
 /**
  * Identity of a job in this list.
@@ -599,6 +600,8 @@ export function DeliveryStatusUpdates({
                 !canUpdate && !isImmutable ? job.blocked_reason : null;
               const address = job.stop_address;
               const postcode = address?.postal_code || "";
+                const addrLat = address?.latitude ?? address?.lat ?? address?.location?.lat ?? null;
+                const addrLng = address?.longitude ?? address?.lng ?? address?.location?.lng ?? null;
               const urgent =
                 !isDelivery && isUrgentPickup(job.scheduled_pickup_at);
               const parcels = job.num_parcels || 1;
@@ -714,9 +717,40 @@ export function DeliveryStatusUpdates({
                         address sits under it for the last hundred metres. */}
                     <div className="mb-3">
                       <div className="flex items-baseline gap-2">
-                        <span className="text-2xl font-extrabold tracking-tight text-foreground">
-                          {postcode || "No postcode"}
-                        </span>
+                        {/* Postcode clickable: open native Google Maps directions. Stop propagation so
+                            the card's onClick (open details) does not fire when the postcode is tapped. */}
+                        {postcode ? (
+                          <span
+                            role="link"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              try {
+                                openDirections({ postcode, lat: addrLat, lng: addrLng, label: postcode });
+                              } catch (err) {
+                                const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(postcode)}`;
+                                window.open(url, "_blank", "noopener,noreferrer");
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                try {
+                                  openDirections({ postcode, lat: addrLat, lng: addrLng, label: postcode });
+                                } catch (err) {
+                                  const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(postcode)}`;
+                                  window.open(url, "_blank", "noopener,noreferrer");
+                                }
+                              }
+                            }}
+                            className="text-2xl font-extrabold tracking-tight text-foreground underline-offset-2 hover:underline cursor-pointer"
+                          >
+                            {postcode}
+                          </span>
+                        ) : (
+                          <span className="text-2xl font-extrabold tracking-tight text-foreground">No postcode</span>
+                        )}
                         <ChevronRightIcon className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <p className="text-sm text-muted-foreground mt-0.5 leading-snug">
