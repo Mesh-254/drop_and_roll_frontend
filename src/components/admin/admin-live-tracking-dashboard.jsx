@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   AlertCircle,
   Wifi,
@@ -8,45 +8,27 @@ import {
   ChevronDown,
   Gauge,
   Clock,
+  X,
 } from "lucide-react";
 import driverApi from "../../api/driver-api";
-import { useCallback } from "react";
 import { trackingWsUrl } from "../../utils/wsUrl";
-
-const VEHICLE_ICONS = {
-  bike: "🏍️",
-  car: "🚗",
-  van: "🚐",
-  truck: "🚚",
-};
-
-const VEHICLE_COLORS = {
-  bike: "#FF6B6B",
-  car: "#4ECDC4",
-  van: "#45B7D1",
-  truck: "#FFA07A",
-};
+import AdminLiveMap from "./admin-live-map";
+import { buildAdminRoutePoints, classifyStopStatus } from "../../lib/admin-route-points";
+import { vehicleIcon, vehicleColor } from "../../lib/vehicle-icons";
 
 export default function AdminLiveTrackingDashboard() {
   const [drivers, setDrivers] = useState([]);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedDriverRoute, setSelectedDriverRoute] = useState(null);
+  const [routeLoading, setRouteLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [wsConnected, setWsConnected] = useState(false);
   const [filterHub, setFilterHub] = useState("all");
   const [filterAvailableOnly, setFilterAvailableOnly] = useState(false);
   const [hubs, setHubs] = useState([]);
   const [error, setError] = useState(null);
-  const mapRef = useRef(null);
-  const mapInstanceRef = useRef(null);
-  const directionsServiceRef = useRef(null);
-  const directionsRendererRef = useRef(null);
-  const markersRef = useRef({}); // Driver markers
-  const routeMarkersRef = useRef([]); // Stop markers
-  const polylineRef = useRef(null);
   const wsRef = useRef(null);
   const wsReconnectTimeoutRef = useRef(null);
-  const [googleLoaded, setGoogleLoaded] = useState(!!window.google);
 
   const formatAddress = (addr) => {
     if (!addr) return null;
@@ -61,115 +43,26 @@ export default function AdminLiveTrackingDashboard() {
     return parts.join(", ") || "Unknown Address";
   };
 
-  // Load Google Maps script if not already loaded
+  // Initial fetch + live-updates socket. The map itself (AdminLiveMap) needs
+  // no imperative setup here — it's a normal React component driven by
+  // `drivers` / `selectedDriver` / `points` props, same as the driver Live
+  // Map (route-overview-map.jsx). No Google Maps script to load, no manual
+  // marker/polyline lifecycle to manage.
   useEffect(() => {
-    const scriptId = "google-maps-script"; // Unique ID to check existence
-    if (document.getElementById(scriptId) || window.google?.maps) {
-      console.log("[AdminDashboard] Google Maps script already present");
-      setGoogleLoaded(true);
-      return;
-    }
-
-    const googleApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-    if (!googleApiKey) {
-      setError("Google Maps API key missing");
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = scriptId;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${googleApiKey}&libraries=places,directions`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      console.log("[AdminDashboard] Google Maps loaded");
-      setGoogleLoaded(true);
-    };
-    script.onerror = () => setError("Failed to load Google Maps script");
-    document.head.appendChild(script);
-
-    return () => {
-      // Optional cleanup: Remove script on unmount (rarely needed)
-      script.remove();
-    };
-  }, []);
-
-  // Initialize map and fetch initial data
-  useEffect(() => {
-    // Use setTimeout to ensure DOM and Google Maps are ready
-    const initTimer = setTimeout(() => {
-      if (googleLoaded && mapRef.current) {
-        initializeMap();
-      } else {
-        console.log(
-          "[AdminDashboard] Waiting for Google Maps or DOM ref, retrying...",
-        );
-        const retryTimer = setTimeout(() => {
-          initializeMap();
-        }, 500);
-        return () => clearTimeout(retryTimer);
-      }
-    }, 200);
-
     fetchInitialLocations();
     connectWebSocket();
 
     return () => {
-      clearTimeout(initTimer);
       disconnectWebSocket();
     };
-  }, [googleLoaded]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Refetch when filters change
   useEffect(() => {
     fetchInitialLocations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterHub, filterAvailableOnly]);
-
-  const initializeMap = useCallback(() => {
-    if (!window.google?.maps || !mapRef.current) {
-      console.warn("[AdminDashboard] Google Maps not ready yet – will retry");
-      return false; // Signal retry needed
-    }
-    try {
-      const map = new window.google.maps.Map(mapRef.current, {
-        zoom: 15,
-        center: { lat: 51.5074, lng: -0.1278 }, // Default to London
-        mapTypeId: "roadmap",
-        styles: [{ featureType: "poi", stylers: [{ visibility: "off" }] }], // Hide POIs for clean tracking
-      });
-      mapInstanceRef.current = map;
-      directionsServiceRef.current = new window.google.maps.DirectionsService();
-      directionsRendererRef.current = new window.google.maps.DirectionsRenderer(
-        { map,
-          suppressMarkers: true, // Don't show default A/B markers; use custom ones
-        },
-      );
-      console.log("[AdminDashboard] Map initialized successfully");
-      return true; // Success
-    } catch (err) {
-      console.error("[AdminDashboard] Map init error:", err);
-      setError("Map initialization failed");
-      return false;
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!googleLoaded) return;
-
-    let retries = 0;
-    const maxRetries = 5;
-    const pollMapReady = () => {
-      if (initializeMap()) return; // Success – stop
-      if (retries >= maxRetries) {
-        setError("Google Maps failed to load after retries");
-        return;
-      }
-      retries++;
-      setTimeout(pollMapReady, 300 * retries); // Exponential backoff: 300ms, 600ms, etc.
-    };
-
-    setTimeout(pollMapReady, 100); // Initial delay
-  }, [googleLoaded, initializeMap]);
 
   const fetchInitialLocations = async () => {
     try {
@@ -192,26 +85,6 @@ export default function AdminLiveTrackingDashboard() {
           if (driver.hub_name) hubSet.add(driver.hub_name);
         });
         setHubs(Array.from(hubSet).sort());
-
-        // Clear old markers
-        Object.values(markersRef.current).forEach((marker) =>
-          marker.setMap(null),
-        );
-        markersRef.current = {};
-
-        // Add new markers
-        driversData.forEach((driver) => {
-          addDriverMarker(driver);
-        });
-
-        // Center map on first driver if available
-        if (driversData.length > 0) {
-          const firstDriver = driversData[0];
-          mapInstanceRef.current?.setCenter({
-            lat: Number.parseFloat(firstDriver.latitude),
-            lng: Number.parseFloat(firstDriver.longitude),
-          });
-        }
       } else {
         setError(result.error || "Failed to fetch locations");
       }
@@ -223,70 +96,28 @@ export default function AdminLiveTrackingDashboard() {
     }
   };
 
-  const addDriverMarker = (driver) => {
-    if (!mapInstanceRef.current || !window.google) return;
-
-    const key = driver.driver_profile || driver.id;
-    const existing = markersRef.current[key];
-    if (existing) existing.setMap(null);
-
-    const position = {
-      lat: Number.parseFloat(driver.latitude),
-      lng: Number.parseFloat(driver.longitude),
-    };
-
-    const marker = new window.google.maps.Marker({
-      position,
-      map: mapInstanceRef.current,
-      title: driver.driver_name,
-      icon: {
-        path: window.google.maps.SymbolPath.CIRCLE,
-        scale: 10,
-        fillColor: VEHICLE_COLORS[driver.vehicle_type] || "#4ECDC4",
-        fillOpacity: 1,
-        strokeColor: "#ffffff",
-        strokeWeight: 2,
-      },
-      label: {
-        text: VEHICLE_ICONS[driver.vehicle_type] || "📍",
-        fontSize: "18px",
-      },
-    });
-
-    const infoWindow = new window.google.maps.InfoWindow({
-      content: `
-        <div class="p-2 text-sm">
-          <p class="font-semibold">${driver.driver_name}</p>
-          <p class="text-xs text-muted-foreground">${driver.vehicle_type}</p>
-          <p class="text-xs text-muted-foreground">${driver.hub_name || "Unknown Hub"}</p>
-          ${driver.speed_kmh ? `<p class="text-xs">Speed: ${driver.speed_kmh} km/h</p>` : ""}
-        </div>
-      `,
-    });
-
-    marker.addListener("click", () => {
-      infoWindow.open(mapInstanceRef.current, marker);
-      selectDriver(driver);
-    });
-
-    markersRef.current[key] = marker;
-  };
-
-  const selectDriver = async (driver) => {
+  const selectDriver = useCallback(async (driver) => {
     setSelectedDriver(driver);
+    setSelectedDriverRoute(null);
+    setRouteLoading(true);
     try {
-      const response = await driverApi.request(
-        `/api/driver/live-tracking/current-route/?driver_id=${driver.driver_profile}`,
-        { method: "GET" },
-      );
-      const { route, bookings } = response.data;
-      console.log(
-        "[AdminDashboard] Fetched route for driver:",
-        route,
-        bookings,
-      );
-      setSelectedDriverRoute(route ? { ...route, bookings } : { bookings });
-      drawStopsOnMap(route, bookings);
+      // Goes through the shared driverApi wrapper (caching + offline
+      // fallback) rather than a raw request call — `driver_id` is the admin
+      // case it's explicitly built for (see driver-api.js getCurrentRoute).
+      const result = await driverApi.getCurrentRoute(driver.driver_profile);
+      if (result.success && result.data) {
+        const { route, bookings } = result.data;
+        console.log("[AdminDashboard] Fetched route for driver:", route, bookings);
+        setSelectedDriverRoute(route ? { ...route, bookings } : { bookings });
+        setError(null);
+      } else if (result.success) {
+        // No active route/bookings (backend 404 → success:true, data:null)
+        setSelectedDriverRoute({ bookings: [] });
+        setError(null);
+      } else {
+        setSelectedDriverRoute(null);
+        setError(result.error || "Failed to fetch assignments");
+      }
     } catch (err) {
       setSelectedDriverRoute(null);
       setError(
@@ -294,107 +125,15 @@ export default function AdminLiveTrackingDashboard() {
           ? "No active assignments"
           : "Failed to fetch assignments",
       );
+    } finally {
+      setRouteLoading(false);
     }
-    if (mapInstanceRef.current) {
-      mapInstanceRef.current.setCenter({
-        lat: parseFloat(driver.latitude),
-        lng: parseFloat(driver.longitude),
-      });
-      mapInstanceRef.current.setZoom(15);
-    }
-  };
+  }, []);
 
-  const drawStopsOnMap = (route, bookings) => {
-    if (directionsRendererRef.current)
-      directionsRendererRef.current.setDirections({ routes: [] });
-    routeMarkersRef.current.forEach((marker) => marker.setMap(null));
-    routeMarkersRef.current = [];
-
-    if (bookings.length === 0) return;
-
-    // Always draw markers for bookings/stops
-    bookings.forEach((b, i) => {
-      const position = {
-        lat: parseFloat(b.pickup_address?.latitude || 0),
-        lng: parseFloat(b.pickup_address?.longitude || 0),
-      }; // Use coords from booking/address
-
-      const labelText = route ? `${i + 1}` : `B${i + 1}`; // Number for route, B for direct
-      const marker = new window.google.maps.Marker({
-        position,
-        map: mapInstanceRef.current,
-        label: { text: labelText, color: "white", fontWeight: "bold" },
-        title:
-          formatAddress(b.pickup_address) ||
-          (route ? `Stop ${i + 1}` : `Booking ${i + 1}`),
-        icon: route
-          ? undefined
-          : { url: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png" }, // Different icon for direct
-      });
-      routeMarkersRef.current.push(marker);
-    });
-
-    if (bookings.length < 2) return; // No path for single
-      
-
-    if (route) {
-      // Optimized Directions for route
-      const waypoints = bookings.slice(1, -1).map((b) => ({
-        location: {
-          lat: parseFloat(b.pickup_address?.latitude || 0),
-          lng: parseFloat(b.pickup_address?.longitude || 0),
-        },
-        stopover: true,
-      }));
-
-      directionsServiceRef.current.route(
-        {
-          origin: {
-            lat: parseFloat(bookings[0].pickup_address?.latitude || 0),
-            lng: parseFloat(bookings[0].pickup_address?.longitude || 0),
-          },
-          destination: {
-            lat: parseFloat(
-              bookings[bookings.length - 1].dropoff_address?.latitude || 0,
-            ),
-            lng: parseFloat(
-              bookings[bookings.length - 1].dropoff_address?.longitude || 0,
-            ),
-          },
-          waypoints,
-          travelMode: "DRIVING",
-          optimizeWaypoint: true,
-        },
-        (result, status) => {
-          if (status === "OK")
-            directionsRendererRef.current.setDirections(result);
-          else setError("Failed to calculate route path");
-        },
-      );
-    } else {
-      // Simple straight-line Polyline for direct bookings (no optimization)
-      const path = bookings.map((b) => ({
-        lat: parseFloat(b.pickup_address?.latitude || 0),
-        lng: parseFloat(b.pickup_address?.longitude || 0),
-      }));
-      new window.google.maps.Polyline({
-        path,
-        geodesic: true,
-        strokeColor: "#FF0000",
-        strokeOpacity: 1.0,
-        strokeWeight: 2,
-        map: mapInstanceRef.current,
-      });
-    }
-
-    // Center on first booking/marker
-    if (bookings.length > 0 && mapInstanceRef.current) {
-      mapInstanceRef.current.setCenter({
-        lat: parseFloat(bookings[0].pickup_lat),
-        lng: parseFloat(bookings[0].pickup_lng),
-      });
-    }
-  };
+  const clearSelectedDriver = useCallback(() => {
+    setSelectedDriver(null);
+    setSelectedDriverRoute(null);
+  }, []);
 
   const connectWebSocket = () => {
     try {
@@ -477,7 +216,9 @@ export default function AdminLiveTrackingDashboard() {
   };
 
   const handleLocationUpdate = (locationData) => {
-    // Update driver in state
+    // Update driver in state. The map re-renders from this state directly
+    // (AdminLiveMap is a plain React component) — no imperative marker
+    // update to do here any more.
     setDrivers((prevDrivers) => {
       const existingIndex = prevDrivers.findIndex(
         (d) => d.driver_profile === locationData.driver_profile,
@@ -491,16 +232,13 @@ export default function AdminLiveTrackingDashboard() {
         updatedDrivers = [...prevDrivers, locationData];
       }
 
-      // Update marker
-      addDriverMarker(locationData);
-
-      // Update selected driver if it matches
-      if (selectedDriver?.driver_profile === locationData.driver_profile) {
-        setSelectedDriver(locationData);
-      }
-
       return updatedDrivers;
     });
+
+    // Keep the focused driver's own position current too.
+    setSelectedDriver((prev) =>
+      prev?.driver_profile === locationData.driver_profile ? locationData : prev,
+    );
   };
 
   const filteredDrivers = drivers.filter((driver) => {
@@ -508,6 +246,14 @@ export default function AdminLiveTrackingDashboard() {
     if (filterAvailableOnly && driver.status !== "available") return false;
     return true;
   });
+
+  // Driver-scoped stop points for the map — every stop the selected driver
+  // has (completed AND remaining), colour-coded. Built fresh whenever the
+  // route data changes; never falls back to any other driver's stops.
+  const routePoints = useMemo(
+    () => buildAdminRoutePoints(selectedDriverRoute?.bookings || []),
+    [selectedDriverRoute],
+  );
 
   return (
     <div className="flex flex-col lg:flex-row h-screen bg-background gap-4 p-4">
@@ -609,7 +355,7 @@ export default function AdminLiveTrackingDashboard() {
                 >
                   <div className="flex items-start gap-3">
                     <span className="text-xl mt-0.5">
-                      {VEHICLE_ICONS[driver.vehicle_type] || "📍"}
+                      {vehicleIcon(driver.vehicle_type)}
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm truncate">
@@ -618,11 +364,18 @@ export default function AdminLiveTrackingDashboard() {
                       <p className="text-xs opacity-75 truncate">
                         {driver.vehicle_type} • {driver.hub_name || "—"}
                       </p>
-                      {driver.speed_kmh && (
-                        <p className="text-xs opacity-75 mt-1">
-                          ⚡ {driver.speed_kmh} km/h
-                        </p>
-                      )}
+                      <div className="flex items-center gap-2 mt-1">
+                        {driver.speed_kmh ? (
+                          <p className="text-xs opacity-75">
+                            ⚡ {driver.speed_kmh} km/h
+                          </p>
+                        ) : null}
+                        {driver.location_stale && (
+                          <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-warning/20 text-warning-foreground opacity-90">
+                            Stale
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </button>
@@ -633,13 +386,19 @@ export default function AdminLiveTrackingDashboard() {
       </div>
 
       {/* Main Map Area */}
-      <div className="flex-1 flex flex-col gap-4">
-        {/* Map */}
-        <div className="flex-1 bg-card border border-border rounded-lg shadow-sm overflow-hidden">
-          <div
-            ref={mapRef}
-            className="w-full h-full"
-            style={{ backgroundColor: "#f0f0f0" }}
+      <div className="flex-1 flex flex-col gap-4 min-h-0">
+        {/* Map — same Leaflet/OSM technique as the driver Live Map
+            (route-overview-map.jsx). Shows every driver when nothing is
+            selected; shows ONLY the selected driver's position and ONLY
+            their stops (colour-coded, grouped, with a Google Maps deep
+            link) once one is picked. */}
+        <div className="flex-1 min-h-0">
+          <AdminLiveMap
+            drivers={filteredDrivers}
+            selectedDriver={selectedDriver}
+            points={routePoints}
+            onSelectDriver={selectDriver}
+            height="100%"
           />
         </div>
 
@@ -648,46 +407,67 @@ export default function AdminLiveTrackingDashboard() {
           <div className="space-y-4">
             {/* Driver Info Card */}
             <div className="bg-card border border-border rounded-lg p-4 shadow-sm">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Driver</p>
-                  <p className="font-semibold text-foreground truncate">
-                    {selectedDriver.driver_name}
-                  </p>
+              <div className="flex items-start justify-between gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Driver</p>
+                    <p className="font-semibold text-foreground truncate">
+                      {selectedDriver.driver_name}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Vehicle</p>
+                    <p className="font-semibold text-foreground capitalize">
+                      {selectedDriver.vehicle_type}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                      <Gauge className="w-3 h-3" />
+                      Speed
+                    </p>
+                    <p className="font-semibold text-foreground">
+                      {selectedDriver.speed_kmh
+                        ? `${selectedDriver.speed_kmh} km/h`
+                        : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      Updated
+                    </p>
+                    <p className="font-semibold text-foreground text-sm">
+                      {selectedDriver.timestamp
+                        ? new Date(selectedDriver.timestamp).toLocaleTimeString()
+                        : "—"}
+                      {selectedDriver.location_stale && (
+                        <span className="ml-2 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-warning/20 text-warning-foreground">
+                          Stale
+                        </span>
+                      )}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Vehicle</p>
-                  <p className="font-semibold text-foreground capitalize">
-                    {selectedDriver.vehicle_type}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                    <Gauge className="w-3 h-3" />
-                    Speed
-                  </p>
-                  <p className="font-semibold text-foreground">
-                    {selectedDriver.speed_kmh
-                      ? `${selectedDriver.speed_kmh} km/h`
-                      : "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    Updated
-                  </p>
-                  <p className="font-semibold text-foreground text-sm">
-                    {selectedDriver.timestamp
-                      ? new Date(selectedDriver.timestamp).toLocaleTimeString()
-                      : "—"}
-                  </p>
-                </div>
+                <button
+                  type="button"
+                  onClick={clearSelectedDriver}
+                  aria-label="Clear selected driver"
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg hover:bg-muted flex-shrink-0"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Back to all drivers
+                </button>
               </div>
             </div>
 
             {/* Route Stops Card */}
-            {selectedDriverRoute &&
+            {routeLoading ? (
+              <div className="bg-card border border-border rounded-lg p-4 shadow-sm text-sm text-muted-foreground">
+                Loading route…
+              </div>
+            ) : (
+              selectedDriverRoute &&
               selectedDriverRoute.bookings &&
               selectedDriverRoute.bookings.length > 0 && (
                 <div className="bg-card border border-border rounded-lg p-4 shadow-sm">
@@ -695,37 +475,48 @@ export default function AdminLiveTrackingDashboard() {
                     Route Stops ({selectedDriverRoute.bookings.length})
                   </h3>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {selectedDriverRoute.bookings.map((booking, index) => (
-                      <div
-                        key={index}
-                        className="p-2 bg-muted rounded-lg text-sm"
-                      >
-                        <div className="flex items-start gap-2">
-                          <span
-                            className="flex items-center justify-center w-6 h-6 rounded-full text-foreground text-xs font-bold flex-shrink-0"
-                            style={{
-                              backgroundColor: VEHICLE_COLORS["bike"],
-                            }}
-                          >
-                            {index + 1}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-foreground truncate">
-                              {formatAddress(booking.pickup_address) ||
-                                "Pickup"}
-                            </p>
-                            {booking.package_description && (
-                              <p className="text-xs text-muted-foreground truncate">
-                                {booking.package_description}
+                    {selectedDriverRoute.bookings.map((booking, index) => {
+                      const statusGroup = classifyStopStatus(
+                        booking.stop_status ?? booking.status,
+                      );
+                      const address = booking.stop_address || booking.pickup_address;
+                      return (
+                        <div
+                          key={booking.stop_id || booking.id || index}
+                          className="p-2 bg-muted rounded-lg text-sm"
+                        >
+                          <div className="flex items-start gap-2">
+                            <span
+                              className="flex items-center justify-center w-6 h-6 rounded-full text-white text-xs font-bold flex-shrink-0"
+                              style={{
+                                backgroundColor:
+                                  statusGroup === "completed" ? "#16a34a" : "#dc2626",
+                              }}
+                            >
+                              {booking.job_number ?? index + 1}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-foreground truncate">
+                                {formatAddress(address) || "Address"}
                               </p>
-                            )}
+                              <p className="text-xs text-muted-foreground truncate">
+                                {booking.leg ? `${booking.leg} · ` : ""}
+                                {booking.stop_status || booking.status || "—"}
+                              </p>
+                              {booking.package_description && (
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {booking.package_description}
+                                </p>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
-              )}
+              )
+            )}
           </div>
         )}
       </div>

@@ -78,3 +78,46 @@ export function openRouteDirections(points = []) {
     console.error("openRouteDirections failed:", e);
   }
 }
+
+/**
+ * Open Google Maps directions starting from a DRIVER'S current position
+ * through an ordered list of stops. This is the admin-side equivalent of
+ * openRouteDirections: that helper omits the origin so Google Maps falls
+ * back to the viewing DEVICE's own location, which is correct for a driver
+ * looking at their own phone but wrong for an admin looking at someone
+ * else's route — the admin's own location has nothing to do with the trip.
+ *
+ * driverPosition: { lat, lng } | null — when omitted, falls back to
+ * openRouteDirections (device-location origin).
+ * points: ordered array of { lat, lng } stops.
+ */
+export function openDriverRouteDirections(driverPosition, points = []) {
+  if (!driverPosition) {
+    openRouteDirections(points);
+    return;
+  }
+
+  try {
+    const safe = (p) => `${Number(p.lat)},${Number(p.lng)}`;
+    const origin = safe(driverPosition);
+
+    if (!points || points.length === 0) {
+      // No stops to show — just centre Maps on the driver.
+      const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(origin)}`;
+      window.open(url, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    const destination = safe(points[points.length - 1]);
+    const waypoints = points.slice(0, -1).map(safe).join("|");
+
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+    if (waypoints) url += `&waypoints=${encodeURIComponent(waypoints)}`;
+
+    window.open(url, "_blank", "noopener,noreferrer");
+  } catch (e) {
+    console.error("openDriverRouteDirections failed:", e);
+    // Fall back to the device-location variant rather than silently doing nothing.
+    openRouteDirections(points);
+  }
+}
