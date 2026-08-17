@@ -183,7 +183,12 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
       initial={{ opacity: 0, y: 20, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.35 }}
-      className="backdrop-blur-xl bg-foreground/10 border border-foreground/20 rounded-3xl shadow-2xl p-8 space-y-5"
+      // LIGHT-MODE CONTRAST FIX: see the matching comment in LoginForm.jsx and
+      // the --overlay-* tokens in tokens.css. This card is a fixed dark-glass
+      // panel over AuthModal's permanent dark scrim, so its colors must stay
+      // constant across the site's light/dark toggle rather than following
+      // --foreground (which flips to near-black in light mode).
+      className="backdrop-blur-xl bg-overlay-bg border border-overlay-border rounded-3xl shadow-2xl p-8 space-y-5"
     >
       {/* Header */}
       <div className="text-center">
@@ -193,8 +198,8 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
             Drop 'N Roll
           </span>
         </div>
-        <h2 className="text-3xl font-bold text-foreground mb-1">Create account</h2>
-        <p className="text-muted-foreground text-sm">Join Drop 'N Roll today</p>
+        <h2 className="text-3xl font-bold text-overlay-fg mb-1">Create account</h2>
+        <p className="text-overlay-fg-muted text-sm">Join Drop 'N Roll today</p>
       </div>
 
       {/* General error */}
@@ -218,10 +223,10 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
               onChange={handleChange}
               placeholder="First name"
               autoComplete="given-name"
-              className={`w-full py-3 pl-12 pr-4 bg-foreground/10 border rounded-xl backdrop-blur-sm text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 transition-all duration-200 ${
+              className={`w-full py-3 pl-12 pr-4 bg-overlay-bg border rounded-xl backdrop-blur-sm text-overlay-fg placeholder-overlay-fg-subtle focus:outline-none focus:ring-2 transition-all duration-200 ${
                 errors.firstName
                   ? "border-destructive/50 focus:ring-destructive/50"
-                  : "border-foreground/20 focus:ring-ring/50 focus:border-primary/30"
+                  : "border-overlay-border focus:ring-ring/50 focus:border-primary/30"
               }`}
             />
           </div>
@@ -241,10 +246,10 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
               onChange={handleChange}
               placeholder="Last name"
               autoComplete="family-name"
-              className={`w-full py-3 pl-12 pr-4 bg-foreground/10 border rounded-xl backdrop-blur-sm text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 transition-all duration-200 ${
+              className={`w-full py-3 pl-12 pr-4 bg-overlay-bg border rounded-xl backdrop-blur-sm text-overlay-fg placeholder-overlay-fg-subtle focus:outline-none focus:ring-2 transition-all duration-200 ${
                 errors.lastName
                   ? "border-destructive/50 focus:ring-destructive/50"
-                  : "border-foreground/20 focus:ring-ring/50 focus:border-primary/30"
+                  : "border-overlay-border focus:ring-ring/50 focus:border-primary/30"
               }`}
             />
           </div>
@@ -264,10 +269,10 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
               onChange={handleChange}
               placeholder="Email address"
               autoComplete="email"
-              className={`w-full py-3 pl-12 pr-4 bg-foreground/10 border rounded-xl backdrop-blur-sm text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 transition-all duration-200 ${
+              className={`w-full py-3 pl-12 pr-4 bg-overlay-bg border rounded-xl backdrop-blur-sm text-overlay-fg placeholder-overlay-fg-subtle focus:outline-none focus:ring-2 transition-all duration-200 ${
                 errors.email
                   ? "border-destructive/50 focus:ring-destructive/50"
-                  : "border-foreground/20 focus:ring-ring/50 focus:border-primary/30"
+                  : "border-overlay-border focus:ring-ring/50 focus:border-primary/30"
               }`}
             />
           </div>
@@ -287,16 +292,16 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
               onChange={handleChange}
               placeholder="Password"
               autoComplete="new-password"
-              className={`w-full py-3 pl-12 pr-12 bg-foreground/10 border rounded-xl backdrop-blur-sm text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 transition-all duration-200 ${
+              className={`w-full py-3 pl-12 pr-12 bg-overlay-bg border rounded-xl backdrop-blur-sm text-overlay-fg placeholder-overlay-fg-subtle focus:outline-none focus:ring-2 transition-all duration-200 ${
                 errors.password
                   ? "border-destructive/50 focus:ring-destructive/50"
-                  : "border-foreground/20 focus:ring-ring/50 focus:border-primary/30"
+                  : "border-overlay-border focus:ring-ring/50 focus:border-primary/30"
               }`}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-brand-text transition-colors"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-overlay-fg-muted hover:text-brand-text transition-colors"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
@@ -315,16 +320,16 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
                       passwordStrength === "weak"
                         ? tier === "weak"
                           ? "bg-destructive"
-                          : "bg-foreground/20"
+                          : "bg-overlay-border"
                         : passwordStrength === "medium"
                         ? tier !== "strong"
                           ? "bg-warning"
-                          : "bg-foreground/20"
+                          : "bg-overlay-border"
                         : "bg-success"
                     }`}
                   />
                 ))}
-                <span className="text-xs text-muted-foreground ml-1 capitalize">
+                <span className="text-xs text-overlay-fg-muted ml-1 capitalize">
                   {passwordStrength}
                 </span>
               </div>
@@ -343,18 +348,18 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
               onChange={handleChange}
               placeholder="Confirm password"
               autoComplete="new-password"
-              className={`w-full py-3 pl-12 pr-12 bg-foreground/10 border rounded-xl backdrop-blur-sm text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 transition-all duration-200 ${
+              className={`w-full py-3 pl-12 pr-12 bg-overlay-bg border rounded-xl backdrop-blur-sm text-overlay-fg placeholder-overlay-fg-subtle focus:outline-none focus:ring-2 transition-all duration-200 ${
                 errors.confirmPassword
                   ? "border-destructive/50 focus:ring-destructive/50"
                   : passwordsMatch
                   ? "border-success/50 focus:ring-success/50"
-                  : "border-foreground/20 focus:ring-ring/50 focus:border-primary/30"
+                  : "border-overlay-border focus:ring-ring/50 focus:border-primary/30"
               }`}
             />
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-brand-text transition-colors"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-overlay-fg-muted hover:text-brand-text transition-colors"
               aria-label={showConfirmPassword ? "Hide password" : "Show password"}
             >
               {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
@@ -400,10 +405,10 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
         {/* Divider */}
         <div className="relative my-1">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-foreground/10" />
+            <div className="w-full border-t border-overlay-border" />
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-3 bg-card/80 text-muted-foreground">or sign up with</span>
+            <span className="px-3 bg-overlay-tag-bg text-overlay-fg-muted">or sign up with</span>
           </div>
         </div>
 
@@ -422,7 +427,7 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
       </form>
 
       {/* Switch to login */}
-      <p className="text-center text-muted-foreground text-sm">
+      <p className="text-center text-overlay-fg-muted text-sm">
         Already have an account?{" "}
         {onSwitchToLogin ? (
           <button
@@ -443,7 +448,7 @@ export default function RegisterForm({ onClose, onSwitchToLogin }) {
       </p>
 
       {/* Terms */}
-      <p className="text-center text-subtle-foreground text-xs leading-relaxed">
+      <p className="text-center text-overlay-fg-subtle text-xs leading-relaxed">
         By creating an account, you agree to Drop 'N Roll's{" "}
         <span className="text-brand-text cursor-pointer">Terms of Service</span>{" "}
         and{" "}

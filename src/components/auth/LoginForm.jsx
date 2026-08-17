@@ -184,7 +184,14 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
       initial={{ opacity: 0, y: 20, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.35 }}
-      className="backdrop-blur-xl bg-foreground/10 border border-foreground/20 rounded-3xl shadow-2xl p-8 space-y-6"
+      // LIGHT-MODE CONTRAST FIX: bg-overlay-bg/border-overlay-border, not
+      // bg-foreground/10 / border-foreground/20. This card is a fixed dark-glass
+      // panel over AuthModal's permanent rgba(0,0,0,0.75) scrim, so it needs its
+      // own colors that stay constant across the site's light/dark toggle —
+      // --foreground flips to near-black in light mode, which made this panel
+      // (and the near-black text on it) collapse to near-invisible. See the
+      // --overlay-* tokens in tokens.css for the full explanation.
+      className="backdrop-blur-xl bg-overlay-bg border border-overlay-border rounded-3xl shadow-2xl p-8 space-y-6"
     >
       {/* Header */}
       <div className="text-center">
@@ -194,8 +201,8 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
             Drop 'N Roll
           </span>
         </div>
-        <h2 className="text-3xl font-bold text-foreground mb-1">Welcome back</h2>
-        <p className="text-muted-foreground text-sm">Sign in to your account</p>
+        <h2 className="text-3xl font-bold text-overlay-fg mb-1">Welcome back</h2>
+        <p className="text-overlay-fg-muted text-sm">Sign in to your account</p>
       </div>
 
       {/* Session-expiry notice — distinct, non-alarming, and only shown when the
@@ -230,10 +237,10 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email address"
               autoComplete="email"
-              className={`w-full py-3 pl-12 pr-4 bg-foreground/10 border rounded-xl backdrop-blur-sm text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 transition-all duration-200 ${
+              className={`w-full py-3 pl-12 pr-4 bg-overlay-bg border rounded-xl backdrop-blur-sm text-overlay-fg placeholder-overlay-fg-subtle focus:outline-none focus:ring-2 transition-all duration-200 ${
                 errors.email
                   ? "border-destructive/50 focus:ring-destructive/50"
-                  : "border-foreground/20 focus:ring-ring/50 focus:border-primary/30"
+                  : "border-overlay-border focus:ring-ring/50 focus:border-primary/30"
               }`}
             />
           </div>
@@ -252,16 +259,16 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
               autoComplete="current-password"
-              className={`w-full py-3 pl-12 pr-12 bg-foreground/10 border rounded-xl backdrop-blur-sm text-foreground placeholder-subtle-foreground focus:outline-none focus:ring-2 transition-all duration-200 ${
+              className={`w-full py-3 pl-12 pr-12 bg-overlay-bg border rounded-xl backdrop-blur-sm text-overlay-fg placeholder-overlay-fg-subtle focus:outline-none focus:ring-2 transition-all duration-200 ${
                 errors.password
                   ? "border-destructive/50 focus:ring-destructive/50"
-                  : "border-foreground/20 focus:ring-ring/50 focus:border-primary/30"
+                  : "border-overlay-border focus:ring-ring/50 focus:border-primary/30"
               }`}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-brand-text transition-colors"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-overlay-fg-muted hover:text-brand-text transition-colors"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
@@ -281,7 +288,7 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
               onChange={(e) => setRememberMe(e.target.checked)}
               className="w-4 h-4 accent-primary cursor-pointer"
             />
-            <span className="text-muted-foreground">Remember me</span>
+            <span className="text-overlay-fg-muted">Remember me</span>
           </label>
           <Link
             to="/forgot-password"
@@ -325,10 +332,10 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
         {/* Divider */}
         <div className="relative my-2">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-foreground/10" />
+            <div className="w-full border-t border-overlay-border" />
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-3 bg-card/80 text-muted-foreground">or continue with</span>
+            <span className="px-3 bg-overlay-tag-bg text-overlay-fg-muted">or continue with</span>
           </div>
         </div>
 
@@ -349,7 +356,7 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
       </form>
 
       {/* Switch to register */}
-      <p className="text-center text-muted-foreground text-sm">
+      <p className="text-center text-overlay-fg-muted text-sm">
         Don't have an account?{" "}
         {onSwitchToRegister ? (
           <button
@@ -370,7 +377,7 @@ export default function LoginForm({ onClose, onSwitchToRegister }) {
       </p>
 
       {/* Terms */}
-      <p className="text-center text-subtle-foreground text-xs leading-relaxed">
+      <p className="text-center text-overlay-fg-subtle text-xs leading-relaxed">
         By continuing, you agree to Drop 'N Roll's{" "}
         <span className="text-brand-text cursor-pointer">Terms of Service</span>{" "}
         and{" "}

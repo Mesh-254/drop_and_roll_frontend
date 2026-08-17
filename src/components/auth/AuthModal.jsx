@@ -94,12 +94,17 @@ export default function AuthModal() {
             className="relative w-full max-w-md max-h-[90dvh] overflow-y-auto"
             style={{ scrollbarWidth: "none" }}
           >
-            {/* Close button */}
+            {/* Close button — bg-overlay-bg/text-overlay-fg (not bg-foreground/10 /
+                text-foreground): this modal panel is a fixed dark-glass card over
+                the permanent dark scrim above, so its own colors must stay constant
+                across the site's light/dark toggle rather than following
+                --foreground, which flips to near-black in light mode. See
+                tokens.css for the full explanation. */}
             <button
               type="button"
               onClick={close}
               aria-label="Close"
-              className="absolute top-4 right-4 z-10 p-2 rounded-full bg-foreground/10 hover:bg-foreground/20 text-foreground transition-colors"
+              className="absolute top-4 right-4 z-10 p-2 rounded-full bg-overlay-bg hover:bg-overlay-border text-overlay-fg transition-colors"
             >
               <X size={18} />
             </button>

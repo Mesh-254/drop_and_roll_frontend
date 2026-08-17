@@ -53,6 +53,26 @@
   --info: oklch(54.6% 0.245 262.881);
   --info-foreground: oklch(100% 0 0);
   --info-surface: oklch(97% 0.014 254.604);
+
+  /*
+   * Auth modal glass-panel tokens — LIGHT-MODE CONTRAST FIX.
+   * Declared with the SAME value in :root and .dark (see the .dark block
+   * below), unlike every other token here. LoginForm/RegisterForm render a
+   * fixed dark-glass card over AuthModal's permanent rgba(0,0,0,0.75) scrim,
+   * so this card's own foreground/background must NOT follow --foreground —
+   * --foreground flips from white (dark mode) to near-black (light mode),
+   * and the form was using it for input text/placeholders/labels on top of
+   * a background also derived from --foreground. In light mode that made
+   * everything near-black-on-near-black: invisible. These tokens give the
+   * card its own permanently-dark palette instead, independent of the
+   * site-wide theme toggle.
+   */
+  --overlay-fg: oklch(100% 0 0);
+  --overlay-fg-muted: oklch(100% 0 0 / 70%);
+  --overlay-fg-subtle: oklch(100% 0 0 / 50%);
+  --overlay-bg: oklch(100% 0 0 / 10%);
+  --overlay-border: oklch(100% 0 0 / 20%);
+  --overlay-tag-bg: oklch(0% 0 0 / 40%);
 }
 
 .dark {
@@ -89,6 +109,15 @@
   --info: oklch(70.7% 0.165 254.624);
   --info-foreground: oklch(21% 0.034 264.665);
   --info-surface: color-mix(in oklab, oklch(70.7% 0.165 254.624) 15%, transparent);
+
+  /* Auth modal glass-panel tokens — identical to the :root declaration above.
+     See the comment there: these are deliberately NOT theme-dependent. */
+  --overlay-fg: oklch(100% 0 0);
+  --overlay-fg-muted: oklch(100% 0 0 / 70%);
+  --overlay-fg-subtle: oklch(100% 0 0 / 50%);
+  --overlay-bg: oklch(100% 0 0 / 10%);
+  --overlay-border: oklch(100% 0 0 / 20%);
+  --overlay-tag-bg: oklch(0% 0 0 / 40%);
 }
 
 /*
@@ -130,4 +159,10 @@
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
   --color-info-surface: var(--info-surface);
+  --color-overlay-fg: var(--overlay-fg);
+  --color-overlay-fg-muted: var(--overlay-fg-muted);
+  --color-overlay-fg-subtle: var(--overlay-fg-subtle);
+  --color-overlay-bg: var(--overlay-bg);
+  --color-overlay-border: var(--overlay-border);
+  --color-overlay-tag-bg: var(--overlay-tag-bg);
 }

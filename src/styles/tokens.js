@@ -94,6 +94,21 @@ export const LIGHT_TOKENS = {
   info: P["blue-600"], // 5.26:1 on white
   "info-foreground": P.white,
   "info-surface": P["blue-50"],
+
+  // Auth modal glass-panel — deliberately the SAME value as DARK_TOKENS below
+  // (see themeContrast.test.js's "defines exactly the same token names" and
+  // tokensParity.test.js). LoginForm/RegisterForm/AuthModal render a fixed
+  // dark-glass card over AuthModal's permanent rgba(0,0,0,0.75) scrim, so
+  // this card's own foreground/background must stay constant across the
+  // site-wide light/dark toggle instead of following --foreground (which
+  // flips to near-black in light mode and made input text/placeholders
+  // invisible against a background also derived from --foreground).
+  "overlay-fg": P.white,
+  "overlay-fg-muted": "oklch(100% 0 0 / 70%)",
+  "overlay-fg-subtle": "oklch(100% 0 0 / 50%)",
+  "overlay-bg": "oklch(100% 0 0 / 10%)",
+  "overlay-border": "oklch(100% 0 0 / 20%)",
+  "overlay-tag-bg": "oklch(0% 0 0 / 40%)",
 };
 
 /**
@@ -143,6 +158,15 @@ export const DARK_TOKENS = {
   "info-foreground": P["gray-900"],
   "info-surface":
     "color-mix(in oklab, oklch(70.7% 0.165 254.624) 15%, transparent)",
+
+  // Auth modal glass-panel — identical values to LIGHT_TOKENS above (see the
+  // comment there); these tokens are deliberately theme-invariant.
+  "overlay-fg": P.white,
+  "overlay-fg-muted": "oklch(100% 0 0 / 70%)",
+  "overlay-fg-subtle": "oklch(100% 0 0 / 50%)",
+  "overlay-bg": "oklch(100% 0 0 / 10%)",
+  "overlay-border": "oklch(100% 0 0 / 20%)",
+  "overlay-tag-bg": "oklch(0% 0 0 / 40%)",
 };
 
 /**

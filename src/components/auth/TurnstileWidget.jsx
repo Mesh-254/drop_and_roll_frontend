@@ -51,6 +51,16 @@ export default function TurnstileWidget({ onVerify, onExpire, onError, className
         if (cancelled || !containerRef.current || !window.turnstile) return;
         widgetIdRef.current = window.turnstile.render(containerRef.current, {
           sitekey: SITE_KEY,
+          // theme: "dark" (not the default "auto") — LIGHT-MODE CONTRAST FIX.
+          // "auto" follows the visitor's OS-level prefers-color-scheme, not
+          // this app's light/dark toggle. LoginForm/RegisterForm render this
+          // widget inside a permanently dark glass card (see tokens.css's
+          // --overlay-* tokens), so on a light-OS visitor "auto" rendered a
+          // bright white Cloudflare widget/"Success!" box that clashed with
+          // and was hard to read against the dark card — same root cause as
+          // the input-field contrast bug, just via Cloudflare's own theming
+          // instead of ours.
+          theme: "dark",
           callback: (token) => callbacksRef.current.onVerify?.(token),
           "expired-callback": () => callbacksRef.current.onExpire?.(),
           "error-callback": () => callbacksRef.current.onError?.(),

@@ -6,7 +6,7 @@ import { Plus, Minus, Maximize2, Minimize2 } from "lucide-react";
 import markerIconUrl from "leaflet/dist/images/marker-icon.png";
 import markerIcon2xUrl from "leaflet/dist/images/marker-icon-2x.png";
 import markerShadowUrl from "leaflet/dist/images/marker-shadow.png";
-import { openRouteDirections } from "../../lib/map-links";
+import { openRouteDirections, openDirections } from "../../lib/map-links";
 
 // Fix default icon paths for Leaflet in bundlers (Vite/webpack)
 delete L.Icon.Default.prototype._getIconUrl;
@@ -15,6 +15,63 @@ L.Icon.Default.mergeOptions({
   iconUrl: markerIconUrl,
   shadowUrl: markerShadowUrl,
 });
+
+// Two stops with the same postcode geocode to the same (or near-identical)
+// lat/lng — think a block of flats, a business park, a hub. Rendering one
+// marker per point there stacked N pins exactly on top of each other: only
+// the topmost was ever visible or tappable, and the rest silently
+// disappeared. Group by postcode first (the more reliable identity — two
+// rows for the same address should count as "the same place" even if their
+// geocoded coordinates differ by a few decimal places of float noise), and
+// fall back to rounded coordinates for points with no postcode.
+function groupPointsByLocation(points) {
+  const groups = [];
+  const indexByKey = new Map();
+
+  points.forEach((p) => {
+    const lat = Number(p.lat);
+    const lng = Number(p.lng);
+    const postcode = (p.postcode || "").trim().toUpperCase();
+    // ~1m precision — enough to catch float jitter between two geocodes of
+    // the same address without merging two genuinely different addresses.
+    const key = postcode ? `pc:${postcode}` : `geo:${lat.toFixed(5)},${lng.toFixed(5)}`;
+
+    if (indexByKey.has(key)) {
+      groups[indexByKey.get(key)].stops.push(p);
+    } else {
+      indexByKey.set(key, groups.length);
+      groups.push({ key, lat, lng, postcode: p.postcode || "", stops: [p] });
+    }
+  });
+
+  return groups;
+}
+
+// Default single-stop icon: plain markerIconUrl/markerIcon2xUrl set above.
+// Grouped stops get a badge on the pin so "multiple jobs here" is visible
+// at a glance on the map itself, not just after opening the popup.
+function groupedMarkerIcon(count) {
+  const html = `
+    <div class="relative" style="width:25px;height:41px;">
+      <svg width="25" height="41" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12.5 0.5C5.87 0.5 0.5 5.87 0.5 12.5c0 9.3 12 27.4 12 27.4s12-18.1 12-27.4C24.5 5.87 19.13 0.5 12.5 0.5z"
+              fill="#2b6cb0" stroke="#1a3f66" stroke-width="1"/>
+        <circle cx="12.5" cy="12.5" r="5.5" fill="#fff"/>
+      </svg>
+      <span
+        class="absolute flex items-center justify-center rounded-full bg-destructive text-white font-bold leading-none border-2 border-white shadow"
+        style="top:-6px;right:-8px;min-width:20px;height:20px;padding:0 4px;font-size:11px;"
+      >${count}</span>
+    </div>
+  `;
+  return L.divIcon({
+    html,
+    className: "route-overview-grouped-marker",
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [0, -36],
+  });
+}
 
 // Internal component: keeps the map correctly sized and fitted to its
 // container. Uses the useMap() hook (stable across react-leaflet versions)
@@ -91,9 +148,13 @@ function MapClickHandler({ points }) {
     click: (e) => {
       try {
         const tgt = e.originalEvent?.target;
-        const className = tgt?.className || "";
-        // If click originated on a marker or popup element, ignore so the popup can work
-        if (typeof className === "string" && /(leaflet-marker-icon|leaflet-marker-shadow|leaflet-popup|leaflet-popup-content)/.test(className)) {
+        // `.className` is a plain string on <img> (the default marker icon)
+        // but an SVGAnimatedString on <svg>/<path>/<circle> (our custom
+        // grouped-stop icon) — checking it directly silently mis-detects
+        // clicks on the SVG marker as map-background clicks. `closest()`
+        // works the same way on both HTML and SVG elements, so it's the
+        // one check that covers both icon types.
+        if (tgt?.closest?.(".leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-popup, .leaflet-popup-content")) {
           return;
         }
         // Otherwise open Google Maps directions for the ordered points
@@ -147,6 +208,7 @@ export default function RouteOverviewMap({ points = [], center = null, height = 
 
   const poly = points.map((p) => [Number(p.lat), Number(p.lng)]);
   const bounds = L.latLngBounds(poly);
+  const locationGroups = groupPointsByLocation(points);
 
   // Normalize height value to CSS string
   const heightStyle = typeof height === "number" ? `${height}px` : height;
@@ -200,6 +262,13 @@ export default function RouteOverviewMap({ points = [], center = null, height = 
         .route-overview-map-shell .leaflet-control-container {
           display: none;
         }
+        /* Our grouped-stop marker is a plain divIcon — strip Leaflet's
+           default white box/border styling so only our own pin+badge SVG
+           shows. */
+        .route-overview-map-shell .route-overview-grouped-marker {
+          background: transparent;
+          border: none;
+        }
       `}</style>
       <MapContainer
         bounds={bounds}
@@ -238,16 +307,54 @@ export default function RouteOverviewMap({ points = [], center = null, height = 
           }}
         />
 
-        {points.map((p, idx) => (
-          <Marker key={`${p.lat}-${p.lng}-${idx}`} position={[Number(p.lat), Number(p.lng)]}>
-            <Popup>
-              <div className="text-sm">
-                <div className="font-semibold">{p.label || `Stop ${idx + 1}`}</div>
-                <div className="text-muted-foreground">{p.postcode || ""}</div>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+        {locationGroups.map((g) => {
+          const isGrouped = g.stops.length > 1;
+          const jobLabels = g.stops.map((s, i) => s.label || `Stop ${i + 1}`);
+          const combinedLabel = jobLabels.join(", ");
+
+          return (
+            <Marker
+              key={g.key}
+              position={[g.lat, g.lng]}
+              // Never pass icon={undefined} here — react-leaflet forwards it
+              // straight into Leaflet's option merge (L.extend(Object.create(
+              // this.options), options)), which copies own keys regardless of
+              // value. An explicit `icon: undefined` therefore overwrites the
+              // prototype's default icon instead of falling through to it,
+              // so this.options.icon ends up undefined and Leaflet's
+              // _initIcon() crashes calling undefined.createIcon(). Only
+              // include the prop at all when there's a real icon to set.
+              {...(isGrouped ? { icon: groupedMarkerIcon(g.stops.length) } : {})}
+            >
+              <Popup>
+                <div className="text-sm max-w-[220px]">
+                  {isGrouped ? (
+                    <>
+                      <div className="font-semibold">
+                        {g.postcode || "Multiple stops"} ({g.stops.length} jobs)
+                      </div>
+                      <div className="text-muted-foreground break-words">Jobs {combinedLabel}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="font-semibold">{combinedLabel}</div>
+                      <div className="text-muted-foreground">{g.postcode || ""}</div>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openDirections({ lat: g.lat, lng: g.lng, postcode: g.postcode, label: combinedLabel })
+                    }
+                    className="mt-2 text-xs font-medium text-primary underline underline-offset-2 touch-action-manipulation"
+                  >
+                    Get directions
+                  </button>
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
 
         {/* Attach map click handler to open route in Google Maps (unless clicking markers/popups) */}
         <MapClickHandler points={points} />
