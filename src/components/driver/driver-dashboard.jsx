@@ -141,7 +141,30 @@ export default function DriverDashboard() {
         const profileData = await driverApi.getProfile();
         if (profileData.success) {
           setProfile(profileData.data);
+
+          // Both flags come from /api/users/auth/me/ (UserSerializer). If either
+          // is missing, something upstream regressed — surface it loudly rather
+          // than silently mis-behaving the way the old always-undefined read did.
+          if (
+            profileData.data.is_tracking_enabled === undefined ||
+            profileData.data.location_sharing_enabled === undefined
+          ) {
+            console.warn(
+              "[DriverDashboard] Profile response missing is_tracking_enabled/location_sharing_enabled — " +
+                "auto-tracking sync skipped this tick to avoid acting on undefined data.",
+            );
+            return;
+          }
+
+          // The server's route/booking-derived auto-tracking flag. Keep the
+          // manual toggle's UI state in sync with the server's manual flag too,
+          // so a refresh (or a second device/tab) reflects reality rather than
+          // whatever this tab's local state happened to default to.
+          setManualTrackingEnabled(profileData.data.location_sharing_enabled);
+
+          const manualEnabled = profileData.data.location_sharing_enabled;
           const hasRecentLocation = await checkRecentLocation(); // New helper below
+
           if (
             profileData.data.is_tracking_enabled &&
             hasRecentLocation &&
@@ -153,8 +176,15 @@ export default function DriverDashboard() {
             );
           } else if (
             !profileData.data.is_tracking_enabled &&
+            !manualEnabled &&
             driverApi.locationWatcher
           ) {
+            // Only auto-stop tracking this poll itself would have auto-started.
+            // A driver who explicitly enabled "Location Sharing" (manualEnabled)
+            // must never be silently switched off by this background check —
+            // that was the bug: this branch had no such guard, so it force-killed
+            // an actively-tracking driver's GPS watcher within one 60s tick (or
+            // sooner, via the visibilitychange handler below) every single time.
             driverApi.stopLocationTracking();
             // react-hot-toast has no `.info` — calling it threw a TypeError that
             // the catch below turned into a permanent 10s "Tracking check failed"
@@ -556,15 +586,23 @@ export default function DriverDashboard() {
     setManualTrackingEnabled(newState);
 
     try {
+      // Persist the driver's OWN opt-in server-side FIRST. This is the flag the
+      // admin live-tracking map actually checks (DriverProfile.location_sharing_enabled,
+      // ORed into the /live/ filter) — without this call the toggle only ever
+      // affected this browser tab's local state and this device's GPS watcher;
+      // the server had no durable record that sharing was on, so an idle driver
+      // (no active route/booking yet) never showed up on the admin map even
+      // while genuinely sending location pings.
+      const result = await driverApi.setLocationSharing(newState);
+      if (!result.success) {
+        // Don't leave the button showing a state the server rejected.
+        setManualTrackingEnabled(!newState);
+        toast.error(result.message || "Failed to update location sharing");
+        return;
+      }
+
       if (newState) {
-        // Turn on manual tracking
         await startTracking();
-        // Optionally update availability if backend supports
-        try {
-          await driverApi.updateAvailability({ available: false });
-        } catch (error) {
-          console.warn("[DriverDashboard] Availability update failed:", error);
-        }
       } else {
         // Turn off manual tracking, let route polling control it
         await stopTracking();

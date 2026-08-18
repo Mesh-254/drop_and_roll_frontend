@@ -794,6 +794,38 @@ class DriverAPI extends ApiBase {
       return { success: false, error: error.message };
     }
   }
+  /**
+   * Set the driver's manual "Location Sharing" opt-in server-side
+   * (DriverProfile.location_sharing_enabled). Pass the explicit state rather
+   * than relying on the server to toggle blind — two taps in quick succession
+   * (or a retried request) must not leave the flag in the opposite state from
+   * what the UI shows.
+   * @param {boolean} enabled
+   */
+  async setLocationSharing(enabled) {
+    try {
+      const response = await super.request(
+        "/api/driver/live-driver/toggle-tracking/",
+        {
+          method: "POST",
+          data: { enabled: !!enabled },
+        },
+      );
+
+      const { tracking_enabled } = response.data;
+      return { success: true, isEnabled: tracking_enabled };
+    } catch (error) {
+      console.error("[DriverAPI] setLocationSharing failed:", error);
+      return {
+        success: false,
+        message: error.response?.data?.message || "Failed to update location sharing",
+        status: error.response?.status,
+      };
+    }
+  }
+
+  // Back-compat alias — same endpoint, blind-toggle semantics (no explicit
+  // state). Prefer setLocationSharing(enabled) for new call sites.
   async toggleTracking() {
     try {
       const response = await super.request(
@@ -803,17 +835,8 @@ class DriverAPI extends ApiBase {
         },
       );
 
-      const { is_tracking_enabled } = response.data;
-
-      // Update local state if you keep it
-      if (this.isTrackingEnabled !== undefined) {
-        this.isTrackingEnabled = is_tracking_enabled;
-      }
-
-      return {
-        success: true,
-        isEnabled: is_tracking_enabled,
-      };
+      const { tracking_enabled } = response.data;
+      return { success: true, isEnabled: tracking_enabled };
     } catch (error) {
       console.error("[DriverAPI] Toggle tracking failed:", error);
       return {
@@ -827,16 +850,30 @@ class DriverAPI extends ApiBase {
   // Get current tracking status from profile
   async getTrackingStatus() {
     /**
-     * Fetches the current tracking status for the authenticated driver.
+     * Fetches the current LOCATION SHARING status for the authenticated
+     * driver from their own profile.
+     *
+     * NOTE: `driver_profile` on this payload (GET /api/users/auth/me/) is a
+     * bare UUID STRING, not a nested object (see UserSerializer.driver_profile
+     * — it's kept that way deliberately so the WS URL builder can use it
+     * directly). Reading `.is_tracking_enabled` off it silently returns
+     * `undefined` on a string rather than throwing, which is exactly what
+     * made this always report `false`. `location_sharing_enabled` is exposed
+     * as its own top-level field for this reason — read that instead.
      * @returns {Promise<Object>} - { success: boolean, isEnabled: boolean }
      */
     try {
       const profileResult = await this.getProfile();
       if (profileResult.success && profileResult.data) {
-        const driverProfile = profileResult.data.driver_profile;
+        if (profileResult.data.location_sharing_enabled === undefined) {
+          console.warn(
+            "[DriverAPI] getTrackingStatus: location_sharing_enabled missing from profile response — " +
+              "is UserSerializer still exposing it? Falling back to false.",
+          );
+        }
         return {
           success: true,
-          isEnabled: driverProfile?.is_tracking_enabled || false,
+          isEnabled: profileResult.data.location_sharing_enabled ?? false,
         };
       }
       return { success: false, isEnabled: false };
