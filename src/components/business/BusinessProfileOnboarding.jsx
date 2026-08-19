@@ -5,6 +5,29 @@ import confetti from 'canvas-confetti';
 import BusinessApi from '../../api/BusinessApi';
 
 /**
+ * Extract a human-readable error string from a DRF response body.
+ *
+ * DRF can return:
+ *   { detail: "..." }                           — simple string
+ *   { field_name: ["error", ...], ... }         — field-level errors
+ *   { non_field_errors: ["..."] }               — cross-field errors
+ *   { code: "PROFILE_EXISTS", detail: "..." }  — custom coded errors
+ */
+function _extractApiError(data) {
+  if (!data || typeof data !== 'object') return null;
+  if (data.code === 'PROFILE_EXISTS') {
+    return 'A business profile already exists for your account. Refresh the page and try the upload again.';
+  }
+  if (typeof data.detail === 'string') return data.detail;
+  const fieldErrors = Object.entries(data)
+    .filter(([, v]) => Array.isArray(v) && v.length)
+    .map(([field, msgs]) => `${field.replace(/_/g, ' ')}: ${msgs.join(', ')}`);
+  if (fieldErrors.length) return fieldErrors.join(' · ');
+  if (Array.isArray(data.non_field_errors)) return data.non_field_errors.join(' ');
+  return null;
+}
+
+/**
  * BusinessProfileOnboarding — Modal wizard for creating a business profile.
  * 
  * Step 1: Company details (name, registration number, VAT, address)
@@ -51,17 +74,15 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     
-    // Basic validation
+    // Client-side validation before hitting the API
     if (!formData.company_name?.trim()) {
       setError('Company name is required');
       return;
     }
-
     if (!formData.contact_email?.trim()) {
       setError('Contact email is required');
       return;
     }
-
     if (formData.net_terms_requested && !formData.net_terms_justification?.trim()) {
       setError('Please explain why you need NET terms');
       return;
@@ -71,38 +92,33 @@ export default function BusinessProfileOnboarding({ onClose, onSuccess }) {
     setError(null);
 
     try {
-      // Submit to backend using BusinessApi
-      const response = await BusinessApi.createProfile(formData);
+      await BusinessApi.createProfile(formData);
       
-      console.log("[v0] Business profile created successfully:", response);
-      
-      // 🎉 Celebrate with confetti
+      // Fire confetti before closing so it's visible
       confetti({
         particleCount: 120,
         spread: 80,
         origin: { y: 0.6 },
         colors: ['#f97316', '#fb923c', '#fdba74', '#fff7ed', '#22c55e'],
       });
-      
-      // Brief delay to let confetti be visible before modal closes
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Call onSuccess callback to trigger auto-retry in bulk upload hook
+
+      // Short pause so confetti is visible, then hand off to parent.
+      // onSuccess() clears the uploadError and shows the success banner;
+      // it does NOT call onClose() so the user isn't suddenly left with a
+      // blank page — the modal exits on its own exit animation.
+      await new Promise(resolve => setTimeout(resolve, 600));
       onSuccess?.();
-      
-      // Close modal
-      onClose?.();
     } catch (err) {
-      console.error("[v0] Failed to create business profile:", err);
-      
-      const errorMessage = err?.response?.data?.detail || 
-                          err?.message || 
-                          'Failed to create business profile. Please try again.';
-      setError(errorMessage);
+      const data = err?.response?.data;
+      const message =
+        _extractApiError(data) ||
+        err?.message ||
+        'Failed to create business profile. Please try again.';
+      setError(message);
     } finally {
       setLoading(false);
     }
-  }, [formData, onSuccess, onClose]);
+  }, [formData, onSuccess]);
 
   // ── Navigate to next step ──────────────────────────────────────────────
   const handleNextStep = useCallback(() => {

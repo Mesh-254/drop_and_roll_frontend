@@ -39,7 +39,7 @@ import {
   UK_PHONE_ERROR,
 } from "../../utils/ukPhone";
 
-const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+const apiKey = import.meta.env.VITE_GOOGLE_MAPS_BROWSER_KEY;
 
 const libraries = ["places", "maps", "geometry", "routes"];
 

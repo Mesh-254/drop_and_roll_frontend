@@ -605,6 +605,9 @@ export function useBulkUpload() {
     // Errors
     uploadError,
 
+    // Clear error without full reset (e.g. after business profile created)
+    clearError: () => setUploadError(null),
+
     // Lifecycle
     reset,
   };

@@ -96,14 +96,15 @@ export function collectProductionEnvProblems(env, options = {}) {
     );
   }
 
-  // Passed straight into <APIProvider apiKey={...}> in GetQuoteBook.jsx and into the Maps
-  // script URL on the admin live-tracking dashboard. Unset means the quote-and-book flow
-  // — the revenue path — renders Google's "this page can't load Google Maps correctly"
-  // overlay instead of the address step, on a build that deploys perfectly.
-  if (!env.VITE_GOOGLE_MAPS_API_KEY) {
+  // Passed straight into <APIProvider apiKey={...}> in GetQuoteBook.jsx. Unset means the
+  // quote-and-book address step (the Places fallback) renders Google's "this page can't
+  // load Google Maps correctly" overlay instead of the address step on a build that
+  // deploys perfectly. The admin live-tracking map was migrated to Leaflet and no longer
+  // depends on this key.
+  const mapsKey = env.VITE_GOOGLE_MAPS_BROWSER_KEY || env.VITE_GOOGLE_MAPS_API_KEY;
+  if (!mapsKey) {
     problems.push(
-      "VITE_GOOGLE_MAPS_API_KEY is not set — the quote/booking address step and the admin " +
-        "live-tracking map both fail to load.",
+      "VITE_GOOGLE_MAPS_API_KEY is not set — the quote/booking address step (Places fallback) fails to load.",
     );
   }
 
