@@ -483,6 +483,45 @@ async getPostcodeAddressDetails(addressId) {
 }
 
 /**
+ * Server-side proxied Google Places autocomplete (no client key ever used).
+ * Returns { success, results } where each result is { id: place_id, suggestion }
+ */
+async googleAutocomplete(query, limit = 10) {
+  if (!query || query.trim().length < 2) return { success: true, results: [] };
+  try {
+    const response = await this.request("/api/booking/address/google-autocomplete/", {
+      method: "GET",
+      params: { query: query.trim(), limit },
+      includeAuth: false,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("[BookingApi] googleAutocomplete error:", error);
+    return { success: false, reason: "upstream_error", message: "Google autocomplete failed" };
+  }
+}
+
+/**
+ * Server-side proxied Google Place Details lookup. Returns the same shape as
+ * getPostcodeAddressDetails (success, address, in_service_area, ...)
+ */
+async getGooglePlaceDetails(placeId) {
+  if (!placeId) return { success: false, message: "Missing place id" };
+  try {
+    const response = await this.request(`/api/booking/address/google-lookup/${encodeURIComponent(placeId)}/`, {
+      method: "GET",
+      includeAuth: false,
+    });
+    return response.data;
+  } catch (error) {
+    const structured = error.response?.data;
+    if (structured && structured.reason) return structured;
+    console.error("[BookingApi] getGooglePlaceDetails error:", error);
+    return { success: false, reason: "upstream_error", message: "Place lookup failed" };
+  }
+}
+
+/**
  * DEPRECATED: Use Ideal Postcodes API instead.
  * This method returns only postcode centroid, not individual addresses.
  * Retained for backward compatibility.
