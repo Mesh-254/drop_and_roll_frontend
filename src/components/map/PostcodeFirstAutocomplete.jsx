@@ -221,6 +221,7 @@ const PostcodeFirstAutocomplete = ({
   const debouncedQuery = useDebouncedValue(query, DEBOUNCE_MS)
 
   const [suggestions, setSuggestions] = useState([]) // Ideal Postcodes hits
+  const [googleSuggestions, setGoogleSuggestions] = useState([]) // Google fallback hits (place_id + suggestion)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [isSearching, setIsSearching] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
@@ -296,6 +297,44 @@ const PostcodeFirstAutocomplete = ({
           : "Address search is running slowly — switching to Google Maps."
       )
       setMode("google")
+    })
+  }, [trimmedQuery, queryIsPostcode, mode])
+
+  // ── Google Places fallback via server-side proxy (preferred to exposing a key)
+  useEffect(() => {
+    if (mode !== "google") return
+    if (trimmedQuery.length < 2 || !queryIsPostcode) {
+      setGoogleSuggestions([])
+      setIsOpen(false)
+      return
+    }
+
+    const thisRequestId = ++requestIdRef.current
+    setIsSearching(true)
+
+    bookingApi.googleAutocomplete(trimmedQuery).then((res) => {
+      if (thisRequestId !== requestIdRef.current) return
+      setIsSearching(false)
+      if (res.success) {
+        const hits = res.results || []
+        setGoogleSuggestions(hits)
+        setVisibleCount(PAGE_SIZE)
+        setHighlightedIndex(-1)
+        setIsOpen(true)
+        return
+      }
+
+      // If the server-side Google proxy isn't configured or failed, fall back
+      // to the old client-side widget (which requires a browser key). The
+      // component's previous behavior used the client widget; keep the same
+      // fallback semantics by leaving mode as "google" — the useMapsLibrary
+      // path will still attempt to initialize if available.
+      setGoogleSuggestions([])
+      setFallbackNotice(
+        res.reason === "not_configured"
+          ? "Google Places is not available on the server — using client widget if configured."
+          : "Google Places proxy failed — please try again."
+      )
     })
   }, [trimmedQuery, queryIsPostcode, mode])
 
@@ -450,6 +489,30 @@ const PostcodeFirstAutocomplete = ({
     })
   }, [])
 
+  const handleSelectGoogleSuggestion = useCallback(async (hit) => {
+    // hit: { id: place_id, suggestion }
+    setIsOpen(false)
+    setIsSearching(true)
+    const res = await bookingApi.getGooglePlaceDetails(hit.id)
+    setIsSearching(false)
+
+    if (!res.success) {
+      setFallbackNotice("Couldn't load that address from Google. Please try again.")
+      setMode("google")
+      setIsOpen(true)
+      return
+    }
+
+    setFallbackNotice(null)
+    const inArea = res.in_service_area !== false
+    setAreaWarning(inArea ? null : res.service_area_message)
+    setPendingConfirm({
+      address: res.address,
+      inServiceArea: inArea,
+      areaMessage: inArea ? null : res.service_area_message,
+    })
+  }, [])
+
   const closeConfirm = () => setPendingConfirm(null)
 
   // Confirm hands the address to the parent — but only for in-area addresses.
@@ -471,10 +534,10 @@ const PostcodeFirstAutocomplete = ({
   }
 
   // ── Keyboard navigation ────────────────────────────────────────────────
-  const visibleSuggestions = suggestions.slice(0, visibleCount)
+  const visibleSuggestions = (mode === "idealPostcodes" ? suggestions.slice(0, visibleCount) : googleSuggestions.slice(0, visibleCount))
 
   const handleKeyDown = (e) => {
-    if (mode !== "idealPostcodes" || !isOpen || visibleSuggestions.length === 0) return
+    if (!isOpen || visibleSuggestions.length === 0) return
     if (e.key === "ArrowDown") {
       e.preventDefault()
       setHighlightedIndex((i) => Math.min(i + 1, visibleSuggestions.length - 1))
@@ -483,7 +546,11 @@ const PostcodeFirstAutocomplete = ({
       setHighlightedIndex((i) => Math.max(i - 1, 0))
     } else if (e.key === "Enter") {
       e.preventDefault()
-      if (highlightedIndex >= 0) handleSelectSuggestion(visibleSuggestions[highlightedIndex])
+      if (highlightedIndex >= 0) {
+        const hit = visibleSuggestions[highlightedIndex]
+        if (mode === "idealPostcodes") handleSelectSuggestion(hit)
+        else handleSelectGoogleSuggestion(hit)
+      }
     } else if (e.key === "Escape") {
       setIsOpen(false)
     }
@@ -542,7 +609,7 @@ const PostcodeFirstAutocomplete = ({
         </div>
       </div>
 
-      {mode === "idealPostcodes" && isOpen && visibleSuggestions.length > 0 && (
+      {(mode === "idealPostcodes" || mode === "google") && isOpen && visibleSuggestions.length > 0 && (
             <ul
               id={listboxId}
               role="listbox"
@@ -557,7 +624,7 @@ const PostcodeFirstAutocomplete = ({
                   role="option"
                   aria-selected={index === highlightedIndex}
                   onMouseEnter={() => setHighlightedIndex(index)}
-                  onClick={() => handleSelectSuggestion(hit)}
+                  onClick={() => (mode === "idealPostcodes" ? handleSelectSuggestion(hit) : handleSelectGoogleSuggestion(hit))}
                   className={`px-4 py-2.5 text-sm cursor-pointer flex items-start gap-2 ${
                     index === highlightedIndex
                       ? "bg-brand-surface"
