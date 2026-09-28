@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { paymentApi } from "../../api/PaymentApi";
 import { Loader2, AlertCircle } from "lucide-react";
+import useStripeCardStyle from "./useStripeCardStyle";
 
 export default function StripeCreditCard({
   txId,
@@ -15,6 +16,7 @@ export default function StripeCreditCard({
 }) {
   const stripe = useStripe();
   const elements = useElements();
+  const cardStyle = useStripeCardStyle();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
 
@@ -59,16 +61,7 @@ export default function StripeCreditCard({
   return (
     <div className="space-y-4">
       <CardElement
-        options={{
-          style: {
-            base: {
-              fontSize: "16px",
-              color: "#1F2937",
-              "::placeholder": { color: "#6B7280" },
-            },
-            invalid: { color: "#EF4444" },
-          },
-        }}
+        options={cardStyle}
         className="w-full px-4 py-3 border border-border-strong rounded-lg bg-card"
       />
       {error && (

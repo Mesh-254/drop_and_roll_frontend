@@ -37,6 +37,7 @@ import {
 } from "@stripe/react-stripe-js";
 import paymentApi from "../../api/PaymentApi";
 import receivableApi from "../../api/ReceivableApi";
+import useStripeCardStyle from "./useStripeCardStyle";
 import {
   ArrowLeft,
   Layers,
@@ -75,6 +76,7 @@ const STATUS_STYLES = {
 function StripePayForm({ clientSecret, transactionId, amount, currency, onSuccess, onError }) {
   const stripe = useStripe();
   const elements = useElements();
+  const cardStyle = useStripeCardStyle("15px");
   const [processing, setProcessing] = useState(false);
   const [cardError, setCardError] = useState(null);
 
@@ -122,17 +124,7 @@ function StripePayForm({ clientSecret, transactionId, amount, currency, onSucces
           Card details
         </label>
         <CardElement
-          options={{
-            style: {
-              base: {
-                color: "#f1f5f9",
-                fontFamily: "Inter, system-ui, sans-serif",
-                fontSize: "15px",
-                "::placeholder": { color: "#94a3b8" },
-              },
-              invalid: { color: "#f87171" },
-            },
-          }}
+          options={cardStyle}
         />
       </div>
 

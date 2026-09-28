@@ -93,6 +93,7 @@ import {
 } from "@stripe/react-stripe-js";
 import paymentApi from "../../api/PaymentApi";
 import bookingApi from "../../api/BookingApi";
+import useStripeCardStyle from "./useStripeCardStyle";
 import {
   Loader2,
   CreditCard,
@@ -110,19 +111,6 @@ const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 // ─── Card element styles ─────────────────────────────────────────────────────
 
-const CARD_STYLE = {
-  style: {
-    base: {
-      color: "#f1f5f9",
-      fontFamily: "Inter, system-ui, sans-serif",
-      fontSize: "16px",
-      "::placeholder": { color: "#94a3b8" },
-      iconColor: "#94a3b8",
-    },
-    invalid: { color: "#f87171" },
-  },
-};
-
 // ─── Stripe checkout form ─────────────────────────────────────────────────────
 
 function StripeCheckoutForm({
@@ -135,6 +123,7 @@ function StripeCheckoutForm({
 }) {
   const stripe = useStripe();
   const elements = useElements();
+  const cardStyle = useStripeCardStyle();
   const [processing, setProcessing] = useState(false);
   const [cardError, setCardError] = useState(null);
 
@@ -186,7 +175,7 @@ function StripeCheckoutForm({
         <label className="block text-sm font-medium text-muted-foreground mb-3">
           Card details
         </label>
-        <CardElement options={CARD_STYLE} />
+        <CardElement options={cardStyle} />
       </div>
 
       {cardError && (
