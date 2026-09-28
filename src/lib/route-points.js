@@ -2,15 +2,9 @@
  * Single source of truth for turning job/stop payloads into Route Overview
  * map points.
  *
- * The dashboard builds `routePoints` from two different endpoints — the
- * assigned-jobs list (on mount) and the current-route poll (every 60s) —
- * and previously each one hand-rolled its own extraction with no status
- * filtering. The route poll's payload includes the FULL route, terminal
- * stops included, so once it landed it silently overwrote the correctly
- * filtered initial points with every historical stop on the route,
- * producing overlapping "clouded" polylines. Routing both call sites
- * through this helper keeps the map showing exactly the same remaining
- * jobs as the "My Jobs" list, on every load, reload, and poll tick.
+ * The dashboard builds `routePoints` from every page of the driver's
+ * current-route jobs, both on mount and on the 60s refresh. This helper keeps
+ * the map limited to the same remaining stops shown in the My Jobs list.
  */
 
 // Statuses that mean a stop is done and should never appear on the map.
@@ -65,11 +59,20 @@ export function buildRoutePoints(stops) {
       stop.stop_address || stop.pickup_address || stop.dropoff_address || stop.address || stop;
     const lat = addr?.latitude ?? addr?.lat ?? addr?.location?.lat ?? null;
     const lng = addr?.longitude ?? addr?.lng ?? addr?.location?.lng ?? null;
-    if (lat == null || lng == null) return;
+    if (
+      lat == null ||
+      lng == null ||
+      (typeof lat === "string" && !lat.trim()) ||
+      (typeof lng === "string" && !lng.trim())
+    ) return;
+
+    const latitude = Number(lat);
+    const longitude = Number(lng);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
 
     points.push({
-      lat: Number(lat),
-      lng: Number(lng),
+      lat: latitude,
+      lng: longitude,
       label: stop.job_number || stop.name || `Stop ${idx + 1}`,
       postcode: addr?.postal_code || addr?.postal || "",
       status,

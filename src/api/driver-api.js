@@ -14,6 +14,8 @@ import { db } from "../offline/db";
 // doesn't silently start tracking.
 const LIVE_TRACKING_FLAG = "dnr_live_tracking_active";
 const LIVE_TRACKING_TTL_MS = 5 * 60 * 1000; // 5 min
+// The current-route endpoint caps page_size at 50; fetch further pages when needed.
+const ASSIGNED_JOBS_PAGE_SIZE = 50;
 
 // ── Live ping cadence ───────────────────────────────────────────────────────
 // These three numbers ARE the contract with the server's freshness window, and
@@ -159,6 +161,50 @@ class DriverAPI extends ApiBase {
       throw error; // Let the caller handle the error
     }
   }
+
+  async getAllAssignedJobs(status = "all") {
+    const firstPage = await this.getAssignedJobs(1, ASSIGNED_JOBS_PAGE_SIZE, status);
+    if (
+      !Array.isArray(firstPage?.ordered_bookings) ||
+      !Number.isInteger(firstPage.count) ||
+      firstPage.count < 0
+    ) {
+      throw new Error("Invalid assigned jobs response: expected ordered_bookings and count");
+    }
+
+    const jobs = [];
+    const seen = new Set();
+    const appendUniqueJobs = (pageJobs) => {
+      if (!Array.isArray(pageJobs)) {
+        throw new Error("Invalid assigned jobs response: ordered_bookings must be an array");
+      }
+
+      pageJobs.forEach((job) => {
+        const key = job.stop_id || (
+          job.id ? `${job.id}:${job.stop_leg || job.leg || ""}` : null
+        );
+        if (key && seen.has(key)) return;
+        if (key) seen.add(key);
+        jobs.push(job);
+      });
+    };
+
+    appendUniqueJobs(firstPage.ordered_bookings);
+    const totalPages = Math.ceil(firstPage.count / ASSIGNED_JOBS_PAGE_SIZE);
+    for (let page = 2; page <= totalPages; page += 1) {
+      const response = await this.getAssignedJobs(page, ASSIGNED_JOBS_PAGE_SIZE, status);
+      appendUniqueJobs(response?.ordered_bookings);
+    }
+
+    if (jobs.length !== firstPage.count) {
+      console.warn(
+        `[DriverAPI] Assigned jobs changed during pagination: expected ${firstPage.count}, received ${jobs.length}`,
+      );
+    }
+
+    return { ...firstPage, ordered_bookings: jobs };
+  }
+
   // load job statuses
   // async getJobStatuses(){
   //   const response = await super.request(`/api/booking/booking-statuses/`);

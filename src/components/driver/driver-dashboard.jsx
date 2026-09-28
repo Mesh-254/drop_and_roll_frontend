@@ -31,12 +31,34 @@ import { ActiveJobsOverviewCard } from "./active-jobs-overview-card";
 // intact in driver-api.js for that re-enablement.
 import { DeliveryStatusUpdates } from "./delivery-status-updates";
 import RouteOverviewMap from "./route-overview-map";
-import { buildRoutePoints } from "../../lib/route-points";
+import { buildRoutePoints, isRemainingJob } from "../../lib/route-points";
 import { JobDetailPage } from "./job-detail-page";
 import { OfflineStatusBar } from "./offline/OfflineStatusBar";
 import * as syncEngine from "../../offline/syncEngine";
 import driverApi from "../../api/driver-api";
 import { publishJobStatus, subscribeJobStatus } from "../../lib/driver-events";
+
+function buildDashboardRoutePoints(jobs, source) {
+  const points = buildRoutePoints(jobs);
+  const remainingJobs = jobs.filter((job) =>
+    isRemainingJob(job.stop_status ?? job.status ?? job.job_status ?? job.delivery_status),
+  ).length;
+
+  console.info("[DriverDashboard] Route map data:", {
+    source,
+    jobsReturned: jobs.length,
+    remainingJobs,
+    plottedPoints: points.length,
+  });
+
+  if (points.length < remainingJobs) {
+    console.warn(
+      `[DriverDashboard] ${remainingJobs - points.length} remaining job(s) have missing or invalid map coordinates`,
+    );
+  }
+
+  return points;
+}
 
 export default function DriverDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -385,10 +407,10 @@ export default function DriverDashboard() {
   // — and only — the jobs currently listed, in the same order.
   const refreshRemainingJobs = useCallback(async () => {
     try {
-      const jbsResp = await driverApi.getAssignedJobs(1, 10, "all");
+      const jbsResp = await driverApi.getAllAssignedJobs("all");
       const jobsData = jbsResp.ordered_bookings || (Array.isArray(jbsResp) ? jbsResp : []);
       setJobs(jobsData);
-      setRoutePoints(buildRoutePoints(jobsData));
+      setRoutePoints(buildDashboardRoutePoints(jobsData, "route refresh"));
     } catch (err) {
       console.warn("[DriverDashboard] Failed to refresh jobs:", err);
     }
@@ -628,7 +650,7 @@ export default function DriverDashboard() {
       const [profResp, jbsResp, ratsResp, metricsResp, docsResp] =
         await Promise.all([
           driverApi.getProfile(),
-          driverApi.getAssignedJobs(1, 10, "all"),
+          driverApi.getAllAssignedJobs("all"),
           driverApi.getRatings(),
           driverApi.getMetrics(),
           driverApi.getDocuments(),
@@ -650,7 +672,7 @@ export default function DriverDashboard() {
       // through the shared filter so completed/cancelled/failed stops never
       // reach the map.
       try {
-        const points = buildRoutePoints(jobsData);
+        const points = buildDashboardRoutePoints(jobsData, "initial load");
         // Always set (even for <2 points / empty): an empty or single-point
         // result means "no remaining stops to show", and RouteOverviewMap
         // already renders its own empty state for that case. Leaving stale
