@@ -5,6 +5,7 @@
 //   • when bank transfer is disabled the tab is absent and card/PayPal remain.
 
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { ThemeProvider, useTheme } from "../../contexts/ThemeContext";
 
 const mockNavigate = jest.fn();
 const mockLocation = { search: "?action=pay", state: null };
@@ -17,16 +18,24 @@ jest.mock("react-router-dom", () => ({
 jest.mock("@stripe/stripe-js", () => ({ loadStripe: jest.fn(() => Promise.resolve(null)) }));
 jest.mock("@stripe/react-stripe-js", () => ({
   Elements: ({ children }) => <div>{children}</div>,
-  CardElement: () => <div data-testid="card-element" />,
+  CardElement: ({ options }) => (
+    <div
+      data-testid="card-element"
+      data-text-color={options?.style?.base?.color}
+      data-placeholder-color={options?.style?.base?.["::placeholder"]?.color}
+      data-invalid-color={options?.style?.invalid?.color}
+    />
+  ),
   useStripe: () => null,
   useElements: () => null,
 }));
 
 const mockGetBankTransferDetails = jest.fn();
+const mockInitiateInvoicePayment = jest.fn();
 jest.mock("../../api/PaymentApi", () => {
   const api = {
     getBankTransferDetails: (...a) => mockGetBankTransferDetails(...a),
-    initiateInvoicePayment: jest.fn(),
+    initiateInvoicePayment: (...a) => mockInitiateInvoicePayment(...a),
   };
   return { __esModule: true, default: api, paymentApi: api };
 });
@@ -38,6 +47,25 @@ jest.mock("../../api/ReceivableApi", () => {
 });
 
 import InvoiceDetailPage from "./InvoiceDetailPage";
+
+function ThemeControls() {
+  const { setTheme } = useTheme();
+  return (
+    <>
+      <button onClick={() => setTheme("light")}>Set light theme</button>
+      <button onClick={() => setTheme("dark")}>Set dark theme</button>
+    </>
+  );
+}
+
+function renderWithTheme(ui) {
+  return render(
+    <ThemeProvider>
+      <ThemeControls />
+      {ui}
+    </ThemeProvider>,
+  );
+}
 
 const ISSUED_INVOICE = {
   id: "inv-1",
@@ -74,12 +102,13 @@ const BANK_DETAILS = {
 describe("InvoiceDetailPage — Bank Transfer tab (§5)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.setItem("theme", "light");
     mockGetInvoice.mockResolvedValue(ISSUED_INVOICE);
   });
 
   test("shows the Bank tab and its details + reference when enabled", async () => {
     mockGetBankTransferDetails.mockResolvedValue({ success: true, data: BANK_DETAILS });
-    render(<InvoiceDetailPage />);
+    renderWithTheme(<InvoiceDetailPage />);
 
     // Bank tab appears once details resolve.
     const bankTab = await screen.findByRole("button", { name: /Bank/i });
@@ -97,7 +126,7 @@ describe("InvoiceDetailPage — Bank Transfer tab (§5)", () => {
 
   test("hides the Bank tab when disabled", async () => {
     mockGetBankTransferDetails.mockResolvedValue({ success: true, data: { enabled: false } });
-    render(<InvoiceDetailPage />);
+    renderWithTheme(<InvoiceDetailPage />);
 
     // Card/PayPal still render; wait for the pay panel.
     await screen.findByText(/Pay Outstanding/i);
@@ -115,6 +144,7 @@ describe("InvoiceDetailPage — Bank Transfer tab (§5)", () => {
 describe("InvoiceDetailPage — payability is served, not derived", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.setItem("theme", "light");
     mockLocation.search = "";
     mockGetBankTransferDetails.mockResolvedValue({ success: true, data: { enabled: false } });
   });
@@ -136,7 +166,7 @@ describe("InvoiceDetailPage — payability is served, not derived", () => {
       outstanding: "16.00",
       is_payable: true,
     });
-    render(<InvoiceDetailPage />);
+    renderWithTheme(<InvoiceDetailPage />);
     expect(await screen.findByRole("button", { name: /Pay Now/i })).toBeInTheDocument();
   });
 
@@ -148,7 +178,7 @@ describe("InvoiceDetailPage — payability is served, not derived", () => {
       is_payable: false,
       is_outstanding: false,
     });
-    render(<InvoiceDetailPage />);
+    renderWithTheme(<InvoiceDetailPage />);
     await screen.findByText(/Invoice Details/i);
     expect(screen.queryByRole("button", { name: /Pay Now/i })).not.toBeInTheDocument();
   });
@@ -157,8 +187,44 @@ describe("InvoiceDetailPage — payability is served, not derived", () => {
     const stale = { ...ISSUED_INVOICE };
     delete stale.is_payable;
     mockGetInvoice.mockResolvedValue(stale);
-    render(<InvoiceDetailPage />);
+    renderWithTheme(<InvoiceDetailPage />);
     await screen.findByText(/Invoice Details/i);
     expect(screen.queryByRole("button", { name: /Pay Now/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("InvoiceDetailPage — Stripe fields follow the active theme", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.setItem("theme", "light");
+    mockLocation.search = "?action=pay";
+    mockGetInvoice.mockResolvedValue(ISSUED_INVOICE);
+    mockGetBankTransferDetails.mockResolvedValue({ success: true, data: { enabled: false } });
+    mockInitiateInvoicePayment.mockResolvedValue({
+      success: true,
+      data: { client_secret: "test-secret", transaction_id: "tx-1" },
+    });
+  });
+
+  test("updates card, placeholder, and invalid text colors when the theme changes", async () => {
+    renderWithTheme(<InvoiceDetailPage />);
+    fireEvent.click(await screen.findByRole("button", { name: /Pay Outstanding/i }));
+    const card = await screen.findByTestId("card-element");
+
+    expect(card).toHaveAttribute("data-text-color", "#1f2937");
+    expect(card).toHaveAttribute("data-placeholder-color", "#6b7280");
+    expect(card).toHaveAttribute("data-invalid-color", "#b91c1c");
+
+    fireEvent.click(screen.getByRole("button", { name: "Set dark theme" }));
+    await waitFor(() => {
+      expect(card).toHaveAttribute("data-text-color", "#f1f5f9");
+      expect(card).toHaveAttribute("data-placeholder-color", "#94a3b8");
+      expect(card).toHaveAttribute("data-invalid-color", "#f87171");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Set light theme" }));
+    await waitFor(() => {
+      expect(card).toHaveAttribute("data-text-color", "#1f2937");
+    });
   });
 });
